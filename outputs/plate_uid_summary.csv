@@ -1,0 +1,37 @@
+plate_uid,plate_name,set_category,total_units,out_units,available_units,size_ranges,availability
+ADT,Anterior Distal Tibia Plates,2.7-4.0,1,0,1,STANDARD(1/1),1/1
+APP,Anterior Patella Plates,2.7-4.0,2,0,2,"SMALL(1/1), STANDARD(1/1)",2/2
+CCOMBO,VA 3.5mm Calcaneal Plates II (Combo),2.7-4.0,1,0,1,STANDARD(1/1),1/1
+CHOOOK,VA 3.5mm Clavicle Hook Plates,2.7-4.0,2,0,2,STANDARD(2/2),2/2
+CMESH,VA 3.5mm Calcaneal Plates (Mesh),2.7-4.0,1,0,1,STANDARD(1/1),1/1
+DFIBII,VA 2.7/3.5mm Distal Lateral Fibular Plates II,2.7-4.0,6,3,3,"LONG(3/3), STANDARD(0/3)",3/6
+DFIBIII,VA 2.7/3.5mm Distal Lateral Fibular Plates III,2.7-4.0,6,3,3,"LONG(3/3), STANDARD(0/3)",3/6
+DIA,VA 3.5mm Clavicle Diaphysis Plates,2.7-4.0,2,0,2,STANDARD(2/2),2/2
+DLF,VA 4.5/5.0mm Distal Lateral Femur Plates,3.5-6.5,2,0,2,STANDARD(2/2),2/2
+DLHI,VA 2.7/3.5mm Distal Lateral Humeral Plates I,2.7-4.0,2,0,2,STANDARD(2/2),2/2
+DLHII,VA 2.7/3.5mm Distal Lateral Humeral Plates II,2.7-4.0,2,0,2,STANDARD(2/2),2/2
+DLT,VA 3.5mm Distal Lateral Tibia Plates,2.7-4.0,3,4,1,"EXTRA LONG(1/1), STANDARD(0/2)",1/3
+DLTII,2.7/3.5 Distal Lateral Tibia Plates,2.7-4.0,1,4,0,STANDARD(0/1),0/1
+DMH,VA 2.7/3.5mm Distal Medial Humeral Plates,2.7-4.0,2,1,1,STANDARD(1/2),1/2
+DMT,VA 2.7/3.5mm Distal Medial Tibia Plates II,2.7-4.0,3,2,1,"LONG(1/1), STANDARD(0/2)",1/3
+DPLH,VA 2.7/3.5mm Distal Posterior/Lateral Humeral Plates,2.7-4.0,2,1,1,STANDARD(1/2),1/2
+DPT,VA 3.5mm T-Type Distal Posterior Tibia Plates,2.7-4.0,1,0,1,STANDARD(1/1),1/1
+DRVL,2.4 DISTAL RADIUS VOLAR PLATES LONG,"2.4-2.7, 2.7-4.0",1,0,1,STANDARD(1/1),1/1
+DSC,VA 2.7/3.5mm Superior Anterior Clavicle Plates II,2.7-4.0,9,0,9,"LONG(3/3), SHORT(3/3), STANDARD(3/3)",9/9
+FIBHOOK,Distal Lateral Fibular Hook Plates,2.7-4.0,1,0,1,STANDARD(1/1),1/1
+FSP,VA 5.0mm Femur Straight Plates,3.5-6.5,7,1,6,"EXTRA LONG(1/1), LONG(2/2), SHORT(2/2), STANDARD(1/2)",6/7
+METAI,VA 3.5mm Metaphyseal Plates,2.7-4.0,1,0,1,STANDARD(1/1),1/1
+METAII,VA 3.5/4.5/5.0mm Metaphyseal Plates,3.5-6.5,1,0,1,STANDARD(1/1),1/1
+MSC,VA 3.5mm Superior Anterior Clavicle Plates MS Clavicle,2.7-4.0,3,0,3,STANDARD(3/3),3/3
+OLEI,VA 3.5mm Proximal Dorsal Ulna Plates Placa Olecranon,2.7-4.0,3,0,3,STANDARD(3/3),3/3
+OLEII,VA 3.5mm Proximal Dorsal Ulna Plates II Placa Olecranon,2.7-4.0,2,0,2,STANDARD(2/2),2/2
+PFP,VA 4.5/5.0/6.5mm Proximal Lateral Femur Plates,3.5-6.5,1,1,0,STANDARD(0/1),0/1
+PHILOS,VA 3.5mm Proximal Lateral Humeral Plates II,2.7-4.0,5,2,3,"EXTRA LONG(1/1), LONG(0/1), STANDARD(2/3)",3/5
+PLTI,VA 3.5/4.5/5.0mm Proximal Lateral Tibia Plates,3.5-6.5,4,1,3,"EXTRA LONG(1/1), LONG(1/1), STANDARD(1/2)",3/4
+PLTII,VA 4.5/5.0mm Proximal Lateral Tibia Plates II,3.5-6.5,2,1,1,STANDARD(1/2),1/2
+PMT,VA 4.5/5.0mm Proximal Medial Tibia Plates,3.5-6.5,3,1,2,"LONG(1/1), STANDARD(1/2)",2/3
+PPMT,VA 3.5mm Posteromedial Proximal Tibia Plates,2.7-4.0,2,1,1,STANDARD(1/2),1/2
+RECON,VA 3.5mm Reconstruction Plate,2.7-4.0,6,1,5,"LONG(3/3), STANDARD(2/3)",5/6
+TSP,VA 5.0mm Tibia Straight Plates,3.5-6.5,4,2,2,"EXTRA LONG(1/1), LONG(1/1), STANDARD(0/2)",2/4
+TUBULAR,VA 3.5mm 1/3 Tubular Plates,2.7-4.0,6,1,5,"LONG(3/3), STANDARD(2/3)",5/6
+URS,VA 3.5mm Ulna Radius Straight Plates,2.7-4.0,4,1,3,"LONG(1/1), STANDARD(2/3)",3/4

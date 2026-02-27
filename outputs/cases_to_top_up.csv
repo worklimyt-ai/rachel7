@@ -1,0 +1,4 @@
+case_id,prefix,hospital,patient_doctor,delivery_date,surgery_date,sales_code,return_date,status,smart_status,sets,sets_raw,plates,powertools
+C056,PC,HTJ,MUTHAYEE,,25/02/2026,SC61/02,,,⚪ PENDING ALLOCATION,PFN (9),PFN09,,P5503P
+C057,PC,HCJ,MASNI,,26/02/2026,,,,⚪ PENDING ALLOCATION,PFN (12),PFN12,,P55031010
+C058,PS,HMLK,HAERREY,,26/02/2026,,,,⚪ PENDING ALLOCATION,FNS (?),FNS,,

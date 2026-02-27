@@ -1,0 +1,136 @@
+hosp_code,name,region,lat,lng,office_to_hospital_km,tbs_to_hospital_km
+ABMC,Anson Bay Medical Centre,Perak,4.0158,101.0319,114.0,128.68
+ADMC,Ara Damansara Medical Centre,Selangor,3.1164,101.5758,10.13,15.66
+AHAS,Aurelius Hospital Alor Star,Kedah,6.1558,100.3956,357.67,372.0
+ALTY,ALTY Orthopaedic Hospital (Ampang),KL,3.16,101.7314,11.09,9.36
+AMC,Apollo Medical Centre,Penang,5.4189,100.3236,287.75,302.37
+BH,Beacon Hospital,KL,3.1097,101.6367,8.46,9.02
+BMC,Bintulu Medical Centre,Sarawak,3.1763,113.0441,1266.68,1258.29
+BSC,Bagan Specialist Centre,Penang,5.4094,100.3739,284.05,298.66
+BTMC,"Bukit Tinggi Medical Centre, Klang",Selangor,2.9994,101.4439,29.66,30.98
+CABJ,Columbia Asia Bukit Jalil,KL,3.0531,101.6733,15.36,5.08
+CABK,COLUMBIA ASIA SDN. BHD. BATU KAWAN,Penang,5.2344,100.4431,263.36,277.98
+CABR,Columbia Asia Bukit Rimau (Shah Alam),Selangor,2.9997,101.5283,23.84,22.14
+CAC,Columbia Asia Cheras,Selangor,3.0336,101.7619,22.02,7.47
+CAP,Columbia Asia Puchong,Selangor,3.0239,101.6214,18.06,11.69
+CAPJ,Columbia Asia Petaling Jaya,Selangor,3.1169,101.6353,7.66,9.5
+CAS,Columbia Asia Setapak,KL,3.2039,101.7119,8.78,13.98
+CASB,Columbia Asia Seremban,NS,2.7031,101.9122,61.88,47.29
+CAT,Columbia Asia Hospital Taiping,Perak,4.8631,100.7258,212.02,226.6
+CMH,CMH Specialist Hospital,NS,2.7267,101.9356,61.0,46.33
+DPCMC,Desa Park Medical Central,KL,3.1883,101.6272,0.9,15.42
+DSH,Damai Service Hospital,KL,3.1722,101.6917,6.48,10.69
+GHKL,Gleneagles Hospital KL,KL,3.1591,101.7364,11.65,9.41
+GHMJ,Gleneagles Hospital Medini Johor,Johor,1.4286,103.6267,295.2,280.93
+HA,Hospital Ampang,Selangor,3.1278,101.7618,15.49,7.85
+HAT,HOSPITAL ANGKATAN TENTERA,KL,3.1818,101.7289,10.44,11.68
+HB,Hospital Banting,Selangor,2.8127,101.5031,43.99,37.51
+HBLG,Hospital Baling,Kedah,5.6792,100.9169,288.45,302.34
+HBST,Hospital Besut,Terengganu,5.7606,102.5033,302.05,310.92
+HBTG,Hospital Bentong,Pahang,3.5244,101.9136,48.73,54.45
+HCJ,Hospital Cyberjaya,Selangor,2.9142,101.6285,30.21,20.43
+HFI,Hospital Fatimah,Perak,4.6133,101.1039,169.31,183.53
+HIAZ,Hospital Islam Az-Zahrah (Bangi),Selangor,2.9614,101.7547,28.27,13.84
+HJEM,Hospital Jempol,NS,2.7931,102.3925,94.78,81.99
+HJSN,Hospital Jasin,Melaka,2.3081,102.4331,131.85,117.28
+HKJ,Hospital Kajang,Selangor,2.9922,101.7892,27.51,12.87
+HKKB,Hospital Kuala Kubu Bharu,Selangor,3.5631,101.6578,42.03,54.25
+HKL,Hospital Kuala Lumpur,KL,3.1735,101.7041,7.8,10.63
+HKLPS,Hospital Kuala Lipis,Pahang,4.1853,102.0494,120.28,128.69
+HKMN,Hospital Kemaman,Terengganu,4.242,103.4218,230.44,229.7
+HKU,Hospital Kulim,Kedah,5.3711,100.5517,271.06,285.56
+HLWE,Lam Wah Ee,Penang,5.3917,100.3053,286.18,300.82
+HM,"Hospital Mersing, Johor Bahru",Johor,2.4296,103.8453,259.48,247.72
+HMLK,Hospital Melaka,Melaka,2.2172,102.2619,128.25,113.59
+HOSHAS,Hospital Sultan Haji Ahmad Shah (Temerloh),Pahang,3.4475,102.4086,90.68,87.61
+HOSZA,Universiti Sultan Zainal Abidin - UniSZA,Terengganu,5.3958,103.0817,293.46,299.16
+HPD,Hospital Port Dickson,NS,2.4594,101.8547,84.38,70.62
+HPDG,Hospital Pendang,Kedah,5.9872,100.4786,336.83,351.15
+HPI,Hospital Pantai Ipoh,Perak,4.6111,101.1217,168.4,182.58
+HPJ,Hospital Putrajaya,Putrajaya,2.9292,101.6742,28.86,17.08
+HPK,Hospital Pantai Klang,Selangor,3.0189,101.4422,28.33,30.62
+HPKK,Hospital Pakar Kanak-Kanak UKM,KL,3.0921,101.7225,14.25,1.97
+HPKN,Hospital Pekan,Pahang,3.4914,103.3892,197.68,191.82
+HPLM,Pantai Hospital Laguna Merbok,Kedah,5.6789,100.4958,304.63,319.05
+HPP,Hospital Pulau Pinang,Penang,5.4172,100.3117,288.25,302.88
+HPUPM,Hospital Pengajar UPM,Selangor,2.995,101.7241,23.41,9.35
+HPUSM,Hospital Pakar Universiti Sains Malaysia,Kelantan,6.1044,102.2858,332.45,342.47
+HQE1,Queen Elizabeth Hospital 1,Sabah,5.9592,116.0711,1629.38,1623.47
+HQE2,Queen Elizabeth Hospital 2,Sabah,5.9558,116.0894,1631.31,1625.39
+HRPB,Hospital Raja Permaisuri Bainun,Perak,4.6042,101.0906,168.89,183.14
+HRPZ,Hospital Raja Perempuan Zainab II (Kota Bharu),Kelantan,6.1264,102.2439,333.87,344.04
+HSA,Hospital Shah Alam,Selangor,3.0857,101.4827,20.24,25.42
+HSAH,Hospital Sultan Abdul Halim,Kedah,5.6669,100.5186,302.37,316.78
+HSAJB,"Hospital Sultanah Aminah, Johor Bahru",Johor,1.4586,103.7461,303.15,289.01
+HSB,Hospital Sultanah Bahiyah,Kedah,6.1492,100.4058,356.56,370.88
+HSBP,Hospital Seri Botani,Perak,4.5428,101.1058,161.91,176.18
+HSBU,Hospital Sungai Buloh,Selangor,3.2197,101.5831,6.88,21.24
+HSD,Hospital Serdang,Selangor,2.9764,101.7142,24.89,11.32
+HSGT,Hospital Segamat,Johor,2.5025,102.8222,152.18,138.97
+HSJ,Hospital Seberang Jaya,Penang,5.3944,100.4081,280.74,295.34
+HSM,Hospital Sri Manjung,Perak,4.1953,100.6658,155.45,169.99
+HSML,Hospital Sultanah Maliha,Kedah,6.3214,99.7992,403.65,418.28
+HSNZ,Hospital Sultanah Nur Zahirah (Kuala Terengganu),Terengganu,5.3248,103.1509,291.25,296.45
+HSR,Hospital Slim River,Perak,3.8294,101.4047,75.99,90.21
+HSY,Hospital Selayang,Selangor,3.2424,101.6447,6.39,19.71
+HTAA,Hospital Tengku Ampuan Afzan (Kuantan),Pahang,3.8016,103.3242,199.6,196.24
+HTAN,Hospital Tuanku Ampuan Najihah,NS,2.7411,102.2472,84.07,70.31
+HTAR,"Hospital Tengku Ampuan Rahimah, Klang",Selangor,3.0333,101.4431,27.23,30.22
+HTF,Hospital Tuanku Fauziah,Perlis,6.4409,100.1914,395.71,410.1
+HTI,Hospital Teluk Intan,Perak,3.9997,101.0206,113.31,127.99
+HTJ,Hospital Tuanku Ja'afar,NS,2.7183,101.9442,62.3,47.63
+HTK,Hospital Tanjong Karang,Selangor,3.4244,101.1764,57.4,70.79
+HTM,Hospital Tanah Merah,Kelantan,5.8117,102.1467,297.45,307.76
+HTPG,Hospital Taiping,Perak,4.8519,100.7414,210.11,224.68
+HUITMPA,Hospital UiTM Puncak Alam,Selangor,3.2038,101.4468,20.98,32.55
+HUKM,Hospital Canselor Tuanku Muhriz UKM/HCTM,KL,3.1026,101.7241,13.55,3.05
+HUTAR,Hospital Universiti Tunku Abdul Rahman,Perak,4.3414,101.1442,139.56,153.93
+IH,Island Hospital Penang,Penang,5.4142,100.3287,287.01,301.64
+IHP,Island Hospital,Penang,5.4217,100.3139,288.56,303.19
+KLS,Kek Lok Si Charitable Hospital,Penang,5.3975,100.2733,288.57,303.22
+KMC,Kedah Medical Centre,Kedah,6.1361,100.3739,356.58,370.94
+KMCJ,Kempas Medical JB,Johor,1.5436,103.7153,294.55,280.49
+KPJD,KPJ Damansara Specialist Hospital,Selangor,3.1344,101.6231,5.86,11.64
+KPJD2,Damansara Specialist Hospital 2 (KPJ Damansara 2),Selangor,3.1625,101.6319,2.61,12.89
+KPJIPH,KPJ Ipoh,Perak,4.6058,101.1136,168.16,182.36
+KPJJ,KPJ Johor Specialist Hospital,Johor,1.4939,103.7431,300.41,286.32
+KPJK,KPJ Klang Specialist Hospital,Selangor,3.0642,101.4656,23.16,27.35
+KPJKR,KPJ Specialist & Healthcare Centre Kinrara,Selangor,3.0489,101.6433,15.25,8.25
+KPJKS,KPJ Kuala Selangor Specialist Hospital,Selangor,3.3283,101.2586,44.68,57.47
+KPJP,KPJ Puteri Specialist Hospital (Johor),Johor,1.4981,103.7383,299.7,285.61
+KPJPHG,KPJ Pahang Specialist Hospital,Pahang,3.8214,103.3444,202.46,199.19
+KPJPLS,KPJ Perlis Specialist Hospital,Perlis,6.4319,100.1856,395.06,409.45
+KPJS,KPJ Sentosa KL,KL,3.1692,101.6975,7.19,10.24
+KPJSEL,KPJ Selangor,Selangor,3.0492,101.5358,18.76,19.78
+KPJSM,KPJ Sri Manjung Specialist Hospital,Perak,4.1953,100.6725,154.94,169.48
+KPJTWK,Tawakkal KL Specialist Hospital KPJ,KL,3.1764,101.7061,7.97,10.94
+KPMCK,Kajang Plaza Medical Centre (KPMC Kajang),Selangor,2.9917,101.7867,27.38,12.73
+KVSG,Klinik Vetenari dan Surgeri Goh,Perak,4.58,101.08,166.81,181.1
+LGL,Loh Guan Lye Specialist Centre,Penang,5.4206,100.3183,288.21,302.83
+MKMC,Mahkota Medical Centre,Melaka,2.1889,102.2514,130.29,115.64
+MMC,Mawar Medical Centre,NS,2.7194,101.9422,62.08,47.41
+MSH,Metro Specialist Hospital,Kedah,5.6358,100.5122,299.51,313.94
+MSU,MSU Medical Centre (Shah Alam),Selangor,3.0786,101.5514,15.1,17.78
+NMC,Aurelius Hospital Nilai,NS,2.8181,101.8037,44.97,30.68
+OSC,OSC Specialist Centre,KL,3.1364,101.6317,5.5,10.98
+PAH,Penang Adventist Hospital,Penang,5.4328,100.3056,290.09,304.72
+PCMC,Pantai Cheras Medical Centre,KL,3.1039,101.7425,15.02,4.47
+PCSH,Perak Community Specialist Hospital,Perak,4.5936,101.0967,167.54,181.79
+PHP,Pantai Hospital Penang,Penang,5.3214,100.2858,280.66,295.32
+PHSM,Pantai Manjung,Perak,4.1883,100.6739,154.27,168.81
+PMC,Putra Medical Centre,Kedah,6.1217,100.3664,355.44,369.8
+PRCMC,Prince Court Medical Centre,KL,3.1484,101.7169,10.0,7.83
+SGH,SARAWAK GENERAL HOSPITAL,Sarawak,1.5439,110.3369,983.84,973.35
+SJMC,Subang Jaya Medical Centre,Selangor,3.0764,101.5953,12.94,12.91
+SKMC,Sri Kota Specialist Medical Centre (Klang),Selangor,3.0417,101.4489,26.14,29.44
+SLSH,SG Long Medical Centre,Selangor,3.0278,101.8025,25.59,11.55
+SMCP,Sunway Medical Centre Penang,Penang,5.3725,100.3989,279.12,293.72
+SMSJ,Sunway Medical Centre Subang Jaya,Selangor,3.0658,101.6072,13.69,11.67
+SMV,Sunway Medical Centre Velocity,KL,3.1258,101.7247,11.99,5.49
+SSAH,Salam Shah Alam Specialist Hospital,Selangor,3.0536,101.5256,19.06,20.83
+SSH,Sentosa Specialist Hospital Klang,Selangor,3.0231,101.4722,25.57,27.27
+SSSH,Salam Senawang Specialist Hospital,NS,2.6886,101.9758,67.0,52.32
+THKD,Thomson Hospital Kota Damansara,Selangor,3.1492,101.5778,7.54,16.82
+UCSI,UCSI Hospital (Port Dickson),NS,2.5539,101.7944,72.46,59.02
+UKMSC,UKM Specialist Centre,KL,3.0927,101.7214,14.12,1.95
+UPSC,UiTM Private Specialist Centre,Selangor,3.2206,101.5831,6.94,21.31
