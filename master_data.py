@@ -6223,7 +6223,7 @@ PLATES = {
 
     # CHOOOK - VA 3.5mm Clavicle Hook Plates
     "52201335": {
-        "uid": "CHOOOK",
+        "uid": "CHOOK",
         "set": "2.7-4.0",
         "proper_name": "VA 3.5mm Clavicle Hook Plates",
         "screw_sizes": "3.5mm",
@@ -6233,7 +6233,7 @@ PLATES = {
         "location": "D2, D3"
     },
     "52201365": {
-        "uid": "CHOOOK",
+        "uid": "CHOOK",
         "set": "2.7-4.0",
         "proper_name": "VA 3.5mm Clavicle Hook Plates",
         "screw_sizes": "3.5mm",
@@ -6243,7 +6243,7 @@ PLATES = {
         "location": "D2, D3"
     },
     "52201345": {
-        "uid": "CHOOOK",
+        "uid": "CHOOK",
         "set": "2.7-4.0",
         "proper_name": "VA 3.5mm Clavicle Hook Plates",
         "screw_sizes": "3.5mm",
@@ -6253,7 +6253,7 @@ PLATES = {
         "location": "D2, D3"
     },
     "52201375": {
-        "uid": "CHOOOK",
+        "uid": "CHOOK",
         "set": "2.7-4.0",
         "proper_name": "VA 3.5mm Clavicle Hook Plates",
         "screw_sizes": "3.5mm",
@@ -6263,7 +6263,7 @@ PLATES = {
         "location": "D2, D3"
     },
     "52201336": {
-        "uid": "CHOOOK",
+        "uid": "CHOOK",
         "set": "2.7-4.0",
         "proper_name": "VA 3.5mm Clavicle Hook Plates",
         "screw_sizes": "3.5mm",
@@ -6273,7 +6273,7 @@ PLATES = {
         "location": "D3"
     },
     "52201366": {
-        "uid": "CHOOOK",
+        "uid": "CHOOK",
         "set": "2.7-4.0",
         "proper_name": "VA 3.5mm Clavicle Hook Plates",
         "screw_sizes": "3.5mm",
@@ -6283,7 +6283,7 @@ PLATES = {
         "location": "D3"
     },
     "52201346": {
-        "uid": "CHOOOK",
+        "uid": "CHOOK",
         "set": "2.7-4.0",
         "proper_name": "VA 3.5mm Clavicle Hook Plates",
         "screw_sizes": "3.5mm",
@@ -6293,7 +6293,7 @@ PLATES = {
         "location": "D3"
     },
     "52201376": {
-        "uid": "CHOOOK",
+        "uid": "CHOOK",
         "set": "2.7-4.0",
         "proper_name": "VA 3.5mm Clavicle Hook Plates",
         "screw_sizes": "3.5mm",
@@ -6303,7 +6303,7 @@ PLATES = {
         "location": "D3"
     },
     "52201337": {
-        "uid": "CHOOOK",
+        "uid": "CHOOK",
         "set": "2.7-4.0",
         "proper_name": "VA 3.5mm Clavicle Hook Plates",
         "screw_sizes": "3.5mm",
@@ -6313,7 +6313,7 @@ PLATES = {
         "location": "D3"
     },
     "52201367": {
-        "uid": "CHOOOK",
+        "uid": "CHOOK",
         "set": "2.7-4.0",
         "proper_name": "VA 3.5mm Clavicle Hook Plates",
         "screw_sizes": "3.5mm",
@@ -6323,7 +6323,7 @@ PLATES = {
         "location": "D3"
     },
     "52201347": {
-        "uid": "CHOOOK",
+        "uid": "CHOOK",
         "set": "2.7-4.0",
         "proper_name": "VA 3.5mm Clavicle Hook Plates",
         "screw_sizes": "3.5mm",
@@ -6333,7 +6333,7 @@ PLATES = {
         "location": "D3"
     },
     "52201377": {
-        "uid": "CHOOOK",
+        "uid": "CHOOK",
         "set": "2.7-4.0",
         "proper_name": "VA 3.5mm Clavicle Hook Plates",
         "screw_sizes": "3.5mm",
