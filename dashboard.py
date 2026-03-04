@@ -6,6 +6,7 @@ Run: streamlit run dashboard.py
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 st.set_page_config(
@@ -130,6 +131,8 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
 """, unsafe_allow_html=True)
 
 KL_TZ = ZoneInfo("Asia/Kuala_Lumpur")
+APP_BUILD_TAG = "ATC-INOFFICE-v1-2026-03-04"
+APP_FILE = str(Path(__file__).resolve())
 
 # Powertool categories — excluded from the Sets tab
 _POWERTOOL_CATS = {"P5503", "P5400", "P8400"}
@@ -284,6 +287,7 @@ with col_time:
         f"{now_kl.strftime('%A, %d %b %Y  %H:%M')} KL</div>",
         unsafe_allow_html=True,
     )
+st.caption(f"Build: {APP_BUILD_TAG} | Running file: {APP_FILE}")
 st.divider()
 
 
