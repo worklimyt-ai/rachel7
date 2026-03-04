@@ -467,6 +467,11 @@ def summarize_cases(
         }
         has_uid_set      = bool(uid_hit_by_key)
         has_shorthand_only = bool(shorthand_hit_keys) and not has_uid_set
+        set_categories = sorted({
+            str(item.get("category", "")).strip()
+            for item in list(uid_hit_by_key.values()) + shorthand_hits
+            if str(item.get("category", "")).strip()
+        })
 
         case_id       = f"C{idx:03d}"
         hospital_code = normalize_code(row.get("hospital", ""))
@@ -490,6 +495,7 @@ def summarize_cases(
             "powertools_raw":   str(row.get("powertools") or row.get("powertool", "")).strip(),
             "has_uid_set":      has_uid_set,
             "has_shorthand_only": has_shorthand_only,
+            "set_categories":   set_categories,
             "set_uid_tokens":   sorted({item["_uid_norm"] for item in uid_hit_by_key.values()}),
             "set_shorthand_tokens": sorted(shorthand_hit_keys),
             # internal date objects (stripped before export)
@@ -946,6 +952,7 @@ def build_case_buckets(
             "smart_status":  case["smart_status"],
             "sets":          case["sets_display"],
             "sets_raw":      case["sets_raw"],
+            "set_categories":case.get("set_categories", []),
             "plates":        case["plates_raw"],
             "powertools":    case["powertools_raw"],
         }
@@ -1094,6 +1101,27 @@ def build_operations_report(
         ),
     }
 
+    cases_all = [
+        {
+            "case_id":            c["case_id"],
+            "prefix":             c["prefix"],
+            "hospital":           c["hospital"],
+            "patient_doctor":     c["patient_doctor"],
+            "delivery_date":      c["delivery_date"],
+            "surgery_date":       c["surgery_date"],
+            "sales_code":         c["sales_code"],
+            "return_date":        c["return_date"],
+            "status":             c["status"],
+            "smart_status":       c["smart_status"],
+            "sets_raw":           c["sets_raw"],
+            "sets":               c["sets_display"],
+            "set_categories":     c.get("set_categories", []),
+            "has_uid_set":        c["has_uid_set"],
+            "has_shorthand_only": c["has_shorthand_only"],
+        }
+        for c in case_summary["parsed_cases"]
+    ]
+
     return {
         "meta": {
             "timezone":    "Asia/Kuala_Lumpur",
@@ -1136,6 +1164,7 @@ def build_operations_report(
         "powertool_delivered":            powertool_outputs["powertool_delivered"],
         "powertool_usage_30d":            powertool_outputs["powertool_usage_30d"],
         "hospital_directory":             hospital_directory,
+        "cases_all":                      cases_all,
         "case_buckets":                   case_buckets,
         "distance_routes": {
             "to_deliver_tomorrow": deliver_tomorrow_rows,
@@ -1190,6 +1219,7 @@ def write_report_files(report: dict[str, Any], output_dir: str | Path) -> dict[s
         "powertool_delivered.csv":            report["powertool_delivered"],
         "powertool_usage_30d.csv":            report["powertool_usage_30d"],
         "hospital_directory.csv":             report["hospital_directory"],
+        "cases_all.csv":                      report.get("cases_all", []),
         "distance_to_deliver_tomorrow.csv":   report["distance_routes"]["to_deliver_tomorrow"],
         "distance_delivered_today.csv":       report["distance_routes"]["delivered_today"],
         "unknown_set_tokens.csv":             report["unknown"]["set_tokens"],
