@@ -1,5 +1,5 @@
 """
-dashboard.py  –  Osteo Ops Commander Dashboard
+dashboard.py  –  CHECKSETGO
 Run: streamlit run dashboard.py
 """
 
@@ -10,7 +10,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 st.set_page_config(
-    page_title="Osteo Ops",
+    page_title="CHECKSETGO",
     page_icon="🦴",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -131,7 +131,7 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
 """, unsafe_allow_html=True)
 
 KL_TZ = ZoneInfo("Asia/Kuala_Lumpur")
-APP_BUILD_TAG = "ATC-INOFFICE-v1-2026-03-04"
+APP_BUILD_TAG = "CHECKSETGO-v1-2026-03-04"
 APP_FILE = str(Path(__file__).resolve())
 
 # Powertool categories — excluded from the Sets tab
@@ -280,7 +280,7 @@ if not set_status_df.empty:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 col_title, col_time = st.columns([3, 1])
 with col_title:
-    st.markdown("## 🦴 Osteo Ops — Commander Dashboard")
+    st.markdown("## CHECKSETGO")
 with col_time:
     st.markdown(
         f"<div style='text-align:right;color:#6b7280;font-size:13px;padding-top:14px'>"
@@ -497,17 +497,16 @@ with inv_tabs[0]:
             left_df = _group_side(in_office, with_hospital=False)
             right_df = _group_side(out_case, with_hospital=True)
 
-            st.markdown("##### Office Split View")
-            col_l, col_r = st.columns(2)
-            with col_l:
-                st.markdown("**In Office**")
-                st.metric("Total In Office", int(in_office.shape[0]))
-                st.dataframe(left_df, use_container_width=True, hide_index=True)
-            with col_r:
-                st.markdown("**Out For Cases**")
-                st.metric("Total Out For Cases", int(out_case.shape[0]))
-                st.dataframe(right_df, use_container_width=True, hide_index=True)
-            st.markdown("---")
+            with st.expander("Office Split View (In vs Out)", expanded=False):
+                col_l, col_r = st.columns(2)
+                with col_l:
+                    st.markdown("**In Office**")
+                    st.metric("Total In Office", int(in_office.shape[0]))
+                    st.dataframe(left_df, use_container_width=True, hide_index=True)
+                with col_r:
+                    st.markdown("**Out For Cases**")
+                    st.metric("Total Out For Cases", int(out_case.shape[0]))
+                    st.dataframe(right_df, use_container_width=True, hide_index=True)
 
         # Exclude powertool categories
         set_avail = set_avail[
@@ -753,189 +752,179 @@ with inv_tabs[2]:
 # ── In Office (ordered control list) ─────────────────────────────────────────
 with inv_tabs[3]:
     office_df = pd.DataFrame(report.get("set_office_status", []))
-    if office_df.empty:
+    set_avail_df = pd.DataFrame(report.get("set_category_availability", []))
+    pt_avail_df = pd.DataFrame(report.get("powertool_category_availability", []))
+    pt_del_df = pd.DataFrame(report.get("powertool_delivered", []))
+
+    if office_df.empty and set_avail_df.empty and pt_avail_df.empty:
         st.info("No set data.")
     else:
         office_df = office_df.copy()
-        if "location_now" not in office_df.columns:
-            office_df["location_now"] = ""
-        if "category" not in office_df.columns:
-            office_df["category"] = ""
-        if "set_display" not in office_df.columns:
-            office_df["set_display"] = office_df.get("id", "")
-        if "id" not in office_df.columns:
-            office_df["id"] = ""
-
+        for col in ("location_now", "category", "set_display", "id"):
+            if col not in office_df.columns:
+                office_df[col] = ""
+        office_df["category_norm"] = office_df["category"].astype(str).str.upper().str.strip()
         office_df["location_norm"] = office_df["location_now"].astype(str).str.upper().str.strip()
         office_df["set_name"] = office_df["set_display"].astype(str).where(
             office_df["set_display"].astype(str).str.strip().ne(""),
             office_df["id"].astype(str),
         )
 
-        categories_in_data = office_df["category"].astype(str).dropna().unique().tolist()
-        ordered_categories = OFFICE_VIEW_ORDER + [
-            c for c in categories_in_data if c not in OFFICE_VIEW_ORDER
-        ]
+        def _safe_int(val) -> int:
+            num = pd.to_numeric(val, errors="coerce")
+            return int(num) if pd.notna(num) else 0
 
-        rows = []
-        for category in ordered_categories:
-            cat_rows = office_df[office_df["category"] == category]
-            total = int(len(cat_rows))
-            office_rows = cat_rows[cat_rows["location_norm"] == "OFFICE"]
-            office_count = int(len(office_rows))
-            office_list = "; ".join(sorted(office_rows["set_name"].astype(str).tolist()))
-            rows.append({
-                "Category": category,
-                "Total": total,
-                "In Office": office_count,
-                "In Office List": office_list,
+        set_avail_lookup: dict[str, int] = {}
+        if not set_avail_df.empty and "category" in set_avail_df.columns:
+            for _, r in set_avail_df.iterrows():
+                key = str(r.get("category", "")).upper().strip()
+                if key:
+                    set_avail_lookup[key] = _safe_int(r.get("available", 0))
+
+        pt_avail_lookup: dict[str, int] = {}
+        if not pt_avail_df.empty and "category" in pt_avail_df.columns:
+            for _, r in pt_avail_df.iterrows():
+                key = str(r.get("category", "")).upper().strip()
+                if key:
+                    pt_avail_lookup[key] = _safe_int(r.get("available", 0))
+
+        pt_out_lookup: dict[str, int] = {}
+        pt_out_detail: dict[str, str] = {}
+        if not pt_del_df.empty and "category" in pt_del_df.columns:
+            for cat, grp in pt_del_df.groupby(pt_del_df["category"].astype(str).str.upper().str.strip()):
+                pt_out_lookup[str(cat)] = int(len(grp))
+                pt_out_detail[str(cat)] = "; ".join(
+                    sorted([
+                        f"{str(rr.get('powertool_uid', '')).strip() or 'UID'}@{str(rr.get('hospital', '')).strip() or 'OUT'}"
+                        for _, rr in grp.iterrows()
+                    ])
+                )
+
+        display_by_norm: dict[str, str] = {c.upper(): c for c in OFFICE_VIEW_ORDER}
+        for src_df in (office_df, set_avail_df, pt_avail_df):
+            if "category" in src_df.columns:
+                for cat in src_df["category"].astype(str).tolist():
+                    cat_norm = str(cat).upper().strip()
+                    if cat_norm and cat_norm not in display_by_norm:
+                        display_by_norm[cat_norm] = str(cat).strip()
+
+        ordered_norm = [c.upper() for c in OFFICE_VIEW_ORDER]
+        extra_norm = sorted([n for n in display_by_norm if n not in ordered_norm])
+        ordered_norm.extend(extra_norm)
+
+        shelf_rows = []
+        for cat_norm in ordered_norm:
+            display = display_by_norm.get(cat_norm, cat_norm)
+            is_powertool = cat_norm in _POWERTOOL_CATS
+            if is_powertool:
+                in_count = pt_avail_lookup.get(cat_norm, 0)
+                out_count = pt_out_lookup.get(cat_norm, 0)
+                available = pt_avail_lookup.get(cat_norm, 0)
+                in_list = ""
+                out_list = pt_out_detail.get(cat_norm, "")
+                total = in_count + out_count
+            else:
+                cat_rows = office_df[office_df["category_norm"] == cat_norm]
+                in_rows = cat_rows[cat_rows["location_norm"] == "OFFICE"]
+                out_rows = cat_rows[
+                    (cat_rows["location_norm"] != "OFFICE")
+                    & (cat_rows["location_norm"] != "")
+                ]
+                in_count = int(len(in_rows))
+                out_count = int(len(out_rows))
+                available = set_avail_lookup.get(cat_norm, in_count)
+                in_list = "; ".join(sorted(in_rows["set_name"].astype(str).tolist()))
+                out_list = "; ".join(
+                    sorted([
+                        f"{str(r['set_name'])}@{str(r['location_now']).strip() or 'OUT'}"
+                        for _, r in out_rows.iterrows()
+                    ])
+                )
+                total = int(len(cat_rows))
+
+            if (
+                total == 0
+                and available == 0
+                and cat_norm not in [c.upper() for c in OFFICE_VIEW_ORDER]
+            ):
+                continue
+
+            shelf_rows.append({
+                "Category": display,
+                "In": in_count,
+                "Out": out_count,
+                "Available": available,
+                "In Details": in_list,
+                "Out Details": out_list,
             })
 
-        out = pd.DataFrame(rows)
-        if search_query:
-            out = out[
-                out["Category"].str.contains(search_query, case=False, na=False)
-                | out["In Office List"].str.contains(search_query, case=False, na=False)
+        shelf_df = pd.DataFrame(shelf_rows)
+        if search_query and not shelf_df.empty:
+            shelf_df = shelf_df[
+                shelf_df["Category"].str.contains(search_query, case=False, na=False)
+                | shelf_df["In Details"].str.contains(search_query, case=False, na=False)
+                | shelf_df["Out Details"].str.contains(search_query, case=False, na=False)
             ]
 
-        top1, top2 = st.columns(2)
-        with top1:
-            st.metric("Categories in View", int(len(out)))
-        with top2:
-            st.metric("Total Sets In Office", int(out["In Office"].sum()) if not out.empty else 0)
+        st.caption("Shelf order follows your requested sequence.")
+        st.dataframe(shelf_df, use_container_width=True, hide_index=True)
 
-        st.dataframe(out, use_container_width=True, hide_index=True)
+        def _avail_total(category_keys: list[str]) -> int:
+            total = 0
+            for key in category_keys:
+                key_norm = str(key).upper().strip()
+                if key_norm in _POWERTOOL_CATS:
+                    total += pt_avail_lookup.get(key_norm, 0)
+                else:
+                    total += set_avail_lookup.get(key_norm, 0)
+            return int(total)
 
-
-def render_non_office_assets_overview() -> None:
-    st.markdown("<div class='sec-header'>Asset Overview — Homes Not OFFICE</div>", unsafe_allow_html=True)
-
-    asset_df = pd.DataFrame(report.get("set_office_status", []))
-    if asset_df.empty:
-        st.info("No asset data.")
-        return
-
-    asset_df = asset_df.copy()
-    for col in (
-        "home", "location_now", "category", "set_display", "id", "set_status",
-        "case_id", "patient_doctor", "surgery_date", "days_since_surgery",
-    ):
-        if col not in asset_df.columns:
-            asset_df[col] = ""
-
-    asset_df["home_norm"] = asset_df["home"].astype(str).str.upper().str.strip()
-    asset_df["location_norm"] = asset_df["location_now"].astype(str).str.upper().str.strip()
-    asset_df["set_name"] = asset_df["set_display"].astype(str).where(
-        asset_df["set_display"].astype(str).str.strip().ne(""),
-        asset_df["id"].astype(str),
-    )
-
-    # "Home not OFFICE" register for ownership overview
-    non_office_home = asset_df[
-        asset_df["home_norm"].ne("OFFICE") & asset_df["home_norm"].ne("")
-    ].copy()
-    non_office_home["in_office_now"] = non_office_home["location_norm"].eq("OFFICE")
-    non_office_home["out_now"] = non_office_home["location_norm"].ne("OFFICE")
-
-    # "Currently not in OFFICE" operational list (all homes)
-    currently_out = asset_df[
-        asset_df["location_norm"].ne("OFFICE") & asset_df["location_norm"].ne("")
-    ].copy()
-
-    if search_query:
-        non_office_home = non_office_home[
-            non_office_home["set_name"].str.contains(search_query, case=False, na=False)
-            | non_office_home["category"].str.contains(search_query, case=False, na=False)
-            | non_office_home["home"].str.contains(search_query, case=False, na=False)
-            | non_office_home["location_now"].str.contains(search_query, case=False, na=False)
-            | non_office_home["patient_doctor"].str.contains(search_query, case=False, na=False)
-            | non_office_home["case_id"].str.contains(search_query, case=False, na=False)
+        copy_lines = ["*Office Sets availability*", ""]
+        copy_map: list[tuple[str, list[str]]] = [
+            ("Comus mini 1.5", ["1.5-2.0"]),
+            ("Comus mini 2.0", ["2.0-2.4"]),
+            ("2.4", ["2.4-2.7"]),
+            ("2.7", ["2.7-4.0"]),
+            ("3.5", ["3.5-6.5"]),
+            ("Canna 2.5", ["CANNA 2.5"]),
+            ("Canna 3.5", ["CANNA 3.5"]),
+            ("Canna 4.0", ["CANNA 4.0"]),
+            ("Canna 5.2", ["CANNA 5.2"]),
+            ("Std canna 2.4", ["STD CANNA 2.4"]),
+            ("Std canna 3.0", ["STD CANNA 3.0"]),
+            ("Std canna 4.0", ["STD CANNA 4.0"]),
+            ("~Std canna 6.5", ["STD CANNA 6.5/7.3"]),
+            ("PFN", ["PFN"]),
+            ("Reamer set", ["REAMER"]),
+            ("ILN Femur", ["ILN FEMUR"]),
+            ("ILN Tibia", ["ILN TIBIA"]),
+            ("ILN Humerus", ["ILN HUMERUS"]),
+            ("ILN Radius & Ulna", ["ILN RADIUS ULNA"]),
+            ("TENS", ["TENS"]),
+            ("Fibular Nail", ["FIBULAR NAIL"]),
+            ("FNS", ["FNS"]),
+            ("Foot set", ["FOOT SET"]),
+            ("Distal Femoral", ["DISTAL FEMORAL"]),
+            ("PFN ll 170-240", ["PFN II 170-240"]),
+            ("PFN ll 340-420", ["PFN II 340-420 SYSTEM", "PFN II 340-420 IMPLANT"]),
+            ("Ankle Nail", ["ANKLE ARTHRODESIS NAIL"]),
+            ("Coatlmon Cable", ["COATLMON CABLE SYSTEM"]),
+            ("ROI", ["ROI"]),
         ]
-        currently_out = currently_out[
-            currently_out["set_name"].str.contains(search_query, case=False, na=False)
-            | currently_out["category"].str.contains(search_query, case=False, na=False)
-            | currently_out["home"].str.contains(search_query, case=False, na=False)
-            | currently_out["location_now"].str.contains(search_query, case=False, na=False)
-            | currently_out["patient_doctor"].str.contains(search_query, case=False, na=False)
-            | currently_out["case_id"].str.contains(search_query, case=False, na=False)
-        ]
+        for label, keys in copy_map:
+            copy_lines.append(f"{label} - {_avail_total(keys)}")
+        copy_lines.append("Power")
+        copy_lines.append(f"5503B (normal) - {_avail_total(['P5503'])}")
+        copy_lines.append(f"5400 (kwire) - {_avail_total(['P5400'])}")
+        copy_lines.append(f"8400 (handpiece) - {_avail_total(['P8400'])}")
 
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Home!=OFFICE Assets", int(non_office_home.shape[0]))
-    m2.metric("Home!=OFFICE In OFFICE Now", int(non_office_home["in_office_now"].sum()) if not non_office_home.empty else 0)
-    m3.metric("Home!=OFFICE Out Now", int(non_office_home["out_now"].sum()) if not non_office_home.empty else 0)
-    m4.metric("Currently Out (All Homes)", int(currently_out.shape[0]))
-
-    home_summary = (
-        non_office_home.groupby("home", dropna=False)
-        .agg(
-            total_assets=("set_name", "count"),
-            in_office_now=("in_office_now", "sum"),
-            out_now=("out_now", "sum"),
-            categories=("category", lambda s: ", ".join(sorted(set([str(x) for x in s if str(x).strip()])))),
-        )
-        .reset_index()
-        .sort_values(["home"])
-        if not non_office_home.empty
-        else pd.DataFrame(columns=["home", "total_assets", "in_office_now", "out_now", "categories"])
-    )
-
-    st.markdown("##### Home Register Summary")
-    st.dataframe(
-        home_summary.rename(columns={
-            "home": "Home", "total_assets": "Total Assets",
-            "in_office_now": "In OFFICE Now", "out_now": "Out Now", "categories": "Categories",
-        }),
-        use_container_width=True,
-        hide_index=True,
-    )
-
-    st.markdown("##### Home!=OFFICE Asset Detail")
-    st.dataframe(
-        non_office_home[[
-            "set_name", "category", "home", "location_now", "set_status",
-            "case_id", "patient_doctor", "surgery_date", "days_since_surgery",
-        ]].rename(columns={
-            "set_name": "Set", "category": "Category", "home": "Home",
-            "location_now": "Current Location", "set_status": "Set Status",
-            "case_id": "Case", "patient_doctor": "Patient/Doctor",
-            "surgery_date": "Surgery", "days_since_surgery": "Days Out",
-        }),
-        use_container_width=True,
-        hide_index=True,
-    )
-
-    st.markdown("##### Currently Not In OFFICE (All Homes)")
-    st.dataframe(
-        currently_out[[
-            "set_name", "category", "home", "location_now", "set_status",
-            "case_id", "patient_doctor", "surgery_date", "days_since_surgery",
-        ]].rename(columns={
-            "set_name": "Set", "category": "Category", "home": "Home",
-            "location_now": "Current Location", "set_status": "Set Status",
-            "case_id": "Case", "patient_doctor": "Patient/Doctor",
-            "surgery_date": "Surgery", "days_since_surgery": "Days Out",
-        }),
-        use_container_width=True,
-        hide_index=True,
-    )
+        st.markdown("##### Copy Block")
+        st.code("\n".join(copy_lines), language="text")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # SECTION 3 — SCHEDULE
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-st.markdown("<div class='sec-header'>Schedule</div>", unsafe_allow_html=True)
-
-sched_tabs = st.tabs([
-    "✅ Delivered Today",
-    "🚚 To Deliver",
-    "📅 Tomorrow",
-    "↩️ To Collect",
-    "🔎 To Follow Up",
-    "⚠️ To Check",
-    "🔋 To Top Up",
-])
-
 _CASE_COLS = [
     "case_id", "hospital", "patient_doctor",
     "delivery_date", "surgery_date", "sales_code",
@@ -965,21 +954,28 @@ def _render_bucket(tab_obj, bucket_key: str):
             use_container_width=True, hide_index=True,
         )
 
-_render_bucket(sched_tabs[0], "delivered_today")
-_render_bucket(sched_tabs[1], "to_deliver")
-_render_bucket(sched_tabs[2], "to_deliver_tomorrow")
-_render_bucket(sched_tabs[3], "to_collect")
-_render_bucket(sched_tabs[4], "to_follow_up")
-_render_bucket(sched_tabs[5], "to_check")
-_render_bucket(sched_tabs[6], "to_top_up")
+with st.expander("Schedule", expanded=False):
+    sched_tabs = st.tabs([
+        "✅ Delivered Today",
+        "🚚 To Deliver",
+        "📅 Tomorrow",
+        "↩️ To Collect",
+        "🔎 To Follow Up",
+        "⚠️ To Check",
+        "🔋 To Top Up",
+    ])
+    _render_bucket(sched_tabs[0], "delivered_today")
+    _render_bucket(sched_tabs[1], "to_deliver")
+    _render_bucket(sched_tabs[2], "to_deliver_tomorrow")
+    _render_bucket(sched_tabs[3], "to_collect")
+    _render_bucket(sched_tabs[4], "to_follow_up")
+    _render_bucket(sched_tabs[5], "to_check")
+    _render_bucket(sched_tabs[6], "to_top_up")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # SECTION 4 — ROUTES
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-st.markdown("<div class='sec-header'>Routes</div>", unsafe_allow_html=True)
-route_tabs = st.tabs(["📅 Tomorrow – Delivery", "✅ Today – Delivered"])
-
 def _render_route(tab_obj, route_key: str):
     with tab_obj:
         rows = pd.DataFrame(report["distance_routes"][route_key])
@@ -1006,8 +1002,10 @@ def _render_route(tab_obj, route_key: str):
             use_container_width=True, hide_index=True,
         )
 
-_render_route(route_tabs[0], "to_deliver_tomorrow")
-_render_route(route_tabs[1], "delivered_today")
+with st.expander("Routes", expanded=False):
+    route_tabs = st.tabs(["📅 Tomorrow – Delivery", "✅ Today – Delivered"])
+    _render_route(route_tabs[0], "to_deliver_tomorrow")
+    _render_route(route_tabs[1], "delivered_today")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1058,9 +1056,6 @@ if search_query:
             }),
             use_container_width=True, hide_index=True,
         )
-
-render_non_office_assets_overview()
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Footer
