@@ -62,7 +62,7 @@ SETS = [
     {"category": "2.7-4.0", "id": "21", "home": "SARAWAK", "uid": "2.721", "shorthand": "2.7"},
     {"category": "2.7-4.0", "id": "22", "home": "UNCF", "uid": "2.722", "shorthand": "2.7"},
     {"category": "2.7-4.0", "id": "23", "home": "OFFICE", "uid": "2.723", "shorthand": "2.7"},
-    {"category": "2.7-4.0", "id": "24", "home": "OFFICE", "uid": "2.724", "shorthand": "2.7"},
+    {"category": "2.7-4.0", "id": "24", "home": "QAYYUM", "uid": "2.724", "shorthand": "2.7"},
     {"category": "2.7-4.0", "id": "25", "home": "CAC", "uid": "2.725", "shorthand": "2.7"},
     {"category": "2.7-4.0", "id": "26", "home": "HSM", "uid": "2.726", "shorthand": "2.7"},
     {"category": "2.7-4.0", "id": "27", "home": "SARAWAK", "uid": "2.727", "shorthand": "2.7"},
@@ -8539,7 +8539,7 @@ HOSPITALS = {
     'HB': {'name': 'Hospital Banting', 'lat': 2.8127, 'lng': 101.5031, 'region': 'Selangor'},
     'HTK': {'name': 'Hospital Tanjong Karang', 'lat': 3.4244, 'lng': 101.1764, 'region': 'Selangor'},
     'HKKB': {'name': 'Hospital Kuala Kubu Bharu', 'lat': 3.5631, 'lng': 101.6578, 'region': 'Selangor'},
-    'SKSM': {'name': 'Sri Kota Specialist Medical Centre', 'lat': 3.0404, 'lng': 101.4456, 'region': 'Selangor'},
+    'SKMC': {'name': 'Sri Kota Specialist Medical Centre', 'lat': 3.0404, 'lng': 101.4456, 'region': 'Selangor'},
 
     # SEREMBAN [cite: 1]
     'HTJ': {'name': "Hospital Tuanku Ja'afar", 'lat': 2.7183, 'lng': 101.9442, 'region': 'NS'},

@@ -134,6 +134,48 @@ KL_TZ = ZoneInfo("Asia/Kuala_Lumpur")
 # Powertool categories — excluded from the Sets tab
 _POWERTOOL_CATS = {"P5503", "P5400", "P8400"}
 
+# Priority order for "In Office" control-tower view
+OFFICE_VIEW_ORDER = [
+    "STD CANNA 6.5/7.3",
+    "STD CANNA 4.0",
+    "STD CANNA 2.4",
+    "STD CANNA 3.0",
+    "RFN",
+    "PFN II 170-240",
+    "PFN II 340-420 SYSTEM",
+    "PFN II 340-420 IMPLANT",
+    "ANKLE ARTHRODESIS NAIL",
+    "COATLMON CABLE SYSTEM",
+    "FOOT SET",
+    "FOOT INSTRUMENT",
+    "PFN II NAIL REMOVAL",
+    "P5503",
+    "P5400",
+    "P8400",
+    "FIBULAR NAIL",
+    "FNS",
+    "ROI",
+    "2.7-4.0",
+    "3.5-6.5",
+    "PFN",
+    "LONG PFN",
+    "REAMER",
+    "ILN TIBIA SUPSUB",
+    "ILN HUMERUS",
+    "2.4-2.7",
+    "1.5-2.0",
+    "ILN RADIUS ULNA",
+    "2.0-2.4",
+    "2.0 ONLY",
+    "TENS",
+    "CANNA 2.5",
+    "CANNA 3.5",
+    "CANNA 4.0",
+    "CANNA 5.2",
+    "ILN FEMUR",
+    "ILN TIBIA",
+]
+
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Sidebar
@@ -200,6 +242,35 @@ kpis   = report["kpis"]
 meta   = report["meta"]
 now_kl = datetime.now(KL_TZ)
 
+# Pre-computed frames for ATC tiers
+set_status_df = pd.DataFrame(report.get("set_office_status", []))
+set_avail_df  = pd.DataFrame(report.get("set_category_availability", []))
+tomorrow_df   = pd.DataFrame(report.get("case_buckets", {}).get("to_deliver_tomorrow", []))
+
+if not set_status_df.empty:
+    set_status_df = set_status_df.copy()
+    for col in (
+        "set_status", "location_now", "home", "category", "set_display",
+        "case_id", "patient_doctor", "surgery_date", "days_since_surgery",
+    ):
+        if col not in set_status_df.columns:
+            set_status_df[col] = ""
+    set_status_df["set_status_norm"] = set_status_df["set_status"].astype(str).str.upper()
+    set_status_df["location_norm"] = set_status_df["location_now"].astype(str).str.upper().str.strip()
+    set_status_df["is_na"] = set_status_df["set_status_norm"].str.contains("NA", na=False)
+    set_status_df["is_out"] = set_status_df["location_norm"].ne("OFFICE") & set_status_df["location_norm"].ne("")
+    set_status_df["is_ready"] = (~set_status_df["is_na"]) & (~set_status_df["is_out"]) & set_status_df["location_norm"].eq("OFFICE")
+    set_status_df["readiness"] = set_status_df.apply(
+        lambda r: "Critical" if r["is_na"] else ("Dirty/Out" if r["is_out"] else ("Ready" if r["is_ready"] else "Unknown")),
+        axis=1,
+    )
+    set_status_df["cue"] = set_status_df["readiness"].map({
+        "Critical": "🔴",
+        "Dirty/Out": "🟡",
+        "Ready": "🟢",
+        "Unknown": "⚪",
+    }).fillna("⚪")
+
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Header
@@ -217,9 +288,9 @@ st.divider()
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# SECTION 1 — KPI BAR
+# TIER 1 — PULSE (FLIGHT READINESS)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-def _kpi(label: str, value: int, style: str = "") -> str:
+def _kpi(label: str, value: str, style: str = "") -> str:
     cls = f"kpi-value {style}" if style else "kpi-value"
     return (
         f'<div class="kpi-card">'
@@ -228,15 +299,20 @@ def _kpi(label: str, value: int, style: str = "") -> str:
         f'</div>'
     )
 
-kpi_cols = st.columns(7)
+deployable_fleet = int(set_status_df["is_ready"].sum()) if not set_status_df.empty else 0
+dirty_queue = int(set_status_df["is_out"].sum()) if not set_status_df.empty else 0
+consignment_mask = set_status_df["home"].astype(str).str.upper().ne("OFFICE") if not set_status_df.empty else pd.Series(dtype=bool)
+consignment_total = int(consignment_mask.sum()) if not set_status_df.empty else 0
+consignment_ready = int((set_status_df["is_ready"] & consignment_mask).sum()) if not set_status_df.empty else 0
+parked_health_pct = (consignment_ready / consignment_total * 100.0) if consignment_total else 0.0
+tomorrow_gap = deployable_fleet - (len(tomorrow_df) if not tomorrow_df.empty else 0)
+
+kpi_cols = st.columns(4)
 kpi_defs = [
-    ("Delivered Today",   kpis["delivered_today"],    "ok"    if kpis["delivered_today"]     else ""),
-    ("To Deliver",        kpis["to_deliver"],          "warn"  if kpis["to_deliver"]          else "ok"),
-    ("Tomorrow",          kpis["to_deliver_tomorrow"], "warn"  if kpis["to_deliver_tomorrow"] else ""),
-    ("To Collect",        kpis["to_collect"],          "warn"  if kpis["to_collect"]          else "ok"),
-    ("To Follow Up",      kpis["to_follow_up"],        "alert" if kpis["to_follow_up"]        else "ok"),
-    ("To Check (ITO)",    kpis["to_check"],            "alert" if kpis["to_check"]            else "ok"),
-    ("To Top Up",         kpis["to_top_up"],           "warn"  if kpis["to_top_up"]           else "ok"),
+    ("Deployable Fleet", f"{deployable_fleet}", "ok" if deployable_fleet else ""),
+    ("Dirty Queue", f"{dirty_queue}", "warn" if dirty_queue else "ok"),
+    ("Parked Health", f"{parked_health_pct:.0f}%", "ok" if parked_health_pct >= 70 else "warn"),
+    ("Tomorrow's Gap", f"{tomorrow_gap:+d}", "ok" if tomorrow_gap >= 0 else "alert"),
 ]
 for col, (label, val, style) in zip(kpi_cols, kpi_defs):
     col.markdown(_kpi(label, val, style), unsafe_allow_html=True)
@@ -245,7 +321,111 @@ st.markdown("<br>", unsafe_allow_html=True)
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# SECTION 2 — INVENTORY SNAPSHOT
+# TIER 2 — FLEET MAP (WHERE + STATE)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+st.markdown("<div class='sec-header'>Fleet Map</div>", unsafe_allow_html=True)
+
+if set_status_df.empty:
+    st.info("No set fleet data.")
+else:
+    fm1, fm2, fm3 = st.columns(3)
+    with fm1:
+        set_type_opt = ["All"] + sorted(set_status_df["category"].astype(str).unique().tolist())
+        selected_set_type = st.selectbox("Set Type", set_type_opt, index=0)
+    with fm2:
+        hospital_opt = ["All"] + sorted(set_status_df["location_now"].fillna("").astype(str).replace("", "OFFICE").unique().tolist())
+        selected_hospital = st.selectbox("Hospital / Location", hospital_opt, index=0)
+    with fm3:
+        readiness_opt = ["All", "Ready", "Dirty/Out", "Critical", "Unknown"]
+        selected_readiness = st.selectbox("Readiness State", readiness_opt, index=0)
+
+    fleet = set_status_df.copy()
+    if selected_set_type != "All":
+        fleet = fleet[fleet["category"] == selected_set_type]
+    if selected_hospital != "All":
+        fleet = fleet[fleet["location_now"].fillna("").replace("", "OFFICE") == selected_hospital]
+    if selected_readiness != "All":
+        fleet = fleet[fleet["readiness"] == selected_readiness]
+    if search_query:
+        mask = fleet.apply(lambda r: r.astype(str).str.contains(search_query, case=False, na=False).any(), axis=1)
+        fleet = fleet[mask]
+
+    st.dataframe(
+        fleet[[
+            "cue", "set_display", "category", "home", "location_now", "readiness",
+            "case_id", "patient_doctor", "surgery_date", "days_since_surgery",
+        ]].rename(columns={
+            "cue": "", "set_display": "Set", "category": "Type", "home": "Home",
+            "location_now": "Current", "readiness": "Flight State",
+            "case_id": "Case", "patient_doctor": "Patient/Doctor",
+            "surgery_date": "Surgery", "days_since_surgery": "Days Out",
+        }),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# TIER 3 — DEEP DIVE (SET COMPOSITION PROXY)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+st.markdown("<div class='sec-header'>Set Deep Dive</div>", unsafe_allow_html=True)
+
+if set_status_df.empty:
+    st.info("No set to inspect.")
+else:
+    set_choices = set_status_df["set_display"].astype(str).tolist()
+    selected_set = st.selectbox("Select Set", set_choices, index=0)
+    selected_rows = set_status_df[set_status_df["set_display"] == selected_set]
+    srow = selected_rows.iloc[0]
+
+    category = str(srow.get("category", ""))
+    availability_row = set_avail_df[set_avail_df["category"] == category] if not set_avail_df.empty else pd.DataFrame()
+    available = int(availability_row.iloc[0]["available"]) if not availability_row.empty else 0
+    total_office = int(availability_row.iloc[0]["total_office"]) if not availability_row.empty else 0
+    score = (available / total_office * 100.0) if total_office else 0.0
+
+    if str(srow.get("readiness", "")) in {"Critical", "Dirty/Out"}:
+        recommendation = "Not Recommended for Surgery"
+        rec_style = "alert"
+    elif score < 60:
+        recommendation = "Use With Caution"
+        rec_style = "warn"
+    else:
+        recommendation = "Recommended"
+        rec_style = "ok"
+
+    d1, d2, d3, d4 = st.columns(4)
+    d1.metric("Set", selected_set)
+    d2.metric("Current", str(srow.get("location_now", "OFFICE") or "OFFICE"))
+    d3.metric("Availability Score", f"{score:.0f}%")
+    d4.metric("State", str(srow.get("readiness", "Unknown")))
+    st.markdown(_kpi("Recommendation", recommendation, rec_style), unsafe_allow_html=True)
+
+    case_id = str(srow.get("case_id", "") or "")
+    all_cases = []
+    for _, rows in report.get("case_buckets", {}).items():
+        all_cases.extend(rows)
+    all_cases_df = pd.DataFrame(all_cases).drop_duplicates(subset=["case_id"], keep="first") if all_cases else pd.DataFrame()
+    linked_case = all_cases_df[all_cases_df["case_id"].astype(str) == case_id] if case_id and not all_cases_df.empty else pd.DataFrame()
+
+    if not linked_case.empty:
+        crow = linked_case.iloc[0]
+        st.markdown(
+            f"**Linked Case:** `{case_id}` | Hospital `{crow.get('hospital','')}` | "
+            f"Patient/Doctor `{crow.get('patient_doctor','')}`"
+        )
+        st.code(
+            f"Sets: {crow.get('sets','')}\n"
+            f"Plates: {crow.get('plates','')}\n"
+            f"Powertools: {crow.get('powertools','')}",
+            language="text",
+        )
+    else:
+        st.caption("No active linked case details for this set.")
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# SECTION 4 — INVENTORY SNAPSHOT (DETAIL)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 def avail_badge(available: int, total: int) -> str:
     if total == 0:
@@ -257,8 +437,8 @@ def avail_badge(available: int, total: int) -> str:
     return f"<span class='avail-badge avail-ok'>{available}/{total}</span>"
 
 
-st.markdown("<div class='sec-header'>Inventory Snapshot</div>", unsafe_allow_html=True)
-inv_tabs = st.tabs(["🔩 Sets", "🦿 Plates", "⚡ Powertools"])
+st.markdown("<div class='sec-header'>Operational Detail — Inventory Snapshot</div>", unsafe_allow_html=True)
+inv_tabs = st.tabs(["🔩 Sets", "🦿 Plates", "⚡ Powertools", "🏢 In Office"])
 
 
 # ── Sets ──────────────────────────────────────────────────────────────────────
@@ -508,6 +688,63 @@ with inv_tabs[2]:
                            "window_start", "window_end"]],
                     use_container_width=True, hide_index=True,
                 )
+
+
+# ── In Office (ordered control list) ─────────────────────────────────────────
+with inv_tabs[3]:
+    office_df = pd.DataFrame(report.get("set_office_status", []))
+    if office_df.empty:
+        st.info("No set data.")
+    else:
+        office_df = office_df.copy()
+        if "location_now" not in office_df.columns:
+            office_df["location_now"] = ""
+        if "category" not in office_df.columns:
+            office_df["category"] = ""
+        if "set_display" not in office_df.columns:
+            office_df["set_display"] = office_df.get("id", "")
+        if "id" not in office_df.columns:
+            office_df["id"] = ""
+
+        office_df["location_norm"] = office_df["location_now"].astype(str).str.upper().str.strip()
+        office_df["set_name"] = office_df["set_display"].astype(str).where(
+            office_df["set_display"].astype(str).str.strip().ne(""),
+            office_df["id"].astype(str),
+        )
+
+        categories_in_data = office_df["category"].astype(str).dropna().unique().tolist()
+        ordered_categories = OFFICE_VIEW_ORDER + [
+            c for c in categories_in_data if c not in OFFICE_VIEW_ORDER
+        ]
+
+        rows = []
+        for category in ordered_categories:
+            cat_rows = office_df[office_df["category"] == category]
+            total = int(len(cat_rows))
+            office_rows = cat_rows[cat_rows["location_norm"] == "OFFICE"]
+            office_count = int(len(office_rows))
+            office_list = "; ".join(sorted(office_rows["set_name"].astype(str).tolist()))
+            rows.append({
+                "Category": category,
+                "Total": total,
+                "In Office": office_count,
+                "In Office List": office_list,
+            })
+
+        out = pd.DataFrame(rows)
+        if search_query:
+            out = out[
+                out["Category"].str.contains(search_query, case=False, na=False)
+                | out["In Office List"].str.contains(search_query, case=False, na=False)
+            ]
+
+        top1, top2 = st.columns(2)
+        with top1:
+            st.metric("Categories in View", int(len(out)))
+        with top2:
+            st.metric("Total Sets In Office", int(out["In Office"].sum()) if not out.empty else 0)
+
+        st.dataframe(out, use_container_width=True, hide_index=True)
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
