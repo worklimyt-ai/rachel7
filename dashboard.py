@@ -511,7 +511,24 @@ with inv_tabs[1]:
             plate_sum["proper_name"] = plate_sum.get("plate_name", "")
         if "screw_sizes" not in plate_sum.columns:
             plate_sum["screw_sizes"] = ""
-        plate_sum["uid_norm"] = plate_sum["plate_uid"].astype(str).str.upper().str.strip()
+        psr_fill = pd.DataFrame(report.get("plate_size_range_availability", []))
+        if not psr_fill.empty and "screw_sizes" in psr_fill.columns and "plate_uid" in psr_fill.columns:
+            uid_screw_map = (
+                psr_fill.assign(
+                    uid_norm=psr_fill["plate_uid"].astype(str).str.upper().str.strip(),
+                    screw_sizes=psr_fill["screw_sizes"].astype(str).str.strip(),
+                )
+                .groupby("uid_norm")["screw_sizes"]
+                .apply(lambda s: ", ".join(sorted({x for x in s if x})))
+                .to_dict()
+            )
+            plate_sum["uid_norm"] = plate_sum["plate_uid"].astype(str).str.upper().str.strip()
+            plate_sum["screw_sizes"] = plate_sum.apply(
+                lambda r: r["screw_sizes"] if str(r["screw_sizes"]).strip() else uid_screw_map.get(str(r["uid_norm"]), ""),
+                axis=1,
+            )
+        else:
+            plate_sum["uid_norm"] = plate_sum["plate_uid"].astype(str).str.upper().str.strip()
         plate_sum["order_rank"] = plate_sum["uid_norm"].map(PLATE_UID_RANK).fillna(10_000).astype(int)
         plate_sum = plate_sum.sort_values(["order_rank", "uid_norm"])
 
@@ -560,7 +577,7 @@ with inv_tabs[1]:
                 f"<span class='inv-name'>{row['proper_name']}</span>"
                 f"<span>{badge}</span>"
                 f"</div>"
-                f"<div class='inv-sub'>{row['plate_uid']} &nbsp;·&nbsp; screw {row['screw_sizes'] or '-'} &nbsp;·&nbsp; {row['size_ranges']}</div>"
+                f"<div class='inv-sub'>{row['plate_uid']} &nbsp;·&nbsp; screw_sizes: {row['screw_sizes'] or 'N/A'} &nbsp;·&nbsp; {row['size_ranges']}</div>"
                 f"{out_lines}"
                 f"</div>"
             )
