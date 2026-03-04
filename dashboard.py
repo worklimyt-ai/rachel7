@@ -297,7 +297,6 @@ with col_time:
         f"{now_kl.strftime('%A, %d %b %Y  %H:%M')} KL</div>",
         unsafe_allow_html=True,
     )
-st.caption(f"Build: {APP_BUILD_TAG} | Running file: {APP_FILE}")
 st.divider()
 
 
@@ -577,7 +576,7 @@ with inv_tabs[1]:
                 f"<span class='inv-name'>{row['proper_name']}</span>"
                 f"<span>{badge}</span>"
                 f"</div>"
-                f"<div class='inv-sub'>{row['plate_uid']} &nbsp;·&nbsp; screw_sizes: {row['screw_sizes'] or 'N/A'} &nbsp;·&nbsp; {row['size_ranges']}</div>"
+                f"<div class='inv-sub'>{row['plate_uid']} &nbsp;·&nbsp; {row['screw_sizes'] or ''}{' &nbsp;·&nbsp; ' if row['screw_sizes'] else ''}{row['size_ranges']}</div>"
                 f"{out_lines}"
                 f"</div>"
             )
