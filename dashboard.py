@@ -447,7 +447,7 @@ with inv_tabs[0]:
                 )
 
             left_col = (
-                f"<div style='flex:0 0 52%;padding-right:20px'>"
+                f"<div style='flex:0 0 39%;padding-right:20px'>"
                 f"<div style='display:flex;align-items:center;gap:12px;flex-wrap:wrap'>"
                 f"<span class='inv-name' style='font-size:20px'>{r['Category']}</span>"
                 f"{badge}"
