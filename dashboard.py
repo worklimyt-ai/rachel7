@@ -411,32 +411,84 @@ with inv_tabs[0]:
                     "Case": str(r.get("case_id", "")),
                 })
 
-        summary_df = pd.DataFrame(summary_rows)
-        if search_query and not summary_df.empty:
-            summary_df = summary_df[
-                summary_df["Category"].str.contains(search_query, case=False, na=False)
-                | summary_df["In Office Sets"].str.contains(search_query, case=False, na=False)
-                | summary_df["Out (Hospital • Surgery)"].str.contains(search_query, case=False, na=False)
+        # Build out-details lookup: category_norm → list of dicts
+        _set_out: dict[str, list[dict]] = {}
+        for r in out_rows:
+            key = r["Category"].upper().strip()
+            _set_out.setdefault(key, []).append(r)
+
+        # Filter summary_rows by search
+        filtered_summary = summary_rows
+        if search_query:
+            sq = search_query.lower()
+            filtered_summary = [
+                r for r in summary_rows
+                if sq in r["Category"].lower()
+                or sq in r["In Office Sets"].lower()
+                or sq in r["Out (Hospital • Surgery)"].lower()
             ]
 
-        st.caption("Merged Sets + In Office view.")
-        st.dataframe(summary_df, use_container_width=True, hide_index=True)
+        def _set_row_html(r: dict) -> str:
+            cat_norm = r["Category"].upper().strip()
+            avail_val = avail_lookup.get(cat_norm, r["In Office"])
+            total_val = total_lookup.get(cat_norm, r["In Office"] + r["Out"])
+            total_val = total_val if total_val > 0 else (r["In Office"] + r["Out"])
+            badge = avail_badge(avail_val, total_val)
 
-        out_df = pd.DataFrame(out_rows)
-        if search_query and not out_df.empty:
-            out_df = out_df[
-                out_df["Category"].str.contains(search_query, case=False, na=False)
-                | out_df["Set"].str.contains(search_query, case=False, na=False)
-                | out_df["Hospital"].str.contains(search_query, case=False, na=False)
-                | out_df["Surgery Date"].str.contains(search_query, case=False, na=False)
-                | out_df["Patient/Doctor"].str.contains(search_query, case=False, na=False)
-                | out_df["Case"].str.contains(search_query, case=False, na=False)
-            ]
-        st.markdown("##### Out For Cases Detail")
-        if out_df.empty:
-            st.success("No sets currently out for cases.")
+            # Left: category name + badge + in-office set names
+            in_sets_html = ""
+            if r["In Office Sets"]:
+                names = [s.strip() for s in r["In Office Sets"].split(";") if s.strip()]
+                in_sets_html = "".join(
+                    f"<span style='display:inline-block;background:#f0fdf4;color:#166534;"
+                    f"font-family:\"JetBrains Mono\",monospace;font-size:11px;font-weight:600;"
+                    f"border-radius:4px;padding:1px 7px;margin:2px 4px 2px 0'>{n}</span>"
+                    for n in names
+                )
+
+            left_col = (
+                f"<div style='flex:0 0 52%;padding-right:20px'>"
+                f"<div style='display:flex;align-items:center;gap:12px;flex-wrap:wrap'>"
+                f"<span class='inv-name' style='font-size:20px'>{r['Category']}</span>"
+                f"{badge}"
+                f"</div>"
+                f"<div style='margin-top:6px'>{in_sets_html}</div>"
+                f"</div>"
+            )
+
+            # Right: OUT lines
+            out_items = _set_out.get(cat_norm, [])
+            if out_items:
+                out_lines = "".join(
+                    f"<div class='out-line'>"
+                    f"<span class='out-tag'>OUT</span> "
+                    f"<span class='out-set'>{o['Set']}</span>"
+                    f"<span class='out-sep'> → </span>"
+                    f"<span class='out-hosp'>{o['Hospital'] or '—'}</span>"
+                    f"<span class='out-sep'> · </span>"
+                    f"<span class='out-surg'>surg {o['Surgery Date'] or '—'}</span>"
+                    + (f"<span class='out-days' style='margin-left:8px'>{o['Patient/Doctor']}</span>" if o['Patient/Doctor'] else "")
+                    + f"</div>"
+                    for o in out_items
+                )
+            else:
+                out_lines = "<span style='color:#9ca3af;font-size:12px;font-style:italic'>all in office</span>"
+
+            right_col = f"<div style='flex:1'>{out_lines}</div>"
+
+            return (
+                f"<div class='inv-row' style='display:flex;align-items:flex-start'>"
+                f"{left_col}{right_col}"
+                f"</div>"
+            )
+
+        if filtered_summary:
+            st.markdown(
+                "".join(_set_row_html(r) for r in filtered_summary),
+                unsafe_allow_html=True,
+            )
         else:
-            st.dataframe(out_df, use_container_width=True, hide_index=True)
+            st.info("No matching sets.")
 
         pt_avail_lookup: dict[str, int] = {}
         if not pt_avail_df.empty and "category" in pt_avail_df.columns:
