@@ -354,12 +354,16 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
             "plate_name":   str(row.get("proper_name", "")).strip(),
             "set_category": str(row.get("set", "")).strip(),
             "size_range":   size_range,
+            "screw_sizes_set": set(),
             "out_drawer_units": 0,
             "out_stock_units":  0,
             "drawer_locations": set(),
             "stock_locations":  set(),
             "out_details":  [],
         })
+        screw_sizes = str(row.get("screw_sizes", "")).strip()
+        if screw_sizes:
+            bucket["screw_sizes_set"].add(screw_sizes)
         bucket["drawer_locations"].update(drawers)
         bucket["stock_locations"].update(others)
         if not drawers and not others:
@@ -660,7 +664,9 @@ def build_plate_outputs(
         out   = od + os_
         row = {
             "plate_uid":             uid,
+            "proper_name":           bucket["plate_name"],
             "plate_name":            bucket["plate_name"],
+            "screw_sizes":           ", ".join(sorted(bucket["screw_sizes_set"])),
             "set_category":          bucket["set_category"],
             "size_range":            size_range,
             "drawer_locations":      ", ".join(sorted(bucket["drawer_locations"])),
@@ -695,13 +701,17 @@ def build_plate_outputs(
         uid = row["plate_uid"]
         s   = uid_summary_map.setdefault(uid, {
             "plate_uid":    uid,
+            "proper_name":  row.get("proper_name", row["plate_name"]),
             "plate_name":   row["plate_name"],
+            "screw_sizes_set": set(),
             "set_category": row["set_category"],
             "total_units":  0,
             "out_units":    0,
             "available_units": 0,
             "size_ranges":  [],
         })
+        for ss in [p.strip() for p in str(row.get("screw_sizes", "")).split(",") if p.strip()]:
+            s["screw_sizes_set"].add(ss)
         s["total_units"]    += row["total_units"]
         s["out_units"]      += row["out_units"]
         s["available_units"]+= row["available_units"]
@@ -710,6 +720,8 @@ def build_plate_outputs(
     plate_uid_summary = []
     for uid, s in sorted(uid_summary_map.items()):
         s["size_ranges"]  = ", ".join(s["size_ranges"])
+        s["screw_sizes"] = ", ".join(sorted(s["screw_sizes_set"]))
+        s.pop("screw_sizes_set", None)
         s["availability"] = f"{s['available_units']}/{s['total_units']}"
         plate_uid_summary.append(s)
 

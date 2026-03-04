@@ -131,7 +131,7 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
 """, unsafe_allow_html=True)
 
 KL_TZ = ZoneInfo("Asia/Kuala_Lumpur")
-APP_BUILD_TAG = "CHECKSETGO-v1-2026-03-04"
+APP_BUILD_TAG = "CHECKSETGO-v2-2026-03-04"
 APP_FILE = str(Path(__file__).resolve())
 
 # Powertool categories — excluded from the Sets tab
@@ -178,6 +178,46 @@ OFFICE_VIEW_ORDER = [
     "ILN FEMUR",
     "ILN TIBIA",
 ]
+
+PLATE_UID_ORDER = [
+    "PHILOS",
+    "OLEI",
+    "OLEII",
+    "DSC",
+    "MSC",
+    "CHOOK",
+    "DIA",
+    "URS",
+    "RECON",
+    "METAI",
+    "METAII",
+    "TUBULAR",
+    "DFIBII",
+    "DFIBIII",
+    "DMH",
+    "DPLH",
+    "DLHI",
+    "DLHII",
+    "DMT",
+    "DLT",
+    "CMESH",
+    "CCOMBO",
+    "PPMT",
+    "DPT",
+    "PLTI",
+    "PLTII",
+    "PMT",
+    "DLF",
+    "TSP",
+    "FSP",
+    "PFP",
+    "APP",
+    "FIBHOOK",
+    "DLTII",
+    "ADT",
+    "DRVL",
+]
+PLATE_UID_RANK = {uid: idx for idx, uid in enumerate(PLATE_UID_ORDER)}
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -467,10 +507,19 @@ with inv_tabs[1]:
     if plate_sum.empty:
         st.info("No plate data.")
     else:
+        if "proper_name" not in plate_sum.columns:
+            plate_sum["proper_name"] = plate_sum.get("plate_name", "")
+        if "screw_sizes" not in plate_sum.columns:
+            plate_sum["screw_sizes"] = ""
+        plate_sum["uid_norm"] = plate_sum["plate_uid"].astype(str).str.upper().str.strip()
+        plate_sum["order_rank"] = plate_sum["uid_norm"].map(PLATE_UID_RANK).fillna(10_000).astype(int)
+        plate_sum = plate_sum.sort_values(["order_rank", "uid_norm"])
+
         if search_query:
             plate_sum = plate_sum[
                 plate_sum["plate_uid"].str.contains(search_query, case=False, na=False)
-                | plate_sum["plate_name"].str.contains(search_query, case=False, na=False)
+                | plate_sum["proper_name"].str.contains(search_query, case=False, na=False)
+                | plate_sum["screw_sizes"].str.contains(search_query, case=False, na=False)
             ]
 
         # Build lookup: plate_uid → list of out details
@@ -508,10 +557,10 @@ with inv_tabs[1]:
             return (
                 f"<div class='inv-row'>"
                 f"<div style='display:flex;justify-content:space-between;align-items:center'>"
-                f"<span class='inv-name'>{row['plate_uid']}</span>"
+                f"<span class='inv-name'>{row['proper_name']}</span>"
                 f"<span>{badge}</span>"
                 f"</div>"
-                f"<div class='inv-sub'>{row['plate_name']} &nbsp;·&nbsp; {row['size_ranges']}</div>"
+                f"<div class='inv-sub'>{row['plate_uid']} &nbsp;·&nbsp; screw {row['screw_sizes'] or '-'} &nbsp;·&nbsp; {row['size_ranges']}</div>"
                 f"{out_lines}"
                 f"</div>"
             )
@@ -523,16 +572,25 @@ with inv_tabs[1]:
 
         with st.expander("📋 Plate size range detail"):
             psr = pd.DataFrame(report["plate_size_range_availability"])
+            if "proper_name" not in psr.columns:
+                psr["proper_name"] = psr.get("plate_name", "")
+            if "screw_sizes" not in psr.columns:
+                psr["screw_sizes"] = ""
+            psr["uid_norm"] = psr["plate_uid"].astype(str).str.upper().str.strip()
+            psr["order_rank"] = psr["uid_norm"].map(PLATE_UID_RANK).fillna(10_000).astype(int)
+            psr = psr.sort_values(["order_rank", "uid_norm", "size_range"])
             if search_query:
                 psr = psr[
                     psr["plate_uid"].str.contains(search_query, case=False, na=False)
+                    | psr["proper_name"].str.contains(search_query, case=False, na=False)
+                    | psr["screw_sizes"].str.contains(search_query, case=False, na=False)
                 ]
             st.dataframe(
                 psr[[
-                    "plate_uid", "plate_name", "size_range", "drawer_locations",
+                    "plate_uid", "proper_name", "screw_sizes", "size_range", "drawer_locations",
                     "available_units", "out_units", "total_units", "availability",
                 ]].rename(columns={
-                    "plate_uid": "UID", "plate_name": "Name", "size_range": "Size",
+                    "plate_uid": "UID", "proper_name": "Proper Name", "screw_sizes": "Screw Sizes", "size_range": "Size",
                     "drawer_locations": "Drawers", "available_units": "Avail",
                     "out_units": "Out", "total_units": "Total", "availability": "Avail/Total",
                 }),
