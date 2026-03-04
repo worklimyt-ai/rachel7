@@ -8538,6 +8538,7 @@ HOSPITALS = {
     'HB': {'name': 'Hospital Banting', 'lat': 2.8127, 'lng': 101.5031, 'region': 'Selangor'},
     'HTK': {'name': 'Hospital Tanjong Karang', 'lat': 3.4244, 'lng': 101.1764, 'region': 'Selangor'},
     'HKKB': {'name': 'Hospital Kuala Kubu Bharu', 'lat': 3.5631, 'lng': 101.6578, 'region': 'Selangor'},
+    'SKSM': {'name': 'Sri Kota Specialist Medical Centre', 'lat': 3.0404, 'lng': 101.4456, 'region': 'Selangor'},
 
     # SEREMBAN [cite: 1]
     'HTJ': {'name': "Hospital Tuanku Ja'afar", 'lat': 2.7183, 'lng': 101.9442, 'region': 'NS'},
