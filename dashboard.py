@@ -670,14 +670,87 @@ with inv_tabs[1]:
 with inv_tabs[2]:
     pt_avail = pd.DataFrame(report["powertool_category_availability"])
     pt_del   = pd.DataFrame(report["powertool_delivered"])
+    pt_uid   = pd.DataFrame(report.get("powertool_uid_availability", []))
 
     if pt_avail.empty:
         st.info("No powertool data.")
     else:
+        if not pt_uid.empty:
+            for col in ("powertool_uid", "category", "availability", "hospital", "surgery_date"):
+                if col not in pt_uid.columns:
+                    pt_uid[col] = ""
+            pt_uid = pt_uid.copy()
+            pt_uid["availability_norm"] = pt_uid["availability"].astype(str).str.upper().str.strip()
+            pt_uid["uid_name"] = pt_uid["powertool_uid"].astype(str).str.strip()
+
+            if search_query:
+                pt_uid = pt_uid[
+                    pt_uid["category"].str.contains(search_query, case=False, na=False)
+                    | pt_uid["uid_name"].str.contains(search_query, case=False, na=False)
+                    | pt_uid["hospital"].str.contains(search_query, case=False, na=False)
+                    | pt_uid["surgery_date"].str.contains(search_query, case=False, na=False)
+                ]
+
+            in_office_uid = pt_uid[
+                pt_uid["availability_norm"].isin(["AVAILABLE", "NA_HOLD"])
+            ]
+            out_uid = pt_uid[
+                pt_uid["availability_norm"].str.startswith("OUT")
+            ]
+
+            def _pt_group_side(df: pd.DataFrame, with_hospital: bool = False) -> pd.DataFrame:
+                rows = []
+                for cat, g in df.groupby("category"):
+                    if with_hospital:
+                        details = "; ".join(
+                            sorted([
+                                f"{str(r['uid_name'])}@{str(r['hospital']).strip() or 'OUT'}({str(r['surgery_date']).strip() or '-'})"
+                                for _, r in g.iterrows()
+                            ])
+                        )
+                    else:
+                        details = "; ".join(
+                            sorted([
+                                f"{str(r['uid_name'])}{' [HOLD]' if str(r['availability_norm']).endswith('NA_HOLD') else ''}"
+                                for _, r in g.iterrows()
+                            ])
+                        )
+                    rows.append({
+                        "Category": cat,
+                        "Count": int(len(g)),
+                        "Units": details,
+                    })
+                return pd.DataFrame(rows).sort_values(["Category"]) if rows else pd.DataFrame(columns=["Category", "Count", "Units"])
+
+            left_df = _pt_group_side(in_office_uid, with_hospital=False)
+            right_df = _pt_group_side(out_uid, with_hospital=True)
+
+            st.markdown("##### Powertool Split View")
+            col_l, col_r = st.columns(2)
+            with col_l:
+                st.markdown("**In Office**")
+                st.metric("Total In Office", int(in_office_uid.shape[0]))
+                st.dataframe(left_df, use_container_width=True, hide_index=True)
+            with col_r:
+                st.markdown("**Out Of Office**")
+                st.metric("Total Out Of Office", int(out_uid.shape[0]))
+                st.dataframe(right_df, use_container_width=True, hide_index=True)
+            st.markdown("---")
+
         if search_query:
             pt_avail = pt_avail[
                 pt_avail["category"].str.contains(search_query, case=False, na=False)
             ]
+
+        pt_u30 = pd.DataFrame(report.get("powertool_usage_30d", []))
+        usage_by_cat: dict[str, int] = {}
+        if not pt_u30.empty:
+            for _, ur in pt_u30.iterrows():
+                cat = str(ur.get("category", "")).strip()
+                if not cat:
+                    continue
+                u_num = pd.to_numeric(ur.get("usage_30d", 0), errors="coerce")
+                usage_by_cat[cat] = usage_by_cat.get(cat, 0) + (int(u_num) if pd.notna(u_num) else 0)
 
         # Build lookup: category → list of out details
         _pt_out: dict[str, list[dict]] = {}
@@ -693,6 +766,8 @@ with inv_tabs[2]:
         def _pt_row_html(row: pd.Series) -> str:
             badge     = avail_badge(int(row["available"]), int(row["usable_total"]))
             out_items = _pt_out.get(row["category"], [])
+            use_30d   = usage_by_cat.get(str(row["category"]), 0)
+            usage_note = f"<span style='color:#6b7280;font-size:12px;margin-left:8px'>30d use: {use_30d}</span>"
             na_note   = (
                 f" <span style='color:#9ca3af;font-size:11px'>[{row['na_hold']} on hold]</span>"
                 if int(row["na_hold"]) > 0 else ""
@@ -716,7 +791,7 @@ with inv_tabs[2]:
             return (
                 f"<div class='inv-row'>"
                 f"<div style='display:flex;justify-content:space-between;align-items:center'>"
-                f"<span class='inv-name'>{row['category']}</span>"
+                f"<span class='inv-name'>{row['category']}{usage_note}</span>"
                 f"<span>{badge}{na_note}</span>"
                 f"</div>"
                 f"{out_lines}"
@@ -727,18 +802,6 @@ with inv_tabs[2]:
             "".join(_pt_row_html(r) for _, r in pt_avail.iterrows()),
             unsafe_allow_html=True,
         )
-
-        with st.expander("📋 30-day usage"):
-            pt_u30 = pd.DataFrame(report["powertool_usage_30d"])
-            if not pt_u30.empty:
-                used = pt_u30[pt_u30["usage_30d"] > 0].sort_values(
-                    "usage_30d", ascending=False
-                )
-                st.dataframe(
-                    used[["powertool_uid", "category", "usage_30d",
-                           "window_start", "window_end"]],
-                    use_container_width=True, hide_index=True,
-                )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
