@@ -453,6 +453,62 @@ with inv_tabs[0]:
     if set_avail.empty:
         st.info("No set data.")
     else:
+        # Left/right operational split for quick visibility
+        split_df = set_status_all.copy()
+        if not split_df.empty:
+            if "location_now" not in split_df.columns:
+                split_df["location_now"] = ""
+            if "category" not in split_df.columns:
+                split_df["category"] = ""
+            if "set_display" not in split_df.columns:
+                split_df["set_display"] = split_df.get("id", "")
+            split_df["location_norm"] = split_df["location_now"].astype(str).str.upper().str.strip()
+            split_df["set_name"] = split_df["set_display"].astype(str).where(
+                split_df["set_display"].astype(str).str.strip().ne(""),
+                split_df.get("id", "").astype(str) if "id" in split_df.columns else "",
+            )
+
+            if search_query:
+                split_df = split_df[
+                    split_df["category"].str.contains(search_query, case=False, na=False)
+                    | split_df["set_name"].str.contains(search_query, case=False, na=False)
+                    | split_df["location_now"].str.contains(search_query, case=False, na=False)
+                ]
+
+            in_office = split_df[split_df["location_norm"] == "OFFICE"]
+            out_case  = split_df[(split_df["location_norm"] != "OFFICE") & (split_df["location_norm"] != "")]
+
+            def _group_side(df: pd.DataFrame, with_hospital: bool = False) -> pd.DataFrame:
+                rows = []
+                for cat, g in df.groupby("category"):
+                    if with_hospital:
+                        item_list = "; ".join(
+                            sorted([f"{r['set_name']}@{str(r['location_now']).strip()}" for _, r in g.iterrows()])
+                        )
+                    else:
+                        item_list = "; ".join(sorted(g["set_name"].astype(str).tolist()))
+                    rows.append({
+                        "Category": cat,
+                        "Count": int(len(g)),
+                        "Sets": item_list,
+                    })
+                return pd.DataFrame(rows).sort_values(["Category"]) if rows else pd.DataFrame(columns=["Category", "Count", "Sets"])
+
+            left_df = _group_side(in_office, with_hospital=False)
+            right_df = _group_side(out_case, with_hospital=True)
+
+            st.markdown("##### Office Split View")
+            col_l, col_r = st.columns(2)
+            with col_l:
+                st.markdown("**In Office**")
+                st.metric("Total In Office", int(in_office.shape[0]))
+                st.dataframe(left_df, use_container_width=True, hide_index=True)
+            with col_r:
+                st.markdown("**Out For Cases**")
+                st.metric("Total Out For Cases", int(out_case.shape[0]))
+                st.dataframe(right_df, use_container_width=True, hide_index=True)
+            st.markdown("---")
+
         # Exclude powertool categories
         set_avail = set_avail[
             ~set_avail["category"].str.upper().isin(_POWERTOOL_CATS)
@@ -751,6 +807,120 @@ with inv_tabs[3]:
         st.dataframe(out, use_container_width=True, hide_index=True)
 
 
+def render_non_office_assets_overview() -> None:
+    st.markdown("<div class='sec-header'>Asset Overview — Homes Not OFFICE</div>", unsafe_allow_html=True)
+
+    asset_df = pd.DataFrame(report.get("set_office_status", []))
+    if asset_df.empty:
+        st.info("No asset data.")
+        return
+
+    asset_df = asset_df.copy()
+    for col in (
+        "home", "location_now", "category", "set_display", "id", "set_status",
+        "case_id", "patient_doctor", "surgery_date", "days_since_surgery",
+    ):
+        if col not in asset_df.columns:
+            asset_df[col] = ""
+
+    asset_df["home_norm"] = asset_df["home"].astype(str).str.upper().str.strip()
+    asset_df["location_norm"] = asset_df["location_now"].astype(str).str.upper().str.strip()
+    asset_df["set_name"] = asset_df["set_display"].astype(str).where(
+        asset_df["set_display"].astype(str).str.strip().ne(""),
+        asset_df["id"].astype(str),
+    )
+
+    # "Home not OFFICE" register for ownership overview
+    non_office_home = asset_df[
+        asset_df["home_norm"].ne("OFFICE") & asset_df["home_norm"].ne("")
+    ].copy()
+    non_office_home["in_office_now"] = non_office_home["location_norm"].eq("OFFICE")
+    non_office_home["out_now"] = non_office_home["location_norm"].ne("OFFICE")
+
+    # "Currently not in OFFICE" operational list (all homes)
+    currently_out = asset_df[
+        asset_df["location_norm"].ne("OFFICE") & asset_df["location_norm"].ne("")
+    ].copy()
+
+    if search_query:
+        non_office_home = non_office_home[
+            non_office_home["set_name"].str.contains(search_query, case=False, na=False)
+            | non_office_home["category"].str.contains(search_query, case=False, na=False)
+            | non_office_home["home"].str.contains(search_query, case=False, na=False)
+            | non_office_home["location_now"].str.contains(search_query, case=False, na=False)
+            | non_office_home["patient_doctor"].str.contains(search_query, case=False, na=False)
+            | non_office_home["case_id"].str.contains(search_query, case=False, na=False)
+        ]
+        currently_out = currently_out[
+            currently_out["set_name"].str.contains(search_query, case=False, na=False)
+            | currently_out["category"].str.contains(search_query, case=False, na=False)
+            | currently_out["home"].str.contains(search_query, case=False, na=False)
+            | currently_out["location_now"].str.contains(search_query, case=False, na=False)
+            | currently_out["patient_doctor"].str.contains(search_query, case=False, na=False)
+            | currently_out["case_id"].str.contains(search_query, case=False, na=False)
+        ]
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Home!=OFFICE Assets", int(non_office_home.shape[0]))
+    m2.metric("Home!=OFFICE In OFFICE Now", int(non_office_home["in_office_now"].sum()) if not non_office_home.empty else 0)
+    m3.metric("Home!=OFFICE Out Now", int(non_office_home["out_now"].sum()) if not non_office_home.empty else 0)
+    m4.metric("Currently Out (All Homes)", int(currently_out.shape[0]))
+
+    home_summary = (
+        non_office_home.groupby("home", dropna=False)
+        .agg(
+            total_assets=("set_name", "count"),
+            in_office_now=("in_office_now", "sum"),
+            out_now=("out_now", "sum"),
+            categories=("category", lambda s: ", ".join(sorted(set([str(x) for x in s if str(x).strip()])))),
+        )
+        .reset_index()
+        .sort_values(["home"])
+        if not non_office_home.empty
+        else pd.DataFrame(columns=["home", "total_assets", "in_office_now", "out_now", "categories"])
+    )
+
+    st.markdown("##### Home Register Summary")
+    st.dataframe(
+        home_summary.rename(columns={
+            "home": "Home", "total_assets": "Total Assets",
+            "in_office_now": "In OFFICE Now", "out_now": "Out Now", "categories": "Categories",
+        }),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.markdown("##### Home!=OFFICE Asset Detail")
+    st.dataframe(
+        non_office_home[[
+            "set_name", "category", "home", "location_now", "set_status",
+            "case_id", "patient_doctor", "surgery_date", "days_since_surgery",
+        ]].rename(columns={
+            "set_name": "Set", "category": "Category", "home": "Home",
+            "location_now": "Current Location", "set_status": "Set Status",
+            "case_id": "Case", "patient_doctor": "Patient/Doctor",
+            "surgery_date": "Surgery", "days_since_surgery": "Days Out",
+        }),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.markdown("##### Currently Not In OFFICE (All Homes)")
+    st.dataframe(
+        currently_out[[
+            "set_name", "category", "home", "location_now", "set_status",
+            "case_id", "patient_doctor", "surgery_date", "days_since_surgery",
+        ]].rename(columns={
+            "set_name": "Set", "category": "Category", "home": "Home",
+            "location_now": "Current Location", "set_status": "Set Status",
+            "case_id": "Case", "patient_doctor": "Patient/Doctor",
+            "surgery_date": "Surgery", "days_since_surgery": "Days Out",
+        }),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # SECTION 3 — SCHEDULE
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -888,6 +1058,8 @@ if search_query:
             }),
             use_container_width=True, hide_index=True,
         )
+
+render_non_office_assets_overview()
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
