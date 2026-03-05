@@ -5,7 +5,7 @@ Run: streamlit run dashboard.py
 
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -131,7 +131,7 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
 """, unsafe_allow_html=True)
 
 KL_TZ = ZoneInfo("Asia/Kuala_Lumpur")
-APP_BUILD_TAG = "CHECKSETGO-v3-2026-03-05"
+APP_BUILD_TAG = "CHECKSETGO-v4-2026-03-05"
 APP_FILE = str(Path(__file__).resolve())
 
 # Powertool categories — excluded from the Sets tab
@@ -256,7 +256,7 @@ with st.sidebar:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Load / cache report
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-@st.cache_data(show_spinner="Loading data…", ttl=300)
+@st.cache_data(show_spinner="Loading data…", ttl=60)
 def load_report(master: str, cases: str, archive: str) -> dict:
     from ops_engine import build_operations_report
     return build_operations_report(
@@ -265,6 +265,9 @@ def load_report(master: str, cases: str, archive: str) -> dict:
         archive_source=archive or None,
     )
 
+
+if refresh:
+    load_report.clear()
 
 if "report" not in st.session_state or refresh:
     with st.spinner("Fetching data…"):
@@ -330,12 +333,14 @@ with inv_tabs[0]:
             num = pd.to_numeric(val, errors="coerce")
             return int(num) if pd.notna(num) else 0
 
-        for col in ("category", "set_display", "id", "location_now", "surgery_date", "patient_doctor", "case_id"):
+        for col in ("category", "set_display", "id", "location_now", "surgery_date", "patient_doctor", "case_id", "set_status"):
             if col not in set_status_all.columns:
                 set_status_all[col] = ""
         set_status_all = set_status_all.copy()
         set_status_all["category_norm"] = set_status_all["category"].astype(str).str.upper().str.strip()
         set_status_all["location_norm"] = set_status_all["location_now"].astype(str).str.upper().str.strip()
+        set_status_all["set_status_norm"] = set_status_all["set_status"].astype(str).str.upper().str.strip()
+        set_status_all["is_na"] = set_status_all["set_status_norm"].str.contains("NA", na=False)
         set_status_all["set_name"] = set_status_all["set_display"].astype(str).where(
             set_status_all["set_display"].astype(str).str.strip().ne(""),
             set_status_all["id"].astype(str),
@@ -372,8 +377,12 @@ with inv_tabs[0]:
         for cat_norm in ordered_norm:
             label = display_by_norm.get(cat_norm, cat_norm)
             cat_rows = set_status_all[set_status_all["category_norm"] == cat_norm]
-            in_rows = cat_rows[cat_rows["location_norm"] == "OFFICE"]
-            out_case_rows = cat_rows[(cat_rows["location_norm"] != "OFFICE") & (cat_rows["location_norm"] != "")]
+            in_rows = cat_rows[(cat_rows["location_norm"] == "OFFICE") & (~cat_rows["is_na"])]
+            out_case_rows = cat_rows[
+                (cat_rows["location_norm"] != "OFFICE")
+                & (cat_rows["location_norm"] != "")
+                & (~cat_rows["is_na"])
+            ]
 
             in_count = int(len(in_rows))
             out_count = int(len(out_case_rows))
@@ -801,239 +810,6 @@ with inv_tabs[2]:
         st.markdown(
             "".join(_pt_row_html(r) for _, r in pt_avail.iterrows()),
             unsafe_allow_html=True,
-        )
-
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# SECTION 3 — FORECAST (NEXT 3 DAYS)
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-st.markdown("<div class='sec-header'>Forecast — Next 3 Days (ATC)</div>", unsafe_allow_html=True)
-
-today_d = now_kl.date()
-horizon_d = today_d + timedelta(days=3)
-
-set_status_fc = pd.DataFrame(report.get("set_office_status", []))
-set_avail_fc = pd.DataFrame(report.get("set_category_availability", []))
-cases_all_fc = pd.DataFrame(report.get("cases_all", []))
-
-if cases_all_fc.empty:
-    all_rows = []
-    for _, rows in report.get("case_buckets", {}).items():
-        all_rows.extend(rows)
-    if all_rows:
-        cases_all_fc = pd.DataFrame(all_rows).drop_duplicates(subset=["case_id"], keep="first")
-        if "set_categories" not in cases_all_fc.columns:
-            cases_all_fc["set_categories"] = ""
-
-if not set_status_fc.empty:
-    for col in ("category", "id", "set_display", "location_now", "surgery_date", "case_id", "patient_doctor"):
-        if col not in set_status_fc.columns:
-            set_status_fc[col] = ""
-    set_status_fc = set_status_fc.copy()
-    set_status_fc["location_norm"] = set_status_fc["location_now"].astype(str).str.upper().str.strip()
-    set_status_fc["set_name"] = set_status_fc["set_display"].astype(str).where(
-        set_status_fc["set_display"].astype(str).str.strip().ne(""),
-        set_status_fc["id"].astype(str),
-    )
-    set_status_fc["surgery_date_obj"] = pd.to_datetime(
-        set_status_fc["surgery_date"], dayfirst=True, errors="coerce"
-    ).dt.date
-
-if not cases_all_fc.empty:
-    for col in ("case_id", "hospital", "patient_doctor", "surgery_date", "set_categories", "sets_raw", "sets"):
-        if col not in cases_all_fc.columns:
-            cases_all_fc[col] = ""
-    cases_all_fc = cases_all_fc.copy()
-    cases_all_fc["surgery_date_obj"] = pd.to_datetime(
-        cases_all_fc["surgery_date"], dayfirst=True, errors="coerce"
-    ).dt.date
-
-    def _cat_list(v: object) -> list[str]:
-        if isinstance(v, list):
-            return [str(x).strip() for x in v if str(x).strip()]
-        text = str(v or "").strip()
-        if not text:
-            return []
-        return [p.strip() for p in text.split(";") if p.strip()]
-
-    cases_all_fc["set_categories_list"] = cases_all_fc["set_categories"].apply(_cat_list)
-else:
-    cases_all_fc = pd.DataFrame(columns=["case_id", "hospital", "patient_doctor", "surgery_date", "set_categories_list", "sets_raw", "sets", "surgery_date_obj"])
-
-cases_done_next3 = cases_all_fc[
-    cases_all_fc["surgery_date_obj"].notna()
-    & (cases_all_fc["surgery_date_obj"] >= today_d)
-    & (cases_all_fc["surgery_date_obj"] <= horizon_d)
-].copy()
-
-demand_counter: dict[str, int] = {}
-for cats in cases_done_next3.get("set_categories_list", pd.Series(dtype=object)):
-    for cat in cats:
-        demand_counter[cat] = demand_counter.get(cat, 0) + 1
-
-avail_lookup: dict[str, int] = {}
-total_lookup: dict[str, int] = {}
-if not set_avail_fc.empty:
-    for _, r in set_avail_fc.iterrows():
-        cat = str(r.get("category", "")).strip()
-        if not cat:
-            continue
-        a_num = pd.to_numeric(r.get("available", 0), errors="coerce")
-        t_num = pd.to_numeric(r.get("total_office", 0), errors="coerce")
-        avail_lookup[cat] = int(a_num) if pd.notna(a_num) else 0
-        total_lookup[cat] = int(t_num) if pd.notna(t_num) else 0
-
-low_rows = []
-all_forecast_cats = sorted(set(list(avail_lookup.keys()) + list(demand_counter.keys())))
-for cat in all_forecast_cats:
-    available_now = avail_lookup.get(cat, 0)
-    demand_3d = demand_counter.get(cat, 0)
-    total_cat = total_lookup.get(cat, 0)
-    remaining = available_now - demand_3d
-    if remaining <= 0 and demand_3d > 0:
-        risk = "Critical"
-    elif remaining <= 1 or available_now <= 1:
-        risk = "Low"
-    else:
-        risk = "OK"
-    low_rows.append({
-        "Category": cat,
-        "Available Now": available_now,
-        "Demand (Next 3D)": demand_3d,
-        "Forecast Remaining": remaining,
-        "Total": total_cat,
-        "Risk": risk,
-    })
-
-low_df = pd.DataFrame(low_rows)
-if not low_df.empty:
-    low_df = low_df[low_df["Risk"] != "OK"].sort_values(["Risk", "Forecast Remaining", "Available Now"])
-
-freeup_df = pd.DataFrame()
-if not set_status_fc.empty:
-    out_now = set_status_fc[
-        (set_status_fc["location_norm"] != "OFFICE")
-        & (set_status_fc["location_norm"] != "")
-    ].copy()
-    freeup_df = out_now[
-        out_now["surgery_date_obj"].notna() & (out_now["surgery_date_obj"] <= horizon_d)
-    ].copy()
-
-    def _priority(surg: object) -> str:
-        if pd.isna(surg):
-            return "Check Date"
-        if surg < today_d:
-            return "Overdue Collect"
-        if surg == today_d:
-            return "Collect Today"
-        return "Collect Soon"
-
-    if not freeup_df.empty:
-        freeup_df["Collection Priority"] = freeup_df["surgery_date_obj"].apply(_priority)
-        freeup_df["Return ETA"] = freeup_df["surgery_date_obj"].astype(str)
-        freeup_df = freeup_df.sort_values(["surgery_date_obj", "category", "set_name"])
-
-fleet_df = pd.DataFrame()
-if not set_status_fc.empty:
-    fleet_df = set_status_fc.copy()
-    fleet_df["Whereabouts"] = fleet_df["location_now"].astype(str).replace("", "OFFICE")
-    fleet_df["Should Return"] = fleet_df["location_norm"].apply(lambda x: "No" if x == "OFFICE" else "Yes")
-
-    def _eta(row: pd.Series) -> str:
-        surg = row.get("surgery_date_obj")
-        if row.get("location_norm") == "OFFICE":
-            return "Ready Now"
-        if pd.isna(surg):
-            return "Check Hospital"
-        if surg < today_d:
-            return "Collect Now"
-        return str(surg)
-
-    def _action(row: pd.Series) -> str:
-        loc = row.get("location_norm")
-        surg = row.get("surgery_date_obj")
-        if loc == "OFFICE":
-            return "Deployable"
-        if pd.isna(surg):
-            return "Call Hospital"
-        if surg <= today_d:
-            return "Dispatch Collection"
-        if surg <= horizon_d:
-            return "Plan Emergency Backhaul"
-        return "Monitor"
-
-    fleet_df["Return ETA"] = fleet_df.apply(_eta, axis=1)
-    fleet_df["Action"] = fleet_df.apply(_action, axis=1)
-    fleet_df = fleet_df.sort_values(["Should Return", "surgery_date", "category", "set_name"])
-
-f_tabs = st.tabs(["⚠️ Low Sets", "✅ Cases Done", "🚚 Emergency Free-Up", "🛫 Fleet ATC"])
-
-with f_tabs[0]:
-    st.caption(f"Window: {today_d} to {horizon_d}")
-    if low_df.empty:
-        st.success("No low-risk set category detected in the next 3 days.")
-    else:
-        st.dataframe(low_df, use_container_width=True, hide_index=True)
-
-with f_tabs[1]:
-    st.caption(f"Surgery date within next 3 days ({today_d} to {horizon_d})")
-    if cases_done_next3.empty:
-        st.info("No cases with surgery date in the next 3 days.")
-    else:
-        show_cases = cases_done_next3.copy()
-        show_cases["Set Categories"] = show_cases["set_categories_list"].apply(lambda x: ", ".join(x))
-        st.dataframe(
-            show_cases[[
-                "case_id", "hospital", "patient_doctor", "surgery_date", "Set Categories", "sets_raw",
-            ]].rename(columns={
-                "case_id": "Case",
-                "hospital": "Hospital",
-                "patient_doctor": "Patient/Doctor",
-                "surgery_date": "Surgery Date",
-                "sets_raw": "Sets Raw",
-            }),
-            use_container_width=True,
-            hide_index=True,
-        )
-
-with f_tabs[2]:
-    st.caption("Sets currently out that can be targeted for collection by/within 3 days.")
-    if freeup_df.empty:
-        st.info("No out sets with surgery date due by the next 3 days.")
-    else:
-        st.dataframe(
-            freeup_df[[
-                "set_name", "category", "location_now", "surgery_date", "Return ETA",
-                "Collection Priority", "case_id", "patient_doctor",
-            ]].rename(columns={
-                "set_name": "Set",
-                "category": "Category",
-                "location_now": "Hospital",
-                "surgery_date": "Surgery Date",
-                "case_id": "Case",
-                "patient_doctor": "Patient/Doctor",
-            }),
-            use_container_width=True,
-            hide_index=True,
-        )
-
-with f_tabs[3]:
-    if fleet_df.empty:
-        st.info("No fleet data.")
-    else:
-        st.dataframe(
-            fleet_df[[
-                "set_name", "category", "Whereabouts", "Should Return", "Return ETA",
-                "surgery_date", "case_id", "patient_doctor", "Action",
-            ]].rename(columns={
-                "set_name": "Set",
-                "category": "Category",
-                "surgery_date": "Surgery Date",
-                "case_id": "Case",
-                "patient_doctor": "Patient/Doctor",
-            }),
-            use_container_width=True,
-            hide_index=True,
         )
 
 
