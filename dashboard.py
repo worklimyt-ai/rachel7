@@ -258,8 +258,9 @@ with st.sidebar:
 # Load / cache report
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 @st.cache_data(show_spinner="Loading data…", ttl=60)
-def load_report(master: str, cases: str, archive: str) -> dict:
+def load_report(master: str, cases: str, archive: str, source_signature: str) -> dict:
     from ops_engine import build_operations_report
+    _ = source_signature  # cache key only
     return build_operations_report(
         master_data_path=master,
         cases_source=cases or None,
@@ -267,15 +268,37 @@ def load_report(master: str, cases: str, archive: str) -> dict:
     )
 
 
+def _source_signature(value: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    path = Path(text).expanduser()
+    if path.exists():
+        stat = path.stat()
+        return f"{path.resolve()}:{stat.st_mtime_ns}:{stat.st_size}"
+    return text
+
+
 if refresh:
     load_report.clear()
 
-if "report" not in st.session_state or refresh:
+report_signature = "|".join([
+    _source_signature(master_path),
+    _source_signature(cases_source),
+    _source_signature(archive_source),
+])
+
+if (
+    "report" not in st.session_state
+    or refresh
+    or st.session_state.get("report_signature") != report_signature
+):
     with st.spinner("Fetching data…"):
         try:
             st.session_state["report"] = load_report(
-                master_path, cases_source, archive_source
+                master_path, cases_source, archive_source, report_signature
             )
+            st.session_state["report_signature"] = report_signature
             st.session_state["load_error"] = None
         except Exception as exc:
             st.session_state["load_error"] = str(exc)

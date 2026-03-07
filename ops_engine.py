@@ -688,9 +688,15 @@ def build_set_outputs(
             "set_status":        s.get("status", ""),
         }
         if not assignments:
+            in_standby = (
+                str(s.get("home", "")).strip().upper() == "STANDBY"
+                or is_standby_status(s.get("status", ""))
+            )
             set_office_status.append({
                 **base_row,
-                "location_now":      s["home"] if str(s.get("home", "")).strip().upper() in {"OFFICE", "STANDBY"} else "OFFICE",
+                "location_now":      "STANDBY" if in_standby else (
+                    s["home"] if str(s.get("home", "")).strip().upper() in {"OFFICE", "STANDBY"} else "OFFICE"
+                ),
                 "delivery_date":     "",
                 "surgery_date":      "",
                 "days_since_surgery":"",
