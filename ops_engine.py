@@ -378,6 +378,7 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
             "drawer_locations": set(),
             "stock_locations":  set(),
             "drawer_size_map": defaultdict(list),
+            "all_size_labels": [],   # all individual size labels in this bucket
             "out_details":  [],
         })
         screw_sizes = str(row.get("screw_sizes", "")).strip()
@@ -392,6 +393,9 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
         bucket["stock_locations"].update(others)
         if not drawers and not others:
             bucket["stock_locations"].add("UNSPECIFIED")
+        # Track every individual size label belonging to this bucket
+        if plate_label and plate_label not in bucket["all_size_labels"]:
+            bucket["all_size_labels"].append(plate_label)
 
         uid_ranges[uid].add(size_range)
         uid_alias_candidates[uid].add(uid)
@@ -680,6 +684,7 @@ def build_plate_outputs(
                     "surgery_date":   case["surgery_date"],
                     "raw_plate_token":parsed["raw_token"],
                     "from_stock":     parsed["from_stock"],
+                    "out_size_labels": sorted(bucket["all_size_labels"]),
                 })
 
     plate_size_range_availability: list[dict[str, Any]] = []
@@ -700,6 +705,17 @@ def build_plate_outputs(
             range_status = "OUT OF STOCK"
         else:
             range_status = "PARTIAL"
+        # Summarise out cases for this bucket (for display)
+        out_case_details = [
+            {
+                "case_id":       d["case_id"],
+                "hospital":      d["hospital"],
+                "surgery_date":  d["surgery_date"],
+                "from_stock":    d["from_stock"],
+                "out_size_labels": d.get("out_size_labels", []),
+            }
+            for d in bucket["out_details"]
+        ]
         row = {
             "plate_uid":             uid,
             "proper_name":           bucket["plate_name"],
@@ -720,6 +736,8 @@ def build_plate_outputs(
             "available_units":       available_units,
             "availability":          f"{available_units}/{total}",
             "range_status":          range_status,
+            "out_case_details":      out_case_details,
+            "all_size_labels":       sorted(bucket["all_size_labels"]),
         }
         plate_size_range_availability.append(row)
         for drawer in sorted(bucket["drawer_size_map"]):
@@ -731,22 +749,25 @@ def build_plate_outputs(
                 "size_range": size_range,
                 "drawer": drawer,
                 "drawer_sizes": ", ".join(labels),
+                "drawer_sizes_list": labels,
                 "drawer_count": len(labels),
                 "available_units": available_units,
                 "total_units": total,
                 "availability": f"{available_units}/{total}",
                 "range_status": range_status,
+                "out_case_details": out_case_details,
             })
         for detail in bucket["out_details"]:
             plate_out_cases.append({
-                "plate_uid":      uid,
-                "size_range":     size_range,
-                "hospital":       detail["hospital"],
-                "case_id":        detail["case_id"],
-                "delivery_date":  detail["delivery_date"],
-                "surgery_date":   detail["surgery_date"],
-                "from_stock":     detail["from_stock"],
-                "raw_plate_token":detail["raw_plate_token"],
+                "plate_uid":       uid,
+                "size_range":      size_range,
+                "hospital":        detail["hospital"],
+                "case_id":         detail["case_id"],
+                "delivery_date":   detail["delivery_date"],
+                "surgery_date":    detail["surgery_date"],
+                "from_stock":      detail["from_stock"],
+                "raw_plate_token": detail["raw_plate_token"],
+                "out_size_labels": detail.get("out_size_labels", []),
             })
 
     # UID-level summary

@@ -616,47 +616,252 @@ with inv_tabs[1]:
                 | plate_sum["screw_sizes"].str.contains(search_query, case=False, na=False)
             ]
 
-        # Build lookup: plate_uid → list of out details
-        _plate_out: dict[str, list[dict]] = {}
-        if not plate_out_df.empty:
-            for _, pr in plate_out_df.iterrows():
-                _plate_out.setdefault(str(pr["plate_uid"]), []).append({
-                    "size":      str(pr.get("size_range", "") or "").strip(),
-                    "hospital":  str(pr.get("hospital", "") or "").strip(),
-                    "surgery":   str(pr.get("surgery_date", "") or "").strip(),
-                    "from_stock":bool(pr.get("from_stock", False)),
+        # ── CSS for plate drawer/size chip display ───────────────────────────
+        st.markdown("""
+<style>
+/* ── Size-range group wrapper ── */
+.sr-group {
+    margin-top: 10px;
+    border-radius: 9px;
+    overflow: hidden;
+    border: 1.5px solid #e5e7eb;
+}
+/* Size-range group — state variants */
+.sr-group.sg-ready   { border-color: #d1fae5; }
+.sr-group.sg-out     { border-color: #fca5a5; }
+.sr-group.sg-nostock { border-color: #e5e7eb; }
+
+/* Size-range header bar */
+.sr-hdr {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 10px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+}
+.sr-hdr.sh-ready   { background:#f0fdf4; color:#15803d; }
+.sr-hdr.sh-out     { background:#fff1f2; color:#be123c; }
+.sr-hdr.sh-nostock { background:#f3f4f6; color:#6b7280; }
+
+/* "OUT → Hospital" tag inside header */
+.sr-out-tag {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    background: #fecdd3;
+    color: #9f1239;
+    border-radius: 4px;
+    padding: 1px 7px;
+    margin-left: 6px;
+}
+.sr-out-tag.ot-stock { background:#fde68a; color:#92400e; }
+
+/* Drawer row inside a size-range group */
+.dr-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 10px 6px 10px;
+    border-top: 1px solid #f3f4f6;
+    background: #ffffff;
+}
+.dr-row.drr-out     { background: #fff8f8; }
+.dr-row.drr-nostock { background: #f9fafb; }
+
+/* Drawer label tag */
+.dr-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    color: #6b7280;
+    background: #f3f4f6;
+    border-radius: 4px;
+    padding: 2px 6px;
+    margin-right: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.drr-out     .dr-tag { background:#ffe4e6; color:#be123c; }
+.drr-nostock .dr-tag { background:#f3f4f6; color:#9ca3af; }
+
+/* Individual size chip — the tiny rounded boxes */
+.sc {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 20px;
+    white-space: nowrap;
+    letter-spacing: .01em;
+    border: 1.5px solid transparent;
+}
+/* in stock */
+.sc-ok      { background:#dcfce7; color:#166534; border-color:#86efac; }
+/* out for a case — amber */
+.sc-out     { background:#fef3c7; color:#92400e; border-color:#fcd34d; }
+/* zero stock — red strikethrough */
+.sc-none    { background:#fee2e2; color:#9f1239; border-color:#fca5a5;
+              text-decoration: line-through; opacity: .8; }
+</style>
+""", unsafe_allow_html=True)
+
+        # Size-range display order
+        _SR_ORDER = ["SHORT", "STANDARD", "LONG", "EXTRA LONG"]
+
+        # ── Build rich lookup from plate_size_range_availability ──────────────
+        # plate_uid → { size_range → {range_status, out_case_details, all_size_labels} }
+        _psr_rich: dict[str, dict[str, dict]] = {}
+        _psr_raw = pd.DataFrame(report.get("plate_size_range_availability", []))
+        if not _psr_raw.empty:
+            for _, srow in _psr_raw.iterrows():
+                uid_key = str(srow["plate_uid"])
+                sr_key  = str(srow.get("size_range", "STANDARD"))
+                _psr_rich.setdefault(uid_key, {})[sr_key] = {
+                    "range_status":    str(srow.get("range_status", "READY")).upper().strip(),
+                    "out_case_details": srow.get("out_case_details", []) or [],
+                    "all_size_labels":  srow.get("all_size_labels", []) or [],
+                }
+
+        # ── Build lookup: plate_uid → { size_range → [ drawer_rows ] } ────────
+        _pdd_lookup: dict[str, dict[str, list[dict]]] = {}
+        _pdd_raw = pd.DataFrame(report.get("plate_drawer_detail", []))
+        if not _pdd_raw.empty:
+            for _, drow in _pdd_raw.iterrows():
+                uid_key = str(drow["plate_uid"])
+                sr_key  = str(drow.get("size_range", "STANDARD"))
+                sizes_list = drow.get("drawer_sizes_list") or []
+                if not sizes_list and drow.get("drawer_sizes"):
+                    sizes_list = [s.strip() for s in str(drow["drawer_sizes"]).split(",") if s.strip()]
+                _pdd_lookup.setdefault(uid_key, {}).setdefault(sr_key, []).append({
+                    "drawer":      str(drow.get("drawer", "")),
+                    "sizes_list":  sizes_list,
+                    "range_status": str(drow.get("range_status", "READY")).upper().strip(),
+                    "out_case_details": drow.get("out_case_details", []) or [],
                 })
 
         def _plate_row_html(row: pd.Series) -> str:
-            badge     = avail_badge(int(row["available_units"]), int(row["total_units"]))
-            out_items = _plate_out.get(row["plate_uid"], [])
-            out_lines = ""
-            for o in out_items:
-                hosp  = o["hospital"] or "—"
-                surg  = o["surgery"]  or "—"
-                size  = (f"<span style='color:#6b7280;font-size:10px;margin-right:4px'>{o['size']}</span>"
-                         if o["size"] else "")
-                stock = (" <span class='out-stock'>[stock]</span>" if o["from_stock"] else "")
-                out_lines += (
-                    f"<div class='out-line'>"
-                    f"<span class='out-tag'>OUT</span> "
-                    f"{size}"
-                    f"<span class='out-sep'>→ </span>"
-                    f"<span class='out-hosp'>{hosp}</span>"
-                    f"<span class='out-sep'> · </span>"
-                    f"<span class='out-surg'>surg {surg}</span>"
-                    f"{stock}"
+            uid   = row["plate_uid"]
+            badge = avail_badge(int(row["available_units"]), int(row["total_units"]))
+
+            # ── Determine which size ranges exist & in what combinations ───────
+            uid_sr_data = _psr_rich.get(uid, {})
+            uid_drawers = _pdd_lookup.get(uid, {})
+            all_srs     = sorted(uid_sr_data.keys(), key=lambda x: _SR_ORDER.index(x) if x in _SR_ORDER else 99)
+
+            # Figure out grouping: which ranges go out together for the same case
+            # Group consecutive ranges that share a case_id into a "send bundle"
+            # We colour the whole bundle the same OUT colour
+            case_to_srs: dict[str, list[str]] = {}
+            for sr in all_srs:
+                for cd in uid_sr_data[sr].get("out_case_details", []):
+                    case_to_srs.setdefault(cd["case_id"], []).append(sr)
+
+            # Map size_range → case info (first case if multiple)
+            sr_case_map: dict[str, dict] = {}
+            for sr in all_srs:
+                for cd in uid_sr_data[sr].get("out_case_details", []):
+                    if sr not in sr_case_map:
+                        sr_case_map[sr] = cd
+
+            sr_blocks = ""
+            for sr in all_srs:
+                sr_info    = uid_sr_data[sr]
+                rs         = sr_info["range_status"]
+                out_cases  = sr_info.get("out_case_details", [])
+                all_labels = sr_info.get("all_size_labels", [])
+                drawer_rows = uid_drawers.get(sr, [])
+
+                # Determine header style
+                if rs == "READY":
+                    hdr_cls = "sh-ready"; grp_cls = "sg-ready"
+                elif rs == "OUT OF STOCK" and out_cases:
+                    hdr_cls = "sh-out";   grp_cls = "sg-out"
+                else:
+                    hdr_cls = "sh-nostock"; grp_cls = "sg-nostock"
+
+                # Build out tags for header (who took it)
+                out_tags_html = ""
+                for cd in out_cases:
+                    hosp    = cd.get("hospital", "") or "—"
+                    surg    = cd.get("surgery_date", "") or "—"
+                    is_stk  = bool(cd.get("from_stock", False))
+                    ot_cls  = "ot-stock" if is_stk else ""
+                    stock_s = " [stk]" if is_stk else ""
+                    out_tags_html += (
+                        f"<span class='sr-out-tag {ot_cls}'>"
+                        f"OUT → {hosp} · surg {surg}{stock_s}"
+                        f"</span>"
+                    )
+
+                # Build drawer rows with per-chip status
+                drawers_html = ""
+                if drawer_rows:
+                    for dr in drawer_rows:
+                        dr_rs  = dr["range_status"]
+                        d_name = dr["drawer"]
+                        sizes  = dr["sizes_list"]
+                        drr_cls = "drr-out" if (dr_rs == "OUT OF STOCK" and out_cases) else (
+                                  "drr-nostock" if dr_rs == "OUT OF STOCK" else "")
+
+                        chips_html = ""
+                        for sz in sizes:
+                            if dr_rs == "OUT OF STOCK" and out_cases:
+                                # size is out for a specific case
+                                chip_cls = "sc-out"
+                            elif dr_rs == "OUT OF STOCK":
+                                # no stock at all
+                                chip_cls = "sc-none"
+                            else:
+                                chip_cls = "sc-ok"
+                            chips_html += f"<span class='sc {chip_cls}'>{sz}</span>"
+
+                        drawers_html += (
+                            f"<div class='dr-row {drr_cls}'>"
+                            f"<span class='dr-tag'>{d_name}</span>"
+                            f"{chips_html}"
+                            f"</div>"
+                        )
+                else:
+                    # No drawers — show size labels as chips (stock items)
+                    chips_html = ""
+                    for sz in all_labels:
+                        if rs == "OUT OF STOCK" and out_cases:
+                            chip_cls = "sc-out"
+                        elif rs == "OUT OF STOCK":
+                            chip_cls = "sc-none"
+                        else:
+                            chip_cls = "sc-ok"
+                        chips_html += f"<span class='sc {chip_cls}'>{sz}</span>"
+                    if chips_html:
+                        drawers_html = (
+                            f"<div class='dr-row'>"
+                            f"<span class='dr-tag' style='color:#9ca3af'>stock</span>"
+                            f"{chips_html}"
+                            f"</div>"
+                        )
+
+                sr_blocks += (
+                    f"<div class='sr-group {grp_cls}'>"
+                    f"<div class='sr-hdr {hdr_cls}'>"
+                    f"<span>{sr}</span>"
+                    f"<span>{out_tags_html}</span>"
+                    f"</div>"
+                    f"{drawers_html}"
                     f"</div>"
                 )
+
             return (
                 f"<div class='inv-row'>"
                 f"<div style='display:flex;justify-content:space-between;align-items:center'>"
                 f"<span class='inv-name'>{row['proper_name']}</span>"
                 f"<span>{badge}</span>"
                 f"</div>"
-                f"<div class='inv-sub'>{row['plate_uid']} &nbsp;·&nbsp; {row['screw_sizes'] or ''}{' &nbsp;·&nbsp; ' if row['screw_sizes'] else ''}{row['size_ranges']}</div>"
-                f"<div class='inv-sub'>status: {row['status_note'] or 'READY'}</div>"
-                f"{out_lines}"
+                f"<div class='inv-sub'>{uid} &nbsp;·&nbsp; {row['screw_sizes'] or ''}</div>"
+                f"{sr_blocks}"
                 f"</div>"
             )
 
