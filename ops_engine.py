@@ -368,8 +368,8 @@ def build_set_indexes(master_sets: list[dict[str, Any]]) -> dict[str, Any]:
         if item["_uid_norm"]:       uid_map[item["_uid_norm"]].append(item)
         if item["_shorthand_norm"]: shorthand_map[item["_shorthand_norm"]].append(item)
         if item["_category_norm"]:  category_map[item["_category_norm"]].append(item)
-        if item["home"] == "OFFICE":
-            # Only count as office-available if not NA status
+        if item["home"] in {"OFFICE", "STANDBY"}:
+            # Treat STANDBY as available inventory alongside OFFICE.
             office_sets.append(item)
 
     return {
@@ -674,7 +674,7 @@ def build_set_outputs(
         if not assignments:
             set_office_status.append({
                 **base_row,
-                "location_now":      "OFFICE",
+                "location_now":      s["home"] if str(s.get("home", "")).strip().upper() in {"OFFICE", "STANDBY"} else "OFFICE",
                 "delivery_date":     "",
                 "surgery_date":      "",
                 "days_since_surgery":"",

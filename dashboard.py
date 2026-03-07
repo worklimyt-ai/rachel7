@@ -333,14 +333,19 @@ with inv_tabs[0]:
             num = pd.to_numeric(val, errors="coerce")
             return int(num) if pd.notna(num) else 0
 
-        for col in ("category", "set_display", "id", "location_now", "surgery_date", "patient_doctor", "case_id", "set_status"):
+        for col in ("category", "set_display", "id", "location_now", "surgery_date", "patient_doctor", "case_id", "set_status", "home"):
             if col not in set_status_all.columns:
                 set_status_all[col] = ""
         set_status_all = set_status_all.copy()
         set_status_all["category_norm"] = set_status_all["category"].astype(str).str.upper().str.strip()
         set_status_all["location_norm"] = set_status_all["location_now"].astype(str).str.upper().str.strip()
+        set_status_all["home_norm"] = set_status_all["home"].astype(str).str.upper().str.strip()
         set_status_all["set_status_norm"] = set_status_all["set_status"].astype(str).str.upper().str.strip()
         set_status_all["is_na"] = set_status_all["set_status_norm"].str.contains("NA", na=False)
+        set_status_all["is_standby"] = (
+            set_status_all["home_norm"].eq("STANDBY")
+            | set_status_all["set_status_norm"].str.contains("STANDBY", na=False)
+        )
         set_status_all["set_name"] = set_status_all["set_display"].astype(str).where(
             set_status_all["set_display"].astype(str).str.strip().ne(""),
             set_status_all["id"].astype(str),
@@ -377,9 +382,9 @@ with inv_tabs[0]:
         for cat_norm in ordered_norm:
             label = display_by_norm.get(cat_norm, cat_norm)
             cat_rows = set_status_all[set_status_all["category_norm"] == cat_norm]
-            in_rows = cat_rows[(cat_rows["location_norm"] == "OFFICE") & (~cat_rows["is_na"])]
+            in_rows = cat_rows[(cat_rows["location_norm"].isin(["OFFICE", "STANDBY"])) & (~cat_rows["is_na"])]
             out_case_rows = cat_rows[
-                (cat_rows["location_norm"] != "OFFICE")
+                (~cat_rows["location_norm"].isin(["OFFICE", "STANDBY"]))
                 & (cat_rows["location_norm"] != "")
                 & (~cat_rows["is_na"])
             ]
@@ -393,7 +398,12 @@ with inv_tabs[0]:
             if cat_norm not in ordered_core and total == 0 and available == 0 and out_count == 0:
                 continue
 
-            in_list = "; ".join(sorted(in_rows["set_name"].astype(str).tolist()))
+            in_list = "; ".join(
+                sorted([
+                    f"{str(r['set_name'])}{' [standby]' if bool(r.get('is_standby', False)) else ''}"
+                    for _, r in in_rows.iterrows()
+                ])
+            )
             out_list = "; ".join(
                 sorted([
                     f"{str(r['set_name'])} @ {str(r['location_now']).strip() or 'OUT'} ({str(r['surgery_date']).strip() or '-'})"
