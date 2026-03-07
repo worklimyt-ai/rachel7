@@ -840,40 +840,25 @@ with inv_tabs[2]:
     pt_uid   = pd.DataFrame(report.get("powertool_uid_availability", []))
     pt_u30   = pd.DataFrame(report.get("powertool_usage_30d", []))
 
-    if pt_avail.empty:
+    if pt_avail.empty and pt_uid.empty:
         st.info("No powertool data.")
     else:
-        if not pt_uid.empty:
-            for col in ("powertool_uid", "category", "availability", "hospital", "surgery_date", "patient_doctor"):
-                if col not in pt_uid.columns:
-                    pt_uid[col] = ""
-            pt_uid = pt_uid.copy()
-            pt_uid["availability_norm"] = pt_uid["availability"].astype(str).str.upper().str.strip()
-            pt_uid["uid_name"] = pt_uid["powertool_uid"].astype(str).str.strip()
+        def _safe_int(val) -> int:
+            num = pd.to_numeric(val, errors="coerce")
+            return int(num) if pd.notna(num) else 0
 
-            if search_query:
-                pt_uid = pt_uid[
-                    pt_uid["category"].str.contains(search_query, case=False, na=False)
-                    | pt_uid["uid_name"].str.contains(search_query, case=False, na=False)
-                    | pt_uid["hospital"].str.contains(search_query, case=False, na=False)
-                    | pt_uid["surgery_date"].str.contains(search_query, case=False, na=False)
-                ]
+        for col in ("powertool_uid", "category", "availability", "hospital", "surgery_date", "patient_doctor"):
+            if col not in pt_uid.columns:
+                pt_uid[col] = ""
+        pt_uid = pt_uid.copy()
+        pt_uid["category_norm"] = pt_uid["category"].astype(str).str.upper().str.strip()
+        pt_uid["availability_norm"] = pt_uid["availability"].astype(str).str.upper().str.strip()
+        pt_uid["uid_name"] = pt_uid["powertool_uid"].astype(str).str.strip()
 
-        if search_query:
-            pt_avail = pt_avail[
-                pt_avail["category"].str.contains(search_query, case=False, na=False)
-            ]
-
-        # Build lookup: uid → list of out details
-        _pt_uid_out: dict[str, list[dict]] = {}
-        if not pt_del.empty:
-            for _, pr in pt_del.iterrows():
-                _pt_uid_out.setdefault(str(pr.get("powertool_uid", "")).strip(), []).append({
-                    "uid":     str(pr.get("powertool_uid", "") or "").strip(),
-                    "hospital":str(pr.get("hospital", "") or "").strip(),
-                    "surgery": str(pr.get("surgery_date", "") or "").strip(),
-                    "patient": str(pr.get("patient_doctor", "") or "").strip(),
-                })
+        if "category" not in pt_avail.columns:
+            pt_avail["category"] = ""
+        pt_avail = pt_avail.copy()
+        pt_avail["category_norm"] = pt_avail["category"].astype(str).str.upper().str.strip()
 
         usage_by_uid: dict[str, int] = {}
         if not pt_u30.empty:
@@ -881,69 +866,185 @@ with inv_tabs[2]:
                 key = str(ur.get("powertool_uid", "")).strip()
                 if not key:
                     continue
-                usage_by_uid[key] = int(pd.to_numeric(ur.get("usage_30d", 0), errors="coerce") or 0)
+                usage_by_uid[key] = _safe_int(ur.get("usage_30d", 0))
 
-    def _pt_row_html(row: pd.Series) -> str:
-        availability = str(row.get("availability_norm", "")).upper().strip()
-        if availability in {"AVAILABLE", "NA_HOLD"}:
-            available, total = 1, 1
-        else:
-            available, total = 0, 1
-        badge = avail_badge(available, total)
-        uid = str(row.get("uid_name", "")).strip()
-        state_note = {
-            "AVAILABLE": "in office",
-            "NA_HOLD": "on hold",
-            "OUT": "out",
-            "OUT_NA_HOLD": "out (on hold)",
-        }.get(availability, availability.lower() or "unknown")
-        use_30d = usage_by_uid.get(uid, 0)
-        usage_note = f"<span style='color:#6b7280;font-size:12px;margin-left:8px'>30d use: {use_30d}</span>"
+        # uid -> out details with patient context
+        _pt_uid_out: dict[str, list[dict]] = {}
+        if not pt_del.empty:
+            for _, pr in pt_del.iterrows():
+                key = str(pr.get("powertool_uid", "")).strip()
+                if not key:
+                    continue
+                _pt_uid_out.setdefault(key, []).append({
+                    "uid": str(pr.get("powertool_uid", "") or "").strip(),
+                    "hospital": str(pr.get("hospital", "") or "").strip(),
+                    "surgery": str(pr.get("surgery_date", "") or "").strip(),
+                    "patient": str(pr.get("patient_doctor", "") or "").strip(),
+                })
 
-        out_lines = ""
-        if availability.startswith("OUT"):
-            for o in _pt_uid_out.get(uid, []):
-                hosp = o["hospital"] or "—"
-                surg = o["surgery"] or "—"
-                patient_note = ""
-                if o.get("patient"):
-                    patient_note = (
-                        "<span class='out-days' style='margin-left:8px'>"
-                        f"{o['patient']}</span>"
-                    )
-                out_lines += (
+        avail_lookup: dict[str, int] = {}
+        usable_lookup: dict[str, int] = {}
+        hold_lookup: dict[str, int] = {}
+        for _, r in pt_avail.iterrows():
+            key = str(r.get("category_norm", "")).strip()
+            if key:
+                avail_lookup[key] = _safe_int(r.get("available", 0))
+                usable_lookup[key] = _safe_int(r.get("usable_total", 0))
+                hold_lookup[key] = _safe_int(r.get("na_hold", 0))
+
+        ordered_cats = ["P5503", "P5400", "P8400"]
+        discovered = sorted({
+            *pt_uid["category_norm"].astype(str).tolist(),
+            *pt_avail["category_norm"].astype(str).tolist(),
+        })
+        ordered_cats.extend([c for c in discovered if c and c not in ordered_cats])
+
+        def _usage_html(uid: str) -> str:
+            use_30d = usage_by_uid.get(uid, 0)
+            return (
+                f"<span style='display:block;color:#4b5563;font-size:14px;"
+                f"font-weight:700;line-height:1.15;margin-top:2px'>30d use {use_30d}</span>"
+            )
+
+        def _unit_chip(uid: str, hold: bool = False) -> str:
+            bg = "#f3f4f6" if hold else "#eff6ff"
+            fg = "#6b7280" if hold else "#1d4ed8"
+            border = "#d1d5db" if hold else "#bfdbfe"
+            suffix = " [hold]" if hold else ""
+            return (
+                f"<span style='display:inline-flex;flex-direction:column;align-items:flex-start;"
+                f"background:{bg};color:{fg};border:1px solid {border};"
+                f"font-family:\"JetBrains Mono\",monospace;border-radius:8px;"
+                f"padding:7px 10px;margin:3px 6px 3px 0;min-width:140px'>"
+                f"<span style='font-size:14px;font-weight:700;line-height:1.1'>{uid}{suffix}</span>"
+                f"{_usage_html(uid)}"
+                f"</span>"
+            )
+
+        summary_rows = []
+        for cat_norm in ordered_cats:
+            cat_rows = pt_uid[pt_uid["category_norm"] == cat_norm]
+            avail_rows = cat_rows[cat_rows["availability_norm"] == "AVAILABLE"]
+            hold_rows = cat_rows[cat_rows["availability_norm"] == "NA_HOLD"]
+            out_rows = cat_rows[cat_rows["availability_norm"].str.startswith("OUT")]
+
+            available = avail_lookup.get(cat_norm, int(len(avail_rows)))
+            usable_total = usable_lookup.get(cat_norm, int(len(avail_rows) + len(out_rows)))
+            usable_total = usable_total if usable_total > 0 else int(len(avail_rows) + len(out_rows))
+            if not cat_norm or (usable_total == 0 and len(hold_rows) == 0 and len(out_rows) == 0 and len(avail_rows) == 0):
+                continue
+
+            available_units = [
+                {"uid": str(r["uid_name"]).strip(), "hold": False}
+                for _, r in avail_rows.sort_values(["uid_name"]).iterrows()
+            ]
+            hold_units = [
+                {"uid": str(r["uid_name"]).strip(), "hold": True}
+                for _, r in hold_rows.sort_values(["uid_name"]).iterrows()
+            ]
+
+            out_items = []
+            for _, r in out_rows.sort_values(["surgery_date", "uid_name"]).iterrows():
+                uid = str(r.get("uid_name", "")).strip()
+                details = _pt_uid_out.get(uid, [])
+                matched = None
+                for d in details:
+                    if (
+                        str(d.get("hospital", "")).strip() == str(r.get("hospital", "")).strip()
+                        and str(d.get("surgery", "")).strip() == str(r.get("surgery_date", "")).strip()
+                    ):
+                        matched = d
+                        break
+                if matched is None:
+                    matched = details[0] if details else {
+                        "uid": uid,
+                        "hospital": str(r.get("hospital", "")).strip(),
+                        "surgery": str(r.get("surgery_date", "")).strip(),
+                        "patient": str(r.get("patient_doctor", "")).strip(),
+                    }
+                out_items.append({
+                    "uid": uid,
+                    "hospital": matched.get("hospital", "") or str(r.get("hospital", "")).strip(),
+                    "surgery": matched.get("surgery", "") or str(r.get("surgery_date", "")).strip(),
+                    "patient": matched.get("patient", "") or str(r.get("patient_doctor", "")).strip(),
+                })
+
+            search_blob = " ".join(
+                [
+                    cat_norm,
+                    " ".join(item["uid"] for item in available_units),
+                    " ".join(item["uid"] for item in hold_units),
+                    " ".join(
+                        f"{item['uid']} {item['hospital']} {item['surgery']} {item['patient']}"
+                        for item in out_items
+                    ),
+                ]
+            ).lower()
+            if search_query and search_query.lower() not in search_blob:
+                continue
+
+            summary_rows.append({
+                "category": cat_norm,
+                "available": available,
+                "usable_total": usable_total,
+                "na_hold": hold_lookup.get(cat_norm, int(len(hold_rows))),
+                "available_units": available_units,
+                "hold_units": hold_units,
+                "out_items": out_items,
+            })
+
+        def _pt_group_html(row: dict) -> str:
+            badge = avail_badge(int(row["available"]), int(row["usable_total"]))
+            hold_note = (
+                f"<span style='color:#9ca3af;font-size:12px'>[{int(row['na_hold'])} on hold]</span>"
+                if int(row["na_hold"]) > 0 else ""
+            )
+            left_items = "".join(_unit_chip(item["uid"], hold=item["hold"]) for item in row["available_units"] + row["hold_units"])
+            if not left_items:
+                left_items = "<span style='color:#9ca3af;font-size:12px;font-style:italic'>none available</span>"
+
+            left_col = (
+                f"<div style='flex:0 0 39%;padding-right:20px'>"
+                f"<div style='display:flex;align-items:center;gap:12px;flex-wrap:wrap'>"
+                f"<span class='inv-name' style='font-size:20px'>{row['category']}</span>"
+                f"{badge}{hold_note}"
+                f"</div>"
+                f"<div style='margin-top:8px'>{left_items}</div>"
+                f"</div>"
+            )
+
+            if row["out_items"]:
+                out_lines = "".join(
                     f"<div class='out-line'>"
                     f"<span class='out-tag'>OUT</span> "
-                    f"<span class='out-hosp'>{hosp}</span>"
+                    f"<span class='out-set'>{o['uid']}</span>"
+                    f"<span class='out-sep'> → </span>"
+                    f"<span class='out-hosp'>{o['hospital'] or '—'}</span>"
                     f"<span class='out-sep'> · </span>"
-                    f"<span class='out-surg'>surg {surg}</span>"
-                    f"{patient_note}"
-                    f"</div>"
+                    f"<span class='out-surg'>surg {o['surgery'] or '—'}</span>"
+                    f"<span style='display:inline-block;margin-left:8px;color:#4b5563;font-size:14px;font-weight:700'>"
+                    f"30d use {usage_by_uid.get(o['uid'], 0)}</span>"
+                    + (f"<span class='out-days' style='margin-left:8px'>{o['patient']}</span>" if o['patient'] else "")
+                    + f"</div>"
+                    for o in row["out_items"]
                 )
-        else:
-            out_lines = "<span style='color:#9ca3af;font-size:12px;font-style:italic'>all in office</span>"
+            else:
+                out_lines = "<span style='color:#9ca3af;font-size:12px;font-style:italic'>all in office</span>"
 
-        return (
-            f"<div class='inv-row'>"
-            f"<div style='display:flex;justify-content:space-between;align-items:flex-start'>"
-            f"<div>"
-            f"<span class='inv-name'>{row['category']}: {uid}</span>"
-            f"<div class='inv-sub'> {uid} · {state_note}{usage_note}</div>"
-            f"</div>"
-            f"<span>{badge}</span>"
-            f"</div>"
-            f"<div style='margin-top:6px'>{out_lines}</div>"
-            f"</div>"
-        )
+            right_col = f"<div style='flex:1'>{out_lines}</div>"
+            return (
+                f"<div class='inv-row' style='display:flex;align-items:flex-start'>"
+                f"{left_col}{right_col}"
+                f"</div>"
+            )
 
-    if not pt_avail.empty:
-        if pt_uid.empty:
-            st.info("No powertool unit data.")
-        else:
+        if summary_rows:
             st.markdown(
-                "".join(_pt_row_html(r) for _, r in pt_uid.sort_values(["category", "uid_name"]).iterrows()),
+                "".join(_pt_group_html(row) for row in summary_rows),
                 unsafe_allow_html=True,
             )
+        else:
+            st.info("No matching powertools.")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
