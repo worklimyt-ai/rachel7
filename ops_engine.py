@@ -154,6 +154,30 @@ def canonical_size_range(value: Any) -> str:
         return "STANDARD"
     return token
 
+
+def size_range_sort_key(value: Any) -> tuple[int, str]:
+    token = canonical_size_range(value)
+    order = {"SHORT": 0, "STANDARD": 1, "LONG": 2, "EXTRA LONG": 3}
+    return (order.get(token, 99), token)
+
+
+def plate_label_sort_key(value: Any) -> tuple[int, int, str]:
+    token = normalize_code(value)
+    side_rank = 1
+    numeric_rank = 10_000
+    side = ""
+    if token.endswith("L"):
+        side_rank = 0
+        side = "L"
+    elif token.endswith("R"):
+        side_rank = 2
+        side = "R"
+    match = re.search(r"(\d+)", token)
+    if match:
+        numeric_value = int(match.group(1))
+        numeric_rank = numeric_value if side != "R" else -numeric_value
+    return (side_rank, numeric_rank, token)
+
 def compact_set_id(value: Any) -> str:
     text = str(value or "").strip()
     if not text:
@@ -364,8 +388,8 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
         size_range = canonical_size_range(row.get("size_range", "STANDARD"))
         key = (uid, size_range)
         drawers, others = parse_locations(row.get("location", ""))
-        drawer_units = len(drawers) or (0 if others else 1)
-        stock_units  = len(others)
+        drawer_units = len(drawers)
+        stock_units  = len(others) or (1 if not drawers and not others else 0)
 
         bucket = size_buckets.setdefault(key, {
             "plate_uid":    uid,
@@ -373,6 +397,8 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
             "set_category": str(row.get("set", "")).strip(),
             "size_range":   size_range,
             "screw_sizes_set": set(),
+            "total_drawer_units": 0,
+            "total_stock_units": 0,
             "out_drawer_units": 0,
             "out_stock_units":  0,
             "drawer_locations": set(),
@@ -400,6 +426,8 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
                 "size_range": size_range,
                 "no_stock":   sku_no_stock,
             })
+        bucket["total_drawer_units"] += drawer_units
+        bucket["total_stock_units"] += stock_units
         bucket["drawer_locations"].update(drawers)
         bucket["stock_locations"].update(others)
         if not drawers and not others:
@@ -700,9 +728,12 @@ def build_plate_outputs(
     plate_out_cases: list[dict[str, Any]] = []
     plate_drawer_detail: list[dict[str, Any]] = []
 
-    for (uid, size_range), bucket in sorted(size_buckets.items()):
-        td = len(bucket["drawer_locations"])
-        ts = len(bucket["stock_locations"])
+    for (uid, size_range), bucket in sorted(
+        size_buckets.items(),
+        key=lambda item: (item[0][0], size_range_sort_key(item[0][1])),
+    ):
+        td = int(bucket.get("total_drawer_units", 0))
+        ts = int(bucket.get("total_stock_units", 0))
         od = bucket["out_drawer_units"]
         os_ = bucket["out_stock_units"]
         total = td + ts
@@ -753,7 +784,7 @@ def build_plate_outputs(
             # drawer_size_detail carries {label, size_range, no_stock} per chip
             detail = sorted(
                 bucket["drawer_size_detail"].get(drawer, []),
-                key=lambda x: x["label"]
+                key=lambda x: plate_label_sort_key(x["label"])
             )
             labels = [d["label"] for d in detail]
             plate_drawer_detail.append({
@@ -798,6 +829,7 @@ def build_plate_outputs(
             "out_units":    0,
             "available_units": 0,
             "size_ranges":  [],
+            "size_ranges_detail": [],
             "missing_ranges": [],
             "partial_ranges": [],
         })
@@ -806,7 +838,10 @@ def build_plate_outputs(
         s["total_units"]    += row["total_units"]
         s["out_units"]      += row["out_units"]
         s["available_units"]+= row["available_units"]
-        s["size_ranges"].append(f"{row['size_range']}({row['available_units']}/{row['total_units']})")
+        s["size_ranges_detail"].append({
+            "size_range": row["size_range"],
+            "text": f"{row['size_range']}({row['available_units']}/{row['total_units']})",
+        })
         if row["available_units"] == 0:
             s["missing_ranges"].append(row["size_range"])
         elif row["available_units"] < row["total_units"]:
@@ -814,14 +849,22 @@ def build_plate_outputs(
 
     plate_uid_summary = []
     for uid, s in sorted(uid_summary_map.items()):
-        s["size_ranges"]  = ", ".join(s["size_ranges"])
+        s["size_ranges"] = ", ".join(
+            item["text"]
+            for item in sorted(s["size_ranges_detail"], key=lambda item: size_range_sort_key(item["size_range"]))
+        )
+        s.pop("size_ranges_detail", None)
         s["screw_sizes"] = ", ".join(sorted(s["screw_sizes_set"]))
         s.pop("screw_sizes_set", None)
         s["availability"] = f"{s['available_units']}/{s['total_units']}"
         if s["missing_ranges"]:
-            s["status_note"] = "OUT OF STOCK: " + ", ".join(sorted(s["missing_ranges"]))
+            s["status_note"] = "OUT OF STOCK: " + ", ".join(
+                sorted(s["missing_ranges"], key=size_range_sort_key)
+            )
         elif s["partial_ranges"]:
-            s["status_note"] = "PARTIAL: " + ", ".join(sorted(s["partial_ranges"]))
+            s["status_note"] = "PARTIAL: " + ", ".join(
+                sorted(s["partial_ranges"], key=size_range_sort_key)
+            )
         else:
             s["status_note"] = "READY"
         plate_uid_summary.append(s)

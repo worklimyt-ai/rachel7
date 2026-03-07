@@ -695,6 +695,12 @@ with inv_tabs[1]:
         _SR_DOT    = {"SHORT": "#f9a8d4", "STANDARD": "#93c5fd",
                       "LONG": "#6ee7b7", "EXTRA LONG": "#c4b5fd"}
 
+        def _drawer_sort_key(value: str) -> tuple[int, str]:
+            text = str(value or "").strip().upper()
+            if text.startswith("D") and text[1:].isdigit():
+                return (int(text[1:]), text)
+            return (10_000, text)
+
         # ── Build drawer-first lookup from plate_drawer_detail ────────────────
         # uid → { drawer → { size_range → {sizes:[{label,no_stock}], out_case_details} } }
         _drawer_lookup: dict[str, dict[str, dict[str, dict]]] = {}
@@ -744,57 +750,30 @@ with inv_tabs[1]:
 
             # ── Drawer blocks ─────────────────────────────────────────────────
             drawer_blocks = ""
-            for drawer in sorted(uid_drawers.keys()):
+            for drawer in sorted(uid_drawers.keys(), key=_drawer_sort_key):
                 sr_map = uid_drawers[drawer]  # {size_range: {sizes, out_case_details}}
-
-                # Collect & deduplicate out cases across all size ranges in this drawer
-                seen: set[str] = set()
-                unique_out: list[dict] = []
-                for sr_data in sr_map.values():
-                    for cd in (sr_data.get("out_case_details") or []):
-                        cid = cd.get("case_id", "")
-                        if cid not in seen:
-                            seen.add(cid)
-                            unique_out.append(cd)
-
-                hdr_cls = "dh-out" if unique_out else ""
-                out_tags = ""
-                for cd in unique_out:
-                    hosp  = cd.get("hospital", "") or "—"
-                    surg  = cd.get("surgery_date", "") or "—"
-                    is_stk = bool(cd.get("from_stock", False))
-                    tc     = "dht-stk" if is_stk else ""
-                    stk_s  = " [stk]" if is_stk else ""
-                    out_tags += (
-                        f"<span class='dh-out-tag {tc}'>"
-                        f"OUT → {hosp} · surg {surg}{stk_s}</span>"
-                    )
 
                 # All chips merged into one row, colour = size_range (or override)
                 chips_html = ""
                 for sr in sorted(sr_map.keys(),
                         key=lambda x: _SR_ORDER.index(x) if x in _SR_ORDER else 99):
                     sr_data   = sr_map[sr]
-                    sr_is_out = bool(sr_data.get("out_case_details"))
                     base_cls  = _SR_CHIP.get(sr, "sc-std")
                     for sz in sr_data["sizes"]:
                         lbl      = sz.get("label", "")
                         no_stock = sz.get("no_stock", False)
                         if no_stock:
                             chip_cls = "sc-none"
-                        elif sr_is_out:
-                            chip_cls = "sc-case"
                         else:
                             chip_cls = base_cls
                         chips_html += f"<span class='sc {chip_cls}'>{lbl}</span>"
 
-                drc_cls = "drc-out" if unique_out else ""
                 drawer_blocks += (
                     f"<div class='dr-block'>"
-                    f"<div class='dr-hdr {hdr_cls}'>"
-                    f"<span>{drawer}</span><span>{out_tags}</span>"
+                    f"<div class='dr-hdr'>"
+                    f"<span>{drawer}</span><span></span>"
                     f"</div>"
-                    f"<div class='dr-chips {drc_cls}'>{chips_html}</div>"
+                    f"<div class='dr-chips'>{chips_html}</div>"
                     f"</div>"
                 )
 
@@ -805,6 +784,7 @@ with inv_tabs[1]:
                 f"<span>{badge}</span>"
                 f"</div>"
                 f"<div class='inv-sub'>{uid} &nbsp;·&nbsp; {row['screw_sizes'] or ''}</div>"
+                f"<div class='inv-sub'>{row.get('size_ranges', '')} &nbsp;·&nbsp; {row.get('status_note', 'READY')}</div>"
                 f"{legend_html}"
                 f"{drawer_blocks}"
                 f"</div>"

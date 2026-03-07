@@ -6059,7 +6059,7 @@ PLATES = {
         "size": "6H",
         "location": "D3, D4"
     },
-    "34000120": {
+    "34000118": {
         "uid": "OLEII",
         "set": "2.7-4.0",
         "proper_name": "VA 3.5mm Proximal Dorsal Ulna Plates II Placa Olecranon",
@@ -6079,6 +6079,17 @@ PLATES = {
         "size": "8H",
         "location": "D3, D4"
     },
+    "34000120": {
+        "uid": "OLEII",
+        "set": "2.7-4.0",
+        "proper_name": "VA 3.5mm Proximal Dorsal Ulna Plates II Placa Olecranon",
+        "screw_sizes": "3.5mm",
+        "size_range": "Standard",
+        "left_right": "R",
+        "size": "8H",
+        "location": "D3, D4"
+    },
+
 
     # DSC - VA 2.7/3.5mm Superior Anterior Clavicle Plates II
     "52201233": {
