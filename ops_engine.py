@@ -411,9 +411,11 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
             "drawer_locations": set(),
             "stock_locations":  set(),
             "drawer_size_map": defaultdict(list),
+            "stock_size_map": defaultdict(list),
             # drawer_size_detail[drawer] = [{label, size_range, no_stock}]
             # Add "status": "no_stock" to a plate SKU in master_data.py to mark unavailable
             "drawer_size_detail": defaultdict(list),
+            "stock_size_detail": defaultdict(list),
             "all_size_labels": [],
             "out_details":  [],
         })
@@ -429,6 +431,13 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
         for drawer in drawers:
             bucket["drawer_size_map"][drawer].append(plate_label)
             bucket["drawer_size_detail"][drawer].append({
+                "label":      plate_label,
+                "size_range": size_range,
+                "no_stock":   sku_no_stock,
+            })
+        for stock_loc in others:
+            bucket["stock_size_map"][stock_loc].append(plate_label)
+            bucket["stock_size_detail"][stock_loc].append({
                 "label":      plate_label,
                 "size_range": size_range,
                 "no_stock":   sku_no_stock,
@@ -740,6 +749,7 @@ def build_plate_outputs(
         key=lambda item: (item[0][0], size_range_sort_key(item[0][1])),
     ):
         drawer_keys = sorted(bucket["drawer_size_map"].keys(), key=drawer_sort_key)
+        stock_keys = sorted(bucket["stock_size_map"].keys(), key=drawer_sort_key)
         td = len(bucket["drawer_locations"])
         ts = len(bucket["stock_locations"])
         od = bucket["out_drawer_units"]
@@ -756,7 +766,9 @@ def build_plate_outputs(
 
         out_case_details: list[dict[str, Any]] = []
         drawer_case_map: dict[str, list[dict[str, Any]]] = {drawer: [] for drawer in drawer_keys}
+        stock_case_map: dict[str, list[dict[str, Any]]] = {stock: [] for stock in stock_keys}
         next_drawer_idx = 0
+        next_stock_idx = 0
         for d in bucket["out_details"]:
             case_detail = {
                 "case_id":      d["case_id"],
@@ -766,6 +778,11 @@ def build_plate_outputs(
             }
             out_case_details.append(case_detail)
             if d["from_stock"] or not drawer_keys:
+                if stock_keys:
+                    target_stock = stock_keys[min(next_stock_idx, len(stock_keys) - 1)]
+                    stock_case_map[target_stock].append(case_detail)
+                    if next_stock_idx < len(stock_keys) - 1:
+                        next_stock_idx += 1
                 continue
             target_drawer = drawer_keys[min(next_drawer_idx, len(drawer_keys) - 1)]
             drawer_case_map[target_drawer].append(case_detail)
@@ -818,6 +835,28 @@ def build_plate_outputs(
                 "range_status":      range_status,
                 "out_case_details":  out_case_details,
                 "drawer_out_case_details": drawer_case_map.get(drawer, []),
+            })
+        for stock_loc in stock_keys:
+            detail = sorted(
+                bucket["stock_size_detail"].get(stock_loc, []),
+                key=lambda x: plate_label_sort_key(x["label"])
+            )
+            labels = [d["label"] for d in detail]
+            plate_drawer_detail.append({
+                "plate_uid":         uid,
+                "proper_name":       bucket["plate_name"],
+                "screw_sizes":       ", ".join(sorted(bucket["screw_sizes_set"])),
+                "size_range":        size_range,
+                "drawer":            stock_loc,
+                "drawer_sizes":      ", ".join(labels),
+                "drawer_size_detail": detail,
+                "drawer_count":      len(labels),
+                "available_units":   available_units,
+                "total_units":       total,
+                "availability":      f"{available_units}/{total}",
+                "range_status":      range_status,
+                "out_case_details":  out_case_details,
+                "drawer_out_case_details": stock_case_map.get(stock_loc, []),
             })
 
         for detail in bucket["out_details"]:

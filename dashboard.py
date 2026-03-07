@@ -936,6 +936,7 @@ with inv_tabs[2]:
             f"</div>"
         )
 
+    if not pt_avail.empty:
         if pt_uid.empty:
             st.info("No powertool unit data.")
         else:
