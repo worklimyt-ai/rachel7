@@ -99,21 +99,36 @@ def normalize_plate_code(value: Any) -> str:
 def canonical_powertool_uid(value: Any) -> str:
     raw = re.sub(r"[^A-Z0-9]", "", normalize_code(value))
     if not raw.startswith("P"):
+        m = re.match(r"^(5503|5400|8400)(\d+)$", raw)
+        if m:
+            prefix, suffix = m.groups()
+            return f"P{prefix}{suffix}"
         return raw
     m = re.match(r"^(P\d{4})(\d+)$", raw)
     if not m:
         return raw
     prefix, suffix = m.groups()
-    return f"{prefix}{int(suffix)}"
+    return f"{prefix}{suffix}"
 
 def canonical_powertool_shorthand(value: Any) -> str:
     raw = re.sub(r"[^A-Z0-9]", "", normalize_code(value))
+    if not raw.startswith("P"):
+        if re.match(r"^(5503|5400|8400)\d+$", raw):
+            return f"P{raw[:4]}"
     m = re.match(r"^(P\d{4})", raw)
     return m.group(1) if m else raw
 
 def split_tokens(value: Any, pattern: str = r"[;]+") -> list[str]:
     text = str(value or "").strip()
     return [p.strip() for p in re.split(pattern, text) if p.strip()] if text else []
+
+
+def split_powertool_tokens(value: Any) -> list[str]:
+    text = str(value or "").strip()
+    return [
+        p.strip() for p in re.split(r"[;,/\n\r\t ]+", text)
+        if p.strip()
+    ] if text else []
 
 def split_plate_tokens(value: Any) -> list[str]:
     out: list[str] = []
@@ -404,7 +419,7 @@ def summarize_cases(
         surgery_date   = parse_date(row.get("surgery_date", ""))
         set_tokens     = split_tokens(row.get("sets", ""))
         plate_tokens   = split_plate_tokens(row.get("plates", ""))
-        powertool_tokens = split_tokens(row.get("powertools") or row.get("powertool", ""))
+        powertool_tokens = split_powertool_tokens(row.get("powertools") or row.get("powertool", ""))
 
         uid_hits:       list[dict[str, Any]] = []
         shorthand_hits: list[dict[str, Any]] = []
@@ -859,7 +874,7 @@ def build_powertool_outputs(
         row_date = parse_date(row.get("surgery_date") or row.get("delivery_date") or "")
         if row_date is None or not (window_start <= row_date <= today_kl):
             continue
-        for token in split_tokens(row.get("powertool") or row.get("powertools") or ""):
+        for token in split_powertool_tokens(row.get("powertool") or row.get("powertools") or ""):
             uid_norm = canonical_powertool_uid(token)
             if uid_norm in power_uid_map:
                 usage_counter[uid_norm] += 1

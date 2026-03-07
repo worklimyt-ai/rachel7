@@ -695,12 +695,13 @@ with inv_tabs[2]:
     pt_avail = pd.DataFrame(report["powertool_category_availability"])
     pt_del   = pd.DataFrame(report["powertool_delivered"])
     pt_uid   = pd.DataFrame(report.get("powertool_uid_availability", []))
+    pt_u30   = pd.DataFrame(report.get("powertool_usage_30d", []))
 
     if pt_avail.empty:
         st.info("No powertool data.")
     else:
         if not pt_uid.empty:
-            for col in ("powertool_uid", "category", "availability", "hospital", "surgery_date"):
+            for col in ("powertool_uid", "category", "availability", "hospital", "surgery_date", "patient_doctor"):
                 if col not in pt_uid.columns:
                     pt_uid[col] = ""
             pt_uid = pt_uid.copy()
@@ -715,207 +716,94 @@ with inv_tabs[2]:
                     | pt_uid["surgery_date"].str.contains(search_query, case=False, na=False)
                 ]
 
-            in_office_uid = pt_uid[
-                pt_uid["availability_norm"].isin(["AVAILABLE", "NA_HOLD"])
-            ]
-            out_uid = pt_uid[
-                pt_uid["availability_norm"].str.startswith("OUT")
-            ]
-
-            def _pt_group_side(df: pd.DataFrame, with_hospital: bool = False) -> pd.DataFrame:
-                rows = []
-                for cat, g in df.groupby("category"):
-                    if with_hospital:
-                        details = "; ".join(
-                            sorted([
-                                f"{str(r['uid_name'])}@{str(r['hospital']).strip() or 'OUT'}({str(r['surgery_date']).strip() or '-'})"
-                                for _, r in g.iterrows()
-                            ])
-                        )
-                    else:
-                        details = "; ".join(
-                            sorted([
-                                f"{str(r['uid_name'])}{' [HOLD]' if str(r['availability_norm']).endswith('NA_HOLD') else ''}"
-                                for _, r in g.iterrows()
-                            ])
-                        )
-                    rows.append({
-                        "Category": cat,
-                        "Count": int(len(g)),
-                        "Units": details,
-                    })
-                return pd.DataFrame(rows).sort_values(["Category"]) if rows else pd.DataFrame(columns=["Category", "Count", "Units"])
-
-            left_df = _pt_group_side(in_office_uid, with_hospital=False)
-            right_df = _pt_group_side(out_uid, with_hospital=True)
-
-            st.markdown("##### Powertool Split View")
-            col_l, col_r = st.columns(2)
-            with col_l:
-                st.markdown("**In Office**")
-                st.metric("Total In Office", int(in_office_uid.shape[0]))
-                st.dataframe(left_df, use_container_width=True, hide_index=True)
-            with col_r:
-                st.markdown("**Out Of Office**")
-                st.metric("Total Out Of Office", int(out_uid.shape[0]))
-                st.dataframe(right_df, use_container_width=True, hide_index=True)
-            st.markdown("---")
-
         if search_query:
             pt_avail = pt_avail[
                 pt_avail["category"].str.contains(search_query, case=False, na=False)
             ]
 
-        pt_u30 = pd.DataFrame(report.get("powertool_usage_30d", []))
-        usage_by_cat: dict[str, int] = {}
-        if not pt_u30.empty:
-            for _, ur in pt_u30.iterrows():
-                cat = str(ur.get("category", "")).strip()
-                if not cat:
-                    continue
-                u_num = pd.to_numeric(ur.get("usage_30d", 0), errors="coerce")
-                usage_by_cat[cat] = usage_by_cat.get(cat, 0) + (int(u_num) if pd.notna(u_num) else 0)
-
-        # Build lookup: category → list of out details
-        _pt_out: dict[str, list[dict]] = {}
+        # Build lookup: uid → list of out details
+        _pt_uid_out: dict[str, list[dict]] = {}
         if not pt_del.empty:
             for _, pr in pt_del.iterrows():
-                _pt_out.setdefault(str(pr["category"]), []).append({
+                _pt_uid_out.setdefault(str(pr.get("powertool_uid", "")).strip(), []).append({
                     "uid":     str(pr.get("powertool_uid", "") or "").strip(),
                     "hospital":str(pr.get("hospital", "") or "").strip(),
                     "surgery": str(pr.get("surgery_date", "") or "").strip(),
                     "patient": str(pr.get("patient_doctor", "") or "").strip(),
                 })
 
-        def _pt_row_html(row: pd.Series) -> str:
-            badge     = avail_badge(int(row["available"]), int(row["usable_total"]))
-            out_items = _pt_out.get(row["category"], [])
-            use_30d   = usage_by_cat.get(str(row["category"]), 0)
-            usage_note = f"<span style='color:#6b7280;font-size:12px;margin-left:8px'>30d use: {use_30d}</span>"
-            na_note   = (
-                f" <span style='color:#9ca3af;font-size:11px'>[{row['na_hold']} on hold]</span>"
-                if int(row["na_hold"]) > 0 else ""
-            )
-            out_lines = ""
-            for o in out_items:
+        usage_by_uid: dict[str, int] = {}
+        if not pt_u30.empty:
+            for _, ur in pt_u30.iterrows():
+                key = str(ur.get("powertool_uid", "")).strip()
+                if not key:
+                    continue
+                usage_by_uid[key] = int(pd.to_numeric(ur.get("usage_30d", 0), errors="coerce") or 0)
+
+    def _pt_row_html(row: pd.Series) -> str:
+        availability = str(row.get("availability_norm", "")).upper().strip()
+        if availability in {"AVAILABLE", "NA_HOLD"}:
+            available, total = 1, 1
+        else:
+            available, total = 0, 1
+        badge = avail_badge(available, total)
+        uid = str(row.get("uid_name", "")).strip()
+        state_note = {
+            "AVAILABLE": "in office",
+            "NA_HOLD": "on hold",
+            "OUT": "out",
+            "OUT_NA_HOLD": "out (on hold)",
+        }.get(availability, availability.lower() or "unknown")
+        use_30d = usage_by_uid.get(uid, 0)
+        usage_note = f"<span style='color:#6b7280;font-size:12px;margin-left:8px'>30d use: {use_30d}</span>"
+
+        out_lines = ""
+        if availability.startswith("OUT"):
+            for o in _pt_uid_out.get(uid, []):
                 hosp = o["hospital"] or "—"
-                surg = o["surgery"]  or "—"
-                uid  = (f"<span class='out-set'>{o['uid']}</span>"
-                        if o["uid"] else "")
+                surg = o["surgery"] or "—"
+                patient_note = ""
+                if o.get("patient"):
+                    patient_note = (
+                        "<span class='out-days' style='margin-left:8px'>"
+                        f"{o['patient']}</span>"
+                    )
                 out_lines += (
                     f"<div class='out-line'>"
                     f"<span class='out-tag'>OUT</span> "
-                    f"{uid}"
-                    f"<span class='out-sep'> → </span>"
                     f"<span class='out-hosp'>{hosp}</span>"
                     f"<span class='out-sep'> · </span>"
                     f"<span class='out-surg'>surg {surg}</span>"
+                    f"{patient_note}"
                     f"</div>"
                 )
-            return (
-                f"<div class='inv-row'>"
-                f"<div style='display:flex;justify-content:space-between;align-items:center'>"
-                f"<span class='inv-name'>{row['category']}{usage_note}</span>"
-                f"<span>{badge}{na_note}</span>"
-                f"</div>"
-                f"{out_lines}"
-                f"</div>"
-            )
+        else:
+            out_lines = "<span style='color:#9ca3af;font-size:12px;font-style:italic'>all in office</span>"
 
-        st.markdown(
-            "".join(_pt_row_html(r) for _, r in pt_avail.iterrows()),
-            unsafe_allow_html=True,
+        return (
+            f"<div class='inv-row'>"
+            f"<div style='display:flex;justify-content:space-between;align-items:flex-start'>"
+            f"<div>"
+            f"<span class='inv-name'>{row['category']}: {uid}</span>"
+            f"<div class='inv-sub'> {uid} · {state_note}{usage_note}</div>"
+            f"</div>"
+            f"<span>{badge}</span>"
+            f"</div>"
+            f"<div style='margin-top:6px'>{out_lines}</div>"
+            f"</div>"
         )
 
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# SECTION 3 — SCHEDULE
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-_CASE_COLS = [
-    "case_id", "hospital", "patient_doctor",
-    "delivery_date", "surgery_date", "sales_code",
-    "sets", "plates", "powertools", "status", "smart_status",
-]
-_CASE_RENAME = {
-    "case_id": "ID", "hospital": "Hospital", "patient_doctor": "Patient/Doctor",
-    "delivery_date": "Delivery", "surgery_date": "Surgery", "sales_code": "Sales Code",
-    "sets": "Sets", "plates": "Plates", "powertools": "Powertools",
-    "status": "Status", "smart_status": "Smart Status",
-}
-
-def _render_bucket(tab_obj, bucket_key: str):
-    with tab_obj:
-        rows = pd.DataFrame(report["case_buckets"][bucket_key])
-        if rows.empty:
-            st.success("Nothing here. ✓")
-            return
-        if search_query:
-            mask = rows.apply(
-                lambda r: r.astype(str).str.contains(search_query, case=False).any(), axis=1
+        if pt_uid.empty:
+            st.info("No powertool unit data.")
+        else:
+            st.markdown(
+                "".join(_pt_row_html(r) for _, r in pt_uid.sort_values(["category", "uid_name"]).iterrows()),
+                unsafe_allow_html=True,
             )
-            rows = rows[mask]
-        cols = [c for c in _CASE_COLS if c in rows.columns]
-        st.dataframe(
-            rows[cols].rename(columns=_CASE_RENAME),
-            use_container_width=True, hide_index=True,
-        )
-
-with st.expander("Schedule", expanded=False):
-    sched_tabs = st.tabs([
-        "✅ Delivered Today",
-        "🚚 To Deliver",
-        "📅 Tomorrow",
-        "↩️ To Collect",
-        "🔎 To Follow Up",
-        "⚠️ To Check",
-        "🔋 To Top Up",
-    ])
-    _render_bucket(sched_tabs[0], "delivered_today")
-    _render_bucket(sched_tabs[1], "to_deliver")
-    _render_bucket(sched_tabs[2], "to_deliver_tomorrow")
-    _render_bucket(sched_tabs[3], "to_collect")
-    _render_bucket(sched_tabs[4], "to_follow_up")
-    _render_bucket(sched_tabs[5], "to_check")
-    _render_bucket(sched_tabs[6], "to_top_up")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# SECTION 4 — ROUTES
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-def _render_route(tab_obj, route_key: str):
-    with tab_obj:
-        rows = pd.DataFrame(report["distance_routes"][route_key])
-        if rows.empty:
-            st.info("No route data.")
-            return
-        if search_query:
-            mask = rows.apply(
-                lambda r: r.astype(str).str.contains(search_query, case=False).any(), axis=1
-            )
-            rows = rows[mask]
-        cols = [
-            "hospital", "hospital_name", "delivery_date", "surgery_date",
-            "office_est_drive_km", "office_est_drive_min", "sets", "plates", "sales_code",
-        ]
-        cols = [c for c in cols if c in rows.columns]
-        st.dataframe(
-            rows[cols].rename(columns={
-                "hospital": "Code", "hospital_name": "Hospital",
-                "delivery_date": "Delivery", "surgery_date": "Surgery",
-                "office_est_drive_km": "~Drive km", "office_est_drive_min": "~Drive min",
-                "sets": "Sets", "plates": "Plates", "sales_code": "Sales Code",
-            }),
-            use_container_width=True, hide_index=True,
-        )
-
-with st.expander("Routes", expanded=False):
-    route_tabs = st.tabs(["📅 Tomorrow – Delivery", "✅ Today – Delivered"])
-    _render_route(route_tabs[0], "to_deliver_tomorrow")
-    _render_route(route_tabs[1], "delivered_today")
-
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# SECTION 5 — DATA QUALITY
+# SECTION 3 — DATA QUALITY
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 total_unknowns = sum(
     len(report["unknown"][k])
@@ -937,7 +825,7 @@ if total_unknowns > 0:
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# SECTION 6 — HOSPITAL DIRECTORY (search-gated)
+# SECTION 4 — HOSPITAL DIRECTORY (search-gated)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if search_query:
     hosp_df  = pd.DataFrame(report["hospital_directory"])
