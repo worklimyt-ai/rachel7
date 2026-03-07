@@ -716,7 +716,7 @@ with inv_tabs[1]:
                     raw = str(drow.get("drawer_sizes", ""))
                     detail = [{"label": s.strip(), "size_range": sr_key, "no_stock": False}
                               for s in raw.split(",") if s.strip()]
-                out_cds = drow.get("out_case_details", []) or []
+                out_cds = drow.get("drawer_out_case_details", drow.get("out_case_details", [])) or []
                 (
                     _drawer_lookup
                     .setdefault(uid_key, {})
@@ -753,27 +753,64 @@ with inv_tabs[1]:
             for drawer in sorted(uid_drawers.keys(), key=_drawer_sort_key):
                 sr_map = uid_drawers[drawer]  # {size_range: {sizes, out_case_details}}
 
+                seen: set[str] = set()
+                unique_out: list[dict] = []
+                for sr, sr_data in sr_map.items():
+                    for cd in (sr_data.get("out_case_details") or []):
+                        key = "|".join([
+                            sr,
+                            str(cd.get("case_id", "")),
+                            str(cd.get("hospital", "")),
+                            str(cd.get("surgery_date", "")),
+                            "1" if cd.get("from_stock") else "0",
+                        ])
+                        if key in seen:
+                            continue
+                        seen.add(key)
+                        unique_out.append({
+                            "size_range": sr,
+                            "hospital": cd.get("hospital", ""),
+                            "surgery_date": cd.get("surgery_date", ""),
+                            "from_stock": bool(cd.get("from_stock", False)),
+                        })
+
+                hdr_cls = "dh-out" if unique_out else ""
+                out_tags = ""
+                for cd in unique_out:
+                    hosp = cd["hospital"] or "—"
+                    surg = cd["surgery_date"] or "—"
+                    tc = "dht-stk" if cd["from_stock"] else ""
+                    stk_s = " [stk]" if cd["from_stock"] else ""
+                    out_tags += (
+                        f"<span class='dh-out-tag {tc}'>"
+                        f"{cd['size_range']} OUT → {hosp} · surg {surg}{stk_s}</span>"
+                    )
+
                 # All chips merged into one row, colour = size_range (or override)
                 chips_html = ""
                 for sr in sorted(sr_map.keys(),
                         key=lambda x: _SR_ORDER.index(x) if x in _SR_ORDER else 99):
                     sr_data   = sr_map[sr]
+                    sr_is_out = bool(sr_data.get("out_case_details"))
                     base_cls  = _SR_CHIP.get(sr, "sc-std")
                     for sz in sr_data["sizes"]:
                         lbl      = sz.get("label", "")
                         no_stock = sz.get("no_stock", False)
                         if no_stock:
                             chip_cls = "sc-none"
+                        elif sr_is_out:
+                            chip_cls = "sc-case"
                         else:
                             chip_cls = base_cls
                         chips_html += f"<span class='sc {chip_cls}'>{lbl}</span>"
 
+                drc_cls = "drc-out" if unique_out else ""
                 drawer_blocks += (
                     f"<div class='dr-block'>"
-                    f"<div class='dr-hdr'>"
-                    f"<span>{drawer}</span><span></span>"
+                    f"<div class='dr-hdr {hdr_cls}'>"
+                    f"<span>{drawer}</span><span>{out_tags}</span>"
                     f"</div>"
-                    f"<div class='dr-chips'>{chips_html}</div>"
+                    f"<div class='dr-chips {drc_cls}'>{chips_html}</div>"
                     f"</div>"
                 )
 

@@ -178,6 +178,13 @@ def plate_label_sort_key(value: Any) -> tuple[int, int, str]:
         numeric_rank = numeric_value if side != "R" else -numeric_value
     return (side_rank, numeric_rank, token)
 
+
+def drawer_sort_key(value: Any) -> tuple[int, str]:
+    token = normalize_code(value)
+    if token.startswith("D") and token[1:].isdigit():
+        return (int(token[1:]), token)
+    return (10_000, token)
+
 def compact_set_id(value: Any) -> str:
     text = str(value or "").strip()
     if not text:
@@ -732,8 +739,9 @@ def build_plate_outputs(
         size_buckets.items(),
         key=lambda item: (item[0][0], size_range_sort_key(item[0][1])),
     ):
-        td = int(bucket.get("total_drawer_units", 0))
-        ts = int(bucket.get("total_stock_units", 0))
+        drawer_keys = sorted(bucket["drawer_size_map"].keys(), key=drawer_sort_key)
+        td = len(bucket["drawer_locations"])
+        ts = len(bucket["stock_locations"])
         od = bucket["out_drawer_units"]
         os_ = bucket["out_stock_units"]
         total = td + ts
@@ -746,15 +754,23 @@ def build_plate_outputs(
         else:
             range_status = "PARTIAL"
 
-        out_case_details = [
-            {
+        out_case_details: list[dict[str, Any]] = []
+        drawer_case_map: dict[str, list[dict[str, Any]]] = {drawer: [] for drawer in drawer_keys}
+        next_drawer_idx = 0
+        for d in bucket["out_details"]:
+            case_detail = {
                 "case_id":      d["case_id"],
                 "hospital":     d["hospital"],
                 "surgery_date": d["surgery_date"],
                 "from_stock":   d["from_stock"],
             }
-            for d in bucket["out_details"]
-        ]
+            out_case_details.append(case_detail)
+            if d["from_stock"] or not drawer_keys:
+                continue
+            target_drawer = drawer_keys[min(next_drawer_idx, len(drawer_keys) - 1)]
+            drawer_case_map[target_drawer].append(case_detail)
+            if next_drawer_idx < len(drawer_keys) - 1:
+                next_drawer_idx += 1
 
         row = {
             "plate_uid":             uid,
@@ -780,7 +796,7 @@ def build_plate_outputs(
         }
         plate_size_range_availability.append(row)
 
-        for drawer in sorted(bucket["drawer_size_map"]):
+        for drawer in drawer_keys:
             # drawer_size_detail carries {label, size_range, no_stock} per chip
             detail = sorted(
                 bucket["drawer_size_detail"].get(drawer, []),
@@ -801,6 +817,7 @@ def build_plate_outputs(
                 "availability":      f"{available_units}/{total}",
                 "range_status":      range_status,
                 "out_case_details":  out_case_details,
+                "drawer_out_case_details": drawer_case_map.get(drawer, []),
             })
 
         for detail in bucket["out_details"]:
