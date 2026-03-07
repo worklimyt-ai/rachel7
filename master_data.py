@@ -62,7 +62,7 @@ SETS = [
     {"category": "2.7-4.0", "id": "21", "home": "SARAWAK", "uid": "2.721", "shorthand": "2.7"},
     {"category": "2.7-4.0", "id": "22", "home": "UNCF", "uid": "2.722", "shorthand": "2.7"},
     {"category": "2.7-4.0", "id": "23", "home": "OFFICE", "uid": "2.723", "shorthand": "2.7"},
-    {"category": "2.7-4.0", "id": "24", "home": "STANDBY", "uid": "2.724", "shorthand": "2.7"},
+    {"category": "2.7-4.0", "id": "24", "home": "QAYYUM", "uid": "2.724", "shorthand": "2.7"},
     {"category": "2.7-4.0", "id": "25", "home": "CAC", "uid": "2.725", "shorthand": "2.7"},
     {"category": "2.7-4.0", "id": "26", "home": "HSM", "uid": "2.726", "shorthand": "2.7"},
     {"category": "2.7-4.0", "id": "27", "home": "SARAWAK", "uid": "2.727", "shorthand": "2.7"},
@@ -84,7 +84,7 @@ SETS = [
     {"category": "3.5-6.5", "id": "13", "home": "PG", "uid": "3.513", "shorthand": "3.5"},
     {"category": "3.5-6.5", "id": "14", "home": "OFFICE", "uid": "3.514", "shorthand": "3.5"},
     {"category": "3.5-6.5", "id": "15", "home": "UNCF", "uid": "3.515", "shorthand": "3.5"},
-    {"category": "3.5-6.5", "id": "16", "home": "OFFICE", "uid": "3.516", "status": "NA", "shorthand": "3.5"},
+    {"category": "3.5-6.5", "id": "16", "home": "QAYYUM", "uid": "3.516", "status": "NA", "shorthand": "3.5"},
     {"category": "3.5-6.5", "id": "17", "home": "UNCF", "uid": "3.517", "shorthand": "3.5"},
     {"category": "3.5-6.5", "id": "18", "home": "CAC", "uid": "3.518", "shorthand": "3.5"},
     {"category": "3.5-6.5", "id": "19", "home": "SARAWAK", "uid": "3.519", "shorthand": "3.5"},
@@ -173,7 +173,7 @@ SETS = [
     {"category": "PFN", "id": "23", "home": "SARAWAK", "uid": "PFN23", "shorthand": "PFN"},
     {"category": "PFN", "id": "24", "home": "SARAWAK", "uid": "PFN24", "shorthand": "PFN"},
     {"category": "PFN", "id": "25", "home": "SABAH", "uid": "PFN25", "shorthand": "PFN"},
-    {"category": "PFN", "id": "26", "home": "OFFICE", "uid": "PFN26", "status": "Standby", "shorthand": "PFN"},
+    {"category": "PFN", "id": "26", "home": "QAYYUM", "uid": "PFN26", "status": "", "shorthand": "PFN"},
     {"category": "LONG PFN", "id": "01", "home": "OFFICE", "uid": "LPFN01", "shorthand": "LPFN"},
     {"category": "LONG PFN", "id": "02", "home": "IPOH", "uid": "LPFN02", "shorthand": "LPFN"},
     {"category": "REAMER", "id": "01", "home": "UNCF", "uid": "REAM01", "shorthand": "REAM"},
@@ -235,8 +235,8 @@ SETS = [
     {"category": "PFN II 340-420 IMPLANT", "id": "01", "home": "PG", "uid": "PFNIIIMP01", "shorthand": "PFNIIIMP"},
     {"category": "PFN II 340-420 IMPLANT", "id": "02", "home": "OFFICE", "uid": "PFNIIIMP02", "shorthand": "PFNIIIMP"},
     {"category": "PFN II 340-420 IMPLANT", "id": "03", "home": "OFFICE", "uid": "PFNIIIMP03", "shorthand": "PFNIIIMP"},
-    {"category": "ANKLE ARTHRODESIS NAIL", "id": "01", "home": "OFFICE", "uid": "ANKLE01", "shorthand": "ANKLE"},
-    {"category": "ANKLE ARTHRODESIS NAIL", "id": "02", "home": "NOTYET", "uid": "ANKLE02", "shorthand": "ANKLE"},
+    {"category": "ANKLE ARTHRODESIS NAIL", "id": "01", "home": "PG", "uid": "ANKLE01", "shorthand": "ANKLE"},
+    {"category": "ANKLE ARTHRODESIS NAIL", "id": "02", "home": "OFFICE", "uid": "ANKLE02", "shorthand": "ANKLE"},
     {"category": "COATLMON CABLE SYSTEM", "id": "01", "home": "OFFICE", "uid": "COATL01", "shorthand": "COATL"},
     {"category": "FOOT SET", "id": "01", "home": "OFFICE", "uid": "FOOT01", "shorthand": "FOOT"},
     {"category": "FOOT SET", "id": "02", "home": "PG", "uid": "FOOT02", "shorthand": "FOOT"},
@@ -269,7 +269,7 @@ SETS = [
     {"category": "P5503", "id": "3009", "home": "OFFICE", "status": "", "uid": "P55033009", "shorthand": "P5503"},
     {"category": "P5503", "id": "8011", "home": "PG", "status": "", "uid": "P55038011", "shorthand": "P5503"},
     {"category": "P5503", "id": "1011", "home": "HTJ", "status": "NA 14/1/2026", "uid": "P55031011", "shorthand": "P5503"},
-    {"category": "P5503", "id": "9003", "home": "HTJ", "status": "NA", "uid": "P55039003", "shorthand": "P5503"},
+    {"category": "P5503", "id": "9003", "home": "OFFICE", "status": "", "uid": "P55039003", "shorthand": "P5503"},
     {"category": "P5503", "id": "1010", "home": "OFFICE", "status": "", "uid": "P55031010", "shorthand": "P5503"},
     {"category": "P5503", "id": "6009", "home": "OFFICE", "status": "NA CUSTOMWITHHELD", "uid": "P55036009", "shorthand": "P5503"},
     {"category": "P5503", "id": "0010", "home": "OFFICE", "status": "", "uid": "P55030010", "shorthand": "P5503"},
@@ -281,6 +281,7 @@ SETS = [
     {"category": "P5503", "id": "2016", "home": "HSB", "status": "", "uid": "P55032016", "shorthand": "P5503"},
     {"category": "P5503", "id": "1008", "home": "OFFICE", "status": "BACK IN ACTION 260114", "uid": "P55031008", "shorthand": "P5503"},
     {"category": "P5503", "id": "1009", "home": "PG", "status": "", "uid": "P55031009", "shorthand": "P5503"},
+    {"category": "P5503", "id": "10004", "home": "OFFICE", "status": "STANDBY", "uid": "P550310004", "shorthand": "P5503"},
     {"category": "P5503", "id": "10006", "home": "HCJ", "status": "", "uid": "P550310006", "shorthand": "P5503"},
     {"category": "P5503", "id": "10008", "home": "OFFICE", "status": "NA", "uid": "P550310008", "shorthand": "P5503"},
     {"category": "P5400", "id": "10007", "home": "OFFICE", "status": "", "uid": "P540010007", "shorthand": "P5400"},
@@ -8512,6 +8513,23 @@ PLATES = {
         "location": "D4"
     }
 }
+
+
+# ── BONEGRAFT ────────────────────────────────────────────────────────────────
+BONEGRAFT = [
+    {"name": "Reprobone novo", "presentation": "1 cc", "shorthand": "n1", "description": "Synthetic bone graft, paste"},
+    {"name": "Reprobone novo", "presentation": "2.5 cc", "shorthand": "n2.5",  "description": "Synthetic bone graft, paste"},
+    {"name": "Reprobone fusion", "presentation": "1 cc", "shorthand": "f1",  "description": "Synthetic bone graft, granulated paste"},
+    {"name": "Reprobone fusion", "presentation": "2.5 cc", "shorthand": "f2.5",  "description": "Synthetic bone graft, granulated paste"},
+    {"name": "Reprobone", "presentation": "5 cc", "shorthand": "r5",  "description": "Synthetic bone substitute, granules"},
+    {"name": "Reprobone", "presentation": "10 cc", "shorthand": "R10",  "description": "Synthetic bone substitute, granules"},
+    {"name": "Reprobone", "presentation": "30 cc", "shorthand": "r30",  "description": "Synthetic bone substitute, granules"},
+    {"name": "Reprobone", "presentation": "20 cc", "shorthand": "r20",  "description": "Synthetic bone substitute, granules"},
+    {"name": "Reprobone", "presentation": "10x10x10 mm", "shorthand": "b10",  "description": "Synthetic bone substitute, block"},
+    {"name": "Reprobone", "presentation": "20x20x20 mm", "shorthand": "b20",  "description": "Synthetic bone substitute, block"},
+    {"name": "Collatamp G", "presentation": "5 cm x 5 cm", "shorthand": "c5",  "description": ""},
+    {"name": "Collatamp G", "presentation": "10 cm x 10 cm", "shorthand": "c10",  "description": ""}
+]
 
 # ── HOSPITALS ─────────────────────────────────────────────────────────────────
 # Single source of truth for hospital codes, names, coordinates, region, type.
