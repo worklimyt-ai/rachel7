@@ -188,6 +188,9 @@ def parse_plate_request(token: str) -> dict[str, Any] | None:
     elif cleaned.endswith("-L"):
         base_uid      = cleaned[:-2]
         needed_ranges = ["STANDARD", "LONG"]
+    elif cleaned.endswith("-S"):
+        base_uid      = cleaned[:-2]
+        needed_ranges = ["STANDARD", "SHORT"]
     else:
         base_uid      = cleaned
         needed_ranges = ["STANDARD"]
@@ -374,11 +377,17 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
             "out_stock_units":  0,
             "drawer_locations": set(),
             "stock_locations":  set(),
+            "drawer_size_map": defaultdict(list),
             "out_details":  [],
         })
         screw_sizes = str(row.get("screw_sizes", "")).strip()
         if screw_sizes:
             bucket["screw_sizes_set"].add(screw_sizes)
+        size_label = str(row.get("size", "")).strip()
+        lr_label = str(row.get("left_right", "")).strip()
+        plate_label = " ".join(part for part in (size_label, lr_label) if part).strip() or str(sku_code).strip()
+        for drawer in drawers:
+            bucket["drawer_size_map"][drawer].append(plate_label)
         bucket["drawer_locations"].update(drawers)
         bucket["stock_locations"].update(others)
         if not drawers and not others:
@@ -675,6 +684,7 @@ def build_plate_outputs(
 
     plate_size_range_availability: list[dict[str, Any]] = []
     plate_out_cases: list[dict[str, Any]] = []
+    plate_drawer_detail: list[dict[str, Any]] = []
 
     for (uid, size_range), bucket in sorted(size_buckets.items()):
         td = len(bucket["drawer_locations"])
@@ -683,6 +693,13 @@ def build_plate_outputs(
         os_ = bucket["out_stock_units"]
         total = td + ts
         out   = od + os_
+        available_units = max(total - out, 0)
+        if available_units == total:
+            range_status = "READY"
+        elif available_units == 0:
+            range_status = "OUT OF STOCK"
+        else:
+            range_status = "PARTIAL"
         row = {
             "plate_uid":             uid,
             "proper_name":           bucket["plate_name"],
@@ -700,10 +717,26 @@ def build_plate_outputs(
             "out_units":             out,
             "available_drawer_units":max(td - od, 0),
             "available_stock_units": max(ts - os_, 0),
-            "available_units":       max(total - out, 0),
-            "availability":          f"{max(total - out, 0)}/{total}",
+            "available_units":       available_units,
+            "availability":          f"{available_units}/{total}",
+            "range_status":          range_status,
         }
         plate_size_range_availability.append(row)
+        for drawer in sorted(bucket["drawer_size_map"]):
+            labels = sorted(bucket["drawer_size_map"][drawer])
+            plate_drawer_detail.append({
+                "plate_uid": uid,
+                "proper_name": bucket["plate_name"],
+                "screw_sizes": ", ".join(sorted(bucket["screw_sizes_set"])),
+                "size_range": size_range,
+                "drawer": drawer,
+                "drawer_sizes": ", ".join(labels),
+                "drawer_count": len(labels),
+                "available_units": available_units,
+                "total_units": total,
+                "availability": f"{available_units}/{total}",
+                "range_status": range_status,
+            })
         for detail in bucket["out_details"]:
             plate_out_cases.append({
                 "plate_uid":      uid,
@@ -730,6 +763,8 @@ def build_plate_outputs(
             "out_units":    0,
             "available_units": 0,
             "size_ranges":  [],
+            "missing_ranges": [],
+            "partial_ranges": [],
         })
         for ss in [p.strip() for p in str(row.get("screw_sizes", "")).split(",") if p.strip()]:
             s["screw_sizes_set"].add(ss)
@@ -737,6 +772,10 @@ def build_plate_outputs(
         s["out_units"]      += row["out_units"]
         s["available_units"]+= row["available_units"]
         s["size_ranges"].append(f"{row['size_range']}({row['available_units']}/{row['total_units']})")
+        if row["available_units"] == 0:
+            s["missing_ranges"].append(row["size_range"])
+        elif row["available_units"] < row["total_units"]:
+            s["partial_ranges"].append(row["size_range"])
 
     plate_uid_summary = []
     for uid, s in sorted(uid_summary_map.items()):
@@ -744,10 +783,17 @@ def build_plate_outputs(
         s["screw_sizes"] = ", ".join(sorted(s["screw_sizes_set"]))
         s.pop("screw_sizes_set", None)
         s["availability"] = f"{s['available_units']}/{s['total_units']}"
+        if s["missing_ranges"]:
+            s["status_note"] = "OUT OF STOCK: " + ", ".join(sorted(s["missing_ranges"]))
+        elif s["partial_ranges"]:
+            s["status_note"] = "PARTIAL: " + ", ".join(sorted(s["partial_ranges"]))
+        else:
+            s["status_note"] = "READY"
         plate_uid_summary.append(s)
 
     return {
         "plate_size_range_availability": plate_size_range_availability,
+        "plate_drawer_detail":           plate_drawer_detail,
         "plate_uid_summary":             plate_uid_summary,
         "plate_out_cases":               sorted(
             plate_out_cases,
@@ -1172,6 +1218,7 @@ def build_operations_report(
         "set_category_availability":      set_outputs["set_category_availability"],
         "set_office_status":              set_outputs["set_office_status"],
         "plate_size_range_availability":  plate_outputs["plate_size_range_availability"],
+        "plate_drawer_detail":            plate_outputs["plate_drawer_detail"],
         "plate_uid_summary":              plate_outputs["plate_uid_summary"],
         "plate_out_cases":                plate_outputs["plate_out_cases"],
         "powertool_category_availability":powertool_outputs["powertool_category_availability"],
@@ -1227,6 +1274,7 @@ def write_report_files(report: dict[str, Any], output_dir: str | Path) -> dict[s
         "set_category_availability.csv":      report["set_category_availability"],
         "set_office_status.csv":              report["set_office_status"],
         "plate_size_range_availability.csv":  report["plate_size_range_availability"],
+        "plate_drawer_detail.csv":            report["plate_drawer_detail"],
         "plate_uid_summary.csv":              report["plate_uid_summary"],
         "plate_out_cases.csv":                report["plate_out_cases"],
         "powertool_category_availability.csv":report["powertool_category_availability"],

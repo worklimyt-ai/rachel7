@@ -586,6 +586,8 @@ with inv_tabs[1]:
             plate_sum["proper_name"] = plate_sum.get("plate_name", "")
         if "screw_sizes" not in plate_sum.columns:
             plate_sum["screw_sizes"] = ""
+        if "status_note" not in plate_sum.columns:
+            plate_sum["status_note"] = ""
         psr_fill = pd.DataFrame(report.get("plate_size_range_availability", []))
         if not psr_fill.empty and "screw_sizes" in psr_fill.columns and "plate_uid" in psr_fill.columns:
             uid_screw_map = (
@@ -653,6 +655,7 @@ with inv_tabs[1]:
                 f"<span>{badge}</span>"
                 f"</div>"
                 f"<div class='inv-sub'>{row['plate_uid']} &nbsp;·&nbsp; {row['screw_sizes'] or ''}{' &nbsp;·&nbsp; ' if row['screw_sizes'] else ''}{row['size_ranges']}</div>"
+                f"<div class='inv-sub'>status: {row['status_note'] or 'READY'}</div>"
                 f"{out_lines}"
                 f"</div>"
             )
@@ -664,6 +667,7 @@ with inv_tabs[1]:
 
         with st.expander("📋 Plate size range detail"):
             psr = pd.DataFrame(report["plate_size_range_availability"])
+            pdd = pd.DataFrame(report.get("plate_drawer_detail", []))
             if "proper_name" not in psr.columns:
                 psr["proper_name"] = psr.get("plate_name", "")
             if "screw_sizes" not in psr.columns:
@@ -677,17 +681,52 @@ with inv_tabs[1]:
                     | psr["proper_name"].str.contains(search_query, case=False, na=False)
                     | psr["screw_sizes"].str.contains(search_query, case=False, na=False)
                 ]
+                if not pdd.empty:
+                    pdd = pdd[
+                        pdd["plate_uid"].str.contains(search_query, case=False, na=False)
+                        | pdd["proper_name"].str.contains(search_query, case=False, na=False)
+                        | pdd["screw_sizes"].str.contains(search_query, case=False, na=False)
+                        | pdd["drawer"].str.contains(search_query, case=False, na=False)
+                        | pdd["drawer_sizes"].str.contains(search_query, case=False, na=False)
+                    ]
             st.dataframe(
                 psr[[
                     "plate_uid", "proper_name", "screw_sizes", "size_range", "drawer_locations",
-                    "available_units", "out_units", "total_units", "availability",
+                    "available_units", "out_units", "total_units", "availability", "range_status",
                 ]].rename(columns={
                     "plate_uid": "UID", "proper_name": "Proper Name", "screw_sizes": "Screw Sizes", "size_range": "Size",
                     "drawer_locations": "Drawers", "available_units": "Avail",
-                    "out_units": "Out", "total_units": "Total", "availability": "Avail/Total",
+                    "out_units": "Out", "total_units": "Total", "availability": "Avail/Total", "range_status": "Status",
                 }),
                 use_container_width=True, hide_index=True,
             )
+            if not pdd.empty:
+                if "proper_name" not in pdd.columns:
+                    pdd["proper_name"] = ""
+                if "screw_sizes" not in pdd.columns:
+                    pdd["screw_sizes"] = ""
+                pdd["uid_norm"] = pdd["plate_uid"].astype(str).str.upper().str.strip()
+                pdd["order_rank"] = pdd["uid_norm"].map(PLATE_UID_RANK).fillna(10_000).astype(int)
+                pdd = pdd.sort_values(["order_rank", "uid_norm", "size_range", "drawer"])
+                st.markdown("##### Drawer view")
+                st.dataframe(
+                    pdd[[
+                        "plate_uid", "proper_name", "screw_sizes", "size_range", "drawer",
+                        "drawer_sizes", "drawer_count", "availability", "range_status",
+                    ]].rename(columns={
+                        "plate_uid": "UID",
+                        "proper_name": "Proper Name",
+                        "screw_sizes": "Screw Sizes",
+                        "size_range": "Size Range",
+                        "drawer": "Drawer",
+                        "drawer_sizes": "Sizes In Drawer",
+                        "drawer_count": "Count",
+                        "availability": "Avail/Total",
+                        "range_status": "Status",
+                    }),
+                    use_container_width=True,
+                    hide_index=True,
+                )
 
 
 # ── Powertools ────────────────────────────────────────────────────────────────
