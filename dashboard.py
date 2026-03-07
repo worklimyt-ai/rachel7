@@ -133,6 +133,7 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
 KL_TZ = ZoneInfo("Asia/Kuala_Lumpur")
 APP_BUILD_TAG = "CHECKSETGO-v4-2026-03-05"
 APP_FILE = str(Path(__file__).resolve())
+DEFAULT_MASTER_DATA_PATH = str(Path(__file__).resolve().with_name("master_data.py"))
 
 # Powertool categories — excluded from the Sets tab
 _POWERTOOL_CATS = {"P5503", "P5400", "P8400"}
@@ -227,7 +228,7 @@ with st.sidebar:
     st.markdown("### ⚙️ Data Sources")
     master_path = st.text_input(
         "master_data.py path",
-        value="master_data.py",
+        value=DEFAULT_MASTER_DATA_PATH,
         help="Absolute or relative path to master_data.py",
     )
     cases_source = st.text_input(

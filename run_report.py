@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 from ops_engine import build_operations_report, write_report_files
 
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate operations JSON/CSV outputs")
-    parser.add_argument("--master-data", default="master_data.py", help="Path to master_data.py")
+    parser.add_argument("--master-data", default=str(SCRIPT_DIR / "master_data.py"), help="Path to master_data.py")
     parser.add_argument("--cases", default=None, help="Cases CSV path or URL")
     parser.add_argument("--archive", default=None, help="Archive CSV path or URL")
-    parser.add_argument("--out", default="outputs", help="Output folder")
+    parser.add_argument("--out", default=str(SCRIPT_DIR / "outputs"), help="Output folder")
     args = parser.parse_args()
 
     report = build_operations_report(

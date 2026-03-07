@@ -42,6 +42,9 @@ DEFAULT_ARCHIVE_URL = (
 )
 DEFAULT_CASES_LOCAL   = Path("/Users/bellbell/Downloads/cases - cases.csv")
 DEFAULT_ARCHIVE_LOCAL = Path("/Users/bellbell/Downloads/cases - archive.csv")
+MODULE_DIR = Path(__file__).resolve().parent
+DEFAULT_MASTER_DATA_PATH = MODULE_DIR / "master_data.py"
+DEFAULT_OUTPUT_DIR = MODULE_DIR / "outputs"
 
 DATE_FORMATS = ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y")
 
@@ -1254,7 +1257,7 @@ def build_distance_rows(
 # ---------------------------------------------------------------------------
 
 def build_operations_report(
-    master_data_path: str | Path = "master_data.py",
+    master_data_path: str | Path = DEFAULT_MASTER_DATA_PATH,
     cases_source: str | None = None,
     archive_source: str | None = None,
     today_kl: date | None = None,
@@ -1471,10 +1474,10 @@ def _cli() -> None:
     parser = argparse.ArgumentParser(
         description="Build operations report from master_data + cases/archive CSVs"
     )
-    parser.add_argument("--master-data", default="master_data.py")
+    parser.add_argument("--master-data", default=str(DEFAULT_MASTER_DATA_PATH))
     parser.add_argument("--cases",   default=None, help="Cases CSV path or URL")
     parser.add_argument("--archive", default=None, help="Archive CSV path or URL")
-    parser.add_argument("--out",     default="outputs", help="Output directory")
+    parser.add_argument("--out",     default=str(DEFAULT_OUTPUT_DIR), help="Output directory")
     args = parser.parse_args()
 
     report = build_operations_report(
