@@ -382,28 +382,46 @@ with inv_tabs[0]:
         for cat_norm in ordered_norm:
             label = display_by_norm.get(cat_norm, cat_norm)
             cat_rows = set_status_all[set_status_all["category_norm"] == cat_norm]
-            in_rows = cat_rows[(cat_rows["location_norm"].isin(["OFFICE", "STANDBY"])) & (~cat_rows["is_na"])]
+            office_rows = cat_rows[
+                (cat_rows["location_norm"] == "OFFICE")
+                & (~cat_rows["is_na"])
+                & (~cat_rows["is_standby"])
+            ]
+            standby_rows = cat_rows[
+                (
+                    cat_rows["location_norm"].eq("STANDBY")
+                    | (
+                        cat_rows["location_norm"].eq("OFFICE")
+                        & cat_rows["is_standby"]
+                    )
+                )
+                & (~cat_rows["is_na"])
+            ]
             out_case_rows = cat_rows[
                 (~cat_rows["location_norm"].isin(["OFFICE", "STANDBY"]))
                 & (cat_rows["location_norm"] != "")
                 & (~cat_rows["is_na"])
             ]
 
-            in_count = int(len(in_rows))
+            in_count = int(len(office_rows))
+            standby_count = int(len(standby_rows))
             out_count = int(len(out_case_rows))
             available = avail_lookup.get(cat_norm, in_count)
-            total = total_lookup.get(cat_norm, int(len(cat_rows)))
+            total = total_lookup.get(cat_norm, int(len(office_rows) + len(out_case_rows)))
             total = total if total > 0 else (in_count + out_count)
 
-            if cat_norm not in ordered_core and total == 0 and available == 0 and out_count == 0:
+            if cat_norm not in ordered_core and total == 0 and available == 0 and out_count == 0 and standby_count == 0:
                 continue
 
-            in_list = "; ".join(
-                sorted([
-                    f"{str(r['set_name'])}{' [standby]' if bool(r.get('is_standby', False)) else ''}"
-                    for _, r in in_rows.iterrows()
-                ])
-            )
+            office_items = [
+                {"name": str(r["set_name"]), "standby": False}
+                for _, r in office_rows.iterrows()
+            ]
+            standby_items = [
+                {"name": str(r["set_name"]), "standby": True}
+                for _, r in standby_rows.iterrows()
+            ]
+            in_list = "; ".join(sorted([item["name"] for item in office_items + standby_items]))
             out_list = "; ".join(
                 sorted([
                     f"{str(r['set_name'])} @ {str(r['location_now']).strip() or 'OUT'} ({str(r['surgery_date']).strip() or '-'})"
@@ -418,6 +436,8 @@ with inv_tabs[0]:
                 "Out": out_count,
                 "Available": available,
                 "Available/Total": f"{available}/{total}",
+                "OfficeItems": office_items,
+                "StandbyItems": standby_items,
                 "In Office Sets": in_list,
                 "Out (Hospital • Surgery)": out_list,
             })
@@ -428,7 +448,6 @@ with inv_tabs[0]:
                     "Set": str(r.get("set_name", "")),
                     "Hospital": str(r.get("location_now", "")),
                     "Surgery Date": str(r.get("surgery_date", "")),
-                    "Patient/Doctor": str(r.get("patient_doctor", "")),
                     "Case": str(r.get("case_id", "")),
                 })
 
@@ -458,13 +477,20 @@ with inv_tabs[0]:
 
             # Left: category name + badge + in-office set names
             in_sets_html = ""
-            if r["In Office Sets"]:
-                names = [s.strip() for s in r["In Office Sets"].split(";") if s.strip()]
+            office_items = list(r.get("OfficeItems", []))
+            standby_items = list(r.get("StandbyItems", []))
+            if office_items or standby_items:
                 in_sets_html = "".join(
                     f"<span style='display:inline-block;background:#f0fdf4;color:#166534;"
                     f"font-family:\"JetBrains Mono\",monospace;font-size:11px;font-weight:600;"
-                    f"border-radius:4px;padding:1px 7px;margin:2px 4px 2px 0'>{n}</span>"
-                    for n in names
+                    f"border-radius:4px;padding:1px 7px;margin:2px 4px 2px 0'>{item['name']}</span>"
+                    for item in office_items
+                )
+                in_sets_html += "".join(
+                    f"<span style='display:inline-block;background:#fff7ed;color:#b45309;"
+                    f"font-family:\"JetBrains Mono\",monospace;font-size:11px;font-weight:600;"
+                    f"border-radius:4px;padding:1px 7px;margin:2px 4px 2px 0'>{item['name']} [standby]</span>"
+                    for item in standby_items
                 )
 
             left_col = (
@@ -488,7 +514,6 @@ with inv_tabs[0]:
                     f"<span class='out-hosp'>{o['Hospital'] or '—'}</span>"
                     f"<span class='out-sep'> · </span>"
                     f"<span class='out-surg'>surg {o['Surgery Date'] or '—'}</span>"
-                    + (f"<span class='out-days' style='margin-left:8px'>{o['Patient/Doctor']}</span>" if o['Patient/Doctor'] else "")
                     + f"</div>"
                     for o in out_items
                 )
@@ -878,7 +903,7 @@ with inv_tabs[2]:
                     continue
                 usage_by_uid[key] = _safe_int(ur.get("usage_30d", 0))
 
-        # uid -> out details with patient context
+        # uid -> out details
         _pt_uid_out: dict[str, list[dict]] = {}
         if not pt_del.empty:
             for _, pr in pt_del.iterrows():
@@ -889,18 +914,19 @@ with inv_tabs[2]:
                     "uid": str(pr.get("powertool_uid", "") or "").strip(),
                     "hospital": str(pr.get("hospital", "") or "").strip(),
                     "surgery": str(pr.get("surgery_date", "") or "").strip(),
-                    "patient": str(pr.get("patient_doctor", "") or "").strip(),
                 })
 
         avail_lookup: dict[str, int] = {}
         usable_lookup: dict[str, int] = {}
         hold_lookup: dict[str, int] = {}
+        standby_lookup: dict[str, int] = {}
         for _, r in pt_avail.iterrows():
             key = str(r.get("category_norm", "")).strip()
             if key:
                 avail_lookup[key] = _safe_int(r.get("available", 0))
                 usable_lookup[key] = _safe_int(r.get("usable_total", 0))
                 hold_lookup[key] = _safe_int(r.get("na_hold", 0))
+                standby_lookup[key] = _safe_int(r.get("standby_hold", 0))
 
         ordered_cats = ["P5503", "P5400", "P8400"]
         discovered = sorted({
@@ -936,6 +962,7 @@ with inv_tabs[2]:
             cat_rows = pt_uid[pt_uid["category_norm"] == cat_norm]
             avail_rows = cat_rows[cat_rows["availability_norm"] == "AVAILABLE"]
             hold_rows = cat_rows[cat_rows["availability_norm"] == "NA_HOLD"]
+            standby_rows = cat_rows[cat_rows["availability_norm"] == "STANDBY_HOLD"]
             out_rows = cat_rows[cat_rows["availability_norm"].str.startswith("OUT")]
 
             available = avail_lookup.get(cat_norm, int(len(avail_rows)))
@@ -951,6 +978,10 @@ with inv_tabs[2]:
             hold_units = [
                 {"uid": str(r["uid_name"]).strip(), "hold": True}
                 for _, r in hold_rows.sort_values(["uid_name"]).iterrows()
+            ]
+            standby_units = [
+                {"uid": str(r["uid_name"]).strip(), "standby": True}
+                for _, r in standby_rows.sort_values(["uid_name"]).iterrows()
             ]
 
             out_items = []
@@ -970,13 +1001,12 @@ with inv_tabs[2]:
                         "uid": uid,
                         "hospital": str(r.get("hospital", "")).strip(),
                         "surgery": str(r.get("surgery_date", "")).strip(),
-                        "patient": str(r.get("patient_doctor", "")).strip(),
                     }
                 out_items.append({
                     "uid": uid,
                     "hospital": matched.get("hospital", "") or str(r.get("hospital", "")).strip(),
                     "surgery": matched.get("surgery", "") or str(r.get("surgery_date", "")).strip(),
-                    "patient": matched.get("patient", "") or str(r.get("patient_doctor", "")).strip(),
+                    "standby": "STANDBY" in str(r.get("availability_norm", "")).upper(),
                 })
 
             search_blob = " ".join(
@@ -984,8 +1014,9 @@ with inv_tabs[2]:
                     cat_norm,
                     " ".join(item["uid"] for item in available_units),
                     " ".join(item["uid"] for item in hold_units),
+                    " ".join(item["uid"] for item in standby_units),
                     " ".join(
-                        f"{item['uid']} {item['hospital']} {item['surgery']} {item['patient']}"
+                        f"{item['uid']} {item['hospital']} {item['surgery']}"
                         for item in out_items
                     ),
                 ]
@@ -1000,6 +1031,7 @@ with inv_tabs[2]:
                 "na_hold": hold_lookup.get(cat_norm, int(len(hold_rows))),
                 "available_units": available_units,
                 "hold_units": hold_units,
+                "standby_units": standby_units,
                 "out_items": out_items,
             })
 
@@ -1009,7 +1041,21 @@ with inv_tabs[2]:
                 f"<span style='color:#9ca3af;font-size:12px'>[{int(row['na_hold'])} on hold]</span>"
                 if int(row["na_hold"]) > 0 else ""
             )
+            standby_note = (
+                f"<span style='color:#b45309;font-size:12px'>[{int(standby_lookup.get(row['category'], 0))} standby]</span>"
+                if int(standby_lookup.get(row["category"], 0)) > 0 else ""
+            )
             left_items = "".join(_unit_chip(item["uid"], hold=item["hold"]) for item in row["available_units"] + row["hold_units"])
+            left_items += "".join(
+                f"<span style='display:inline-flex;flex-direction:column;align-items:flex-start;"
+                f"background:#fff7ed;color:#b45309;border:1px solid #fdba74;"
+                f"font-family:\"JetBrains Mono\",monospace;border-radius:8px;"
+                f"padding:7px 10px;margin:3px 6px 3px 0;min-width:140px'>"
+                f"<span style='font-size:14px;font-weight:700;line-height:1.1'>{item['uid']} [standby]</span>"
+                f"{_usage_html(item['uid'])}"
+                f"</span>"
+                for item in row["standby_units"]
+            )
             if not left_items:
                 left_items = "<span style='color:#9ca3af;font-size:12px;font-style:italic'>none available</span>"
 
@@ -1017,7 +1063,7 @@ with inv_tabs[2]:
                 f"<div style='flex:0 0 39%;padding-right:20px'>"
                 f"<div style='display:flex;align-items:center;gap:12px;flex-wrap:wrap'>"
                 f"<span class='inv-name' style='font-size:20px'>{row['category']}</span>"
-                f"{badge}{hold_note}"
+                f"{badge}{hold_note}{standby_note}"
                 f"</div>"
                 f"<div style='margin-top:8px'>{left_items}</div>"
                 f"</div>"
@@ -1034,7 +1080,7 @@ with inv_tabs[2]:
                     f"<span class='out-surg'>surg {o['surgery'] or '—'}</span>"
                     f"<span style='display:inline-block;margin-left:8px;color:#4b5563;font-size:14px;font-weight:700'>"
                     f"30d use {usage_by_uid.get(o['uid'], 0)}</span>"
-                    + (f"<span class='out-days' style='margin-left:8px'>{o['patient']}</span>" if o['patient'] else "")
+                    + ("<span style='margin-left:8px;color:#b45309;font-size:12px;font-weight:700'>[standby]</span>" if o.get('standby') else "")
                     + f"</div>"
                     for o in row["out_items"]
                 )

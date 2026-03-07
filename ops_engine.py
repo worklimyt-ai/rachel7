@@ -200,6 +200,11 @@ def format_set_display(shorthand: Any, set_id: Any) -> str:
 def is_na_status(value: Any) -> bool:
     return "NA" in normalize_code(value)
 
+
+def is_standby_status(value: Any) -> bool:
+    return "STANDBY" in normalize_code(value)
+
+
 def is_powertool_category(category: str) -> bool:
     return bool(re.match(r"^P\d", normalize_code(category)))
 
@@ -349,6 +354,7 @@ def build_set_indexes(master_sets: list[dict[str, Any]]) -> dict[str, Any]:
     shorthand_map: dict[str, list[dict[str, Any]]] = defaultdict(list)
     category_map:  dict[str, list[dict[str, Any]]] = defaultdict(list)
     office_sets:   list[dict[str, Any]] = []
+    standby_sets:  list[dict[str, Any]] = []
     normalized:    list[dict[str, Any]] = []
 
     for row in master_sets:
@@ -368,9 +374,10 @@ def build_set_indexes(master_sets: list[dict[str, Any]]) -> dict[str, Any]:
         if item["_uid_norm"]:       uid_map[item["_uid_norm"]].append(item)
         if item["_shorthand_norm"]: shorthand_map[item["_shorthand_norm"]].append(item)
         if item["_category_norm"]:  category_map[item["_category_norm"]].append(item)
-        if item["home"] in {"OFFICE", "STANDBY"}:
-            # Treat STANDBY as available inventory alongside OFFICE.
+        if item["home"] == "OFFICE":
             office_sets.append(item)
+        elif item["home"] == "STANDBY":
+            standby_sets.append(item)
 
     return {
         "all_sets":     normalized,
@@ -378,6 +385,7 @@ def build_set_indexes(master_sets: list[dict[str, Any]]) -> dict[str, Any]:
         "shorthand_map":shorthand_map,
         "category_map": category_map,
         "office_sets":  office_sets,
+        "standby_sets": standby_sets,
     }
 
 
@@ -629,15 +637,19 @@ def build_set_outputs(
     set_indexes: dict[str, Any], set_out_assignments: list[dict[str, Any]]
 ) -> dict[str, Any]:
     office_sets = set_indexes["office_sets"]
+    standby_sets = set_indexes.get("standby_sets", [])
 
-    # Exclude NA-status sets from totals
-    active_office_sets = [s for s in office_sets if not is_na_status(s.get("status", ""))]
+    # Exclude NA and STANDBY from availability totals.
+    active_office_sets = [
+        s for s in office_sets
+        if not is_na_status(s.get("status", "")) and not is_standby_status(s.get("status", ""))
+    ]
 
     total_by_category = Counter(item["category"] for item in active_office_sets)
     out_by_category   = Counter(
         item["category"]
         for item in set_out_assignments
-        if not is_na_status(item.get("set_status", ""))
+        if not is_na_status(item.get("set_status", "")) and not is_standby_status(item.get("set_status", ""))
     )
 
     set_category_availability: list[dict[str, Any]] = []
@@ -659,7 +671,8 @@ def build_set_outputs(
         by_set_key[row["set_key"]].append(row)
 
     set_office_status: list[dict[str, Any]] = []
-    for s in sorted(office_sets, key=lambda x: (x["category"], x["id"], x["uid"])):
+    visible_sets = office_sets + standby_sets
+    for s in sorted(visible_sets, key=lambda x: (x["category"], x["id"], x["uid"])):
         key         = s["_set_key"]
         assignments = by_set_key.get(key, [])
         base_row    = {
@@ -955,6 +968,7 @@ def build_powertool_outputs(
         item["_power_shorthand"]= canonical_powertool_shorthand(sh_src)
         item["_power_key"]      = f"{item['_power_uid']}|{item['category']}|{item['id']}"
         item["_is_na_hold"]     = is_na_status(item.get("status", ""))
+        item["_is_standby_hold"] = is_standby_status(item.get("status", ""))
         if item["_power_uid"]:       power_uid_map[item["_power_uid"]].append(item)
         if item["_power_shorthand"]: power_shorthand_map[item["_power_shorthand"]].append(item)
 
@@ -992,21 +1006,27 @@ def build_powertool_outputs(
             if unk:
                 unknown_powertool_tokens[unk] += 1
 
-    out_by_cat   = Counter(a["category"] for a in delivered_assignments if not a.get("is_na_hold"))
+    out_by_cat   = Counter(
+        a["category"] for a in delivered_assignments
+        if not a.get("is_na_hold") and not is_standby_status(a.get("status", ""))
+    )
     total_by_cat = Counter(item["category"] for item in office_powertools)
     na_by_cat    = Counter(item["category"] for item in office_powertools if item.get("_is_na_hold"))
+    standby_by_cat = Counter(item["category"] for item in office_powertools if item.get("_is_standby_hold"))
 
     powertool_category_availability: list[dict[str, Any]] = []
     for cat in sorted(total_by_cat):
         total    = total_by_cat[cat]
         na_hold  = na_by_cat.get(cat, 0)
-        usable   = max(total - na_hold, 0)
+        standby_hold = standby_by_cat.get(cat, 0)
+        usable   = max(total - na_hold - standby_hold, 0)
         out      = out_by_cat.get(cat, 0)
         available= max(usable - out, 0)
         powertool_category_availability.append({
             "category":    cat,
             "total_office": total,
             "na_hold":     na_hold,
+            "standby_hold":standby_hold,
             "usable_total":usable,
             "out_for_case":out,
             "available":   available,
@@ -1029,18 +1049,27 @@ def build_powertool_outputs(
             "home":         item["home"],
             "status":       item.get("status", ""),
             "is_na_hold":   item.get("_is_na_hold", False),
+            "is_standby_hold": item.get("_is_standby_hold", False),
         }
         if not rows:
             powertool_uid_availability.append({
                 **base,
-                "availability":"NA_HOLD" if item.get("_is_na_hold") else "AVAILABLE",
+                "availability":(
+                    "NA_HOLD" if item.get("_is_na_hold")
+                    else "STANDBY_HOLD" if item.get("_is_standby_hold")
+                    else "AVAILABLE"
+                ),
                 "hospital":"", "case_id":"", "delivery_date":"", "surgery_date":"",
             })
         else:
             for a in rows:
                 powertool_uid_availability.append({
                     **base,
-                    "availability":"OUT_NA_HOLD" if item.get("_is_na_hold") else "OUT",
+                    "availability":(
+                        "OUT_NA_HOLD" if item.get("_is_na_hold")
+                        else "OUT_STANDBY_HOLD" if item.get("_is_standby_hold")
+                        else "OUT"
+                    ),
                     "hospital":     a["hospital"],
                     "case_id":      a["case_id"],
                     "delivery_date":a["delivery_date"],
