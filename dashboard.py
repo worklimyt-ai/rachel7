@@ -577,7 +577,6 @@ with inv_tabs[0]:
 # ── Plates ────────────────────────────────────────────────────────────────────
 with inv_tabs[1]:
     plate_sum    = pd.DataFrame(report["plate_uid_summary"])
-    plate_out_df = pd.DataFrame(report["plate_out_cases"])
 
     if plate_sum.empty:
         st.info("No plate data.")
@@ -616,17 +615,17 @@ with inv_tabs[1]:
                 | plate_sum["screw_sizes"].str.contains(search_query, case=False, na=False)
             ]
 
-        # ── CSS for plate drawer/size chip display ───────────────────────────
+        # ── CSS ───────────────────────────────────────────────────────────────
         st.markdown("""
 <style>
-/* ── Per-plate drawer block ── */
+/* Drawer block */
 .dr-block {
     margin-top: 8px;
     border-radius: 8px;
     overflow: hidden;
     border: 1.5px solid #e5e7eb;
 }
-/* Drawer header bar */
+/* Drawer header */
 .dr-hdr {
     display: flex;
     align-items: center;
@@ -639,193 +638,163 @@ with inv_tabs[1]:
     color: #374151;
     letter-spacing: .06em;
 }
-.dr-hdr.dh-out     { background:#fff1f2; color:#be123c; }
-.dr-hdr.dh-nostock { background:#f3f4f6; color:#9ca3af; }
-
-/* OUT tag inside drawer header */
+.dr-hdr.dh-out { background:#fff1f2; color:#be123c; }
+/* OUT → hospital tag in header */
 .dh-out-tag {
-    font-size: 10px;
-    font-weight: 700;
-    background: #fecdd3;
-    color: #9f1239;
-    border-radius: 4px;
-    padding: 1px 7px;
-    margin-left: 6px;
-    letter-spacing: .03em;
+    font-size: 10px; font-weight: 700;
+    background: #fecdd3; color: #9f1239;
+    border-radius: 4px; padding: 1px 7px; margin-left: 6px;
 }
-.dh-out-tag.dht-stock { background:#fde68a; color:#92400e; }
-
-/* Size chips row inside a drawer */
+.dh-out-tag.dht-stk { background:#fde68a; color:#92400e; }
+/* Chip row */
 .dr-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
+    display: flex; flex-wrap: wrap; gap: 5px;
     padding: 7px 10px;
     background: #ffffff;
     border-top: 1px solid #f3f4f6;
 }
-.dr-chips.drc-out     { background: #fffbf0; }
-.dr-chips.drc-nostock { background: #f9fafb; }
-
-/* size_range sub-label before chips group */
-.sr-sublabel {
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: .09em;
-    text-transform: uppercase;
-    color: #9ca3af;
-    align-self: center;
-    margin-right: 2px;
-    white-space: nowrap;
-    flex-basis: 100%;
-    margin-bottom: 2px;
-}
-
-/* Individual size chip */
+.dr-chips.drc-out { background: #fffbf0; }
+/* Size chip */
 .sc {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    font-weight: 600;
-    padding: 3px 9px;
-    border-radius: 20px;
-    white-space: nowrap;
-    letter-spacing: .01em;
-    border: 1.5px solid transparent;
+    font-size: 11px; font-weight: 600;
+    padding: 3px 9px; border-radius: 20px;
+    white-space: nowrap; border: 1.5px solid transparent;
 }
-.sc-ok   { background:#dcfce7; color:#166534; border-color:#86efac; }
+/* size_range colours — in stock */
+.sc-std  { background:#dbeafe; color:#1e40af; border-color:#93c5fd; }
+.sc-sht  { background:#fce7f3; color:#9d174d; border-color:#f9a8d4; }
+.sc-lng  { background:#d1fae5; color:#065f46; border-color:#6ee7b7; }
+.sc-xl   { background:#ede9fe; color:#4c1d95; border-color:#c4b5fd; }
+/* out for a case — amber override */
 .sc-case { background:#fef3c7; color:#92400e; border-color:#fcd34d; }
+/* no stock — red strikethrough */
 .sc-none { background:#fee2e2; color:#9f1239; border-color:#fca5a5;
            text-decoration: line-through; opacity:.8; }
+/* legend row */
+.sr-legend {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin-top: 6px; margin-bottom: 2px;
+}
+.sr-legend-item {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 10px; color: #6b7280;
+}
+.sr-legend-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    flex-shrink: 0;
+}
 </style>
 """, unsafe_allow_html=True)
 
-        _SR_ORDER = ["SHORT", "STANDARD", "LONG", "EXTRA LONG"]
+        _SR_ORDER  = ["SHORT", "STANDARD", "LONG", "EXTRA LONG"]
+        # chip class per size_range when in stock
+        _SR_CHIP   = {"SHORT": "sc-sht", "STANDARD": "sc-std",
+                      "LONG": "sc-lng", "EXTRA LONG": "sc-xl"}
+        # legend colour dot
+        _SR_DOT    = {"SHORT": "#f9a8d4", "STANDARD": "#93c5fd",
+                      "LONG": "#6ee7b7", "EXTRA LONG": "#c4b5fd"}
 
-        # ── Build drawer-first lookup ─────────────────────────────────────────
-        # plate_uid → { drawer → [ {size_label, size_range, no_stock,
-        #                           range_status, out_case_details} ] }
-        # Also need per-(uid, size_range) out_case_details for case tagging
-        _psr_rich: dict[str, dict[str, dict]] = {}
-        _psr_raw = pd.DataFrame(report.get("plate_size_range_availability", []))
-        if not _psr_raw.empty:
-            for _, srow in _psr_raw.iterrows():
-                uid_key = str(srow["plate_uid"])
-                sr_key  = str(srow.get("size_range", "STANDARD"))
-                _psr_rich.setdefault(uid_key, {})[sr_key] = {
-                    "range_status":     str(srow.get("range_status", "READY")).upper().strip(),
-                    "out_case_details": srow.get("out_case_details", []) or [],
-                }
-
-        # Drawer-first lookup: uid → { drawer → { sr → [size_detail_items] } }
-        _drawer_lookup: dict[str, dict[str, dict[str, list]]] = {}
+        # ── Build drawer-first lookup from plate_drawer_detail ────────────────
+        # uid → { drawer → { size_range → {sizes:[{label,no_stock}], out_case_details} } }
+        _drawer_lookup: dict[str, dict[str, dict[str, dict]]] = {}
         _pdd_raw = pd.DataFrame(report.get("plate_drawer_detail", []))
         if not _pdd_raw.empty:
             for _, drow in _pdd_raw.iterrows():
-                uid_key  = str(drow["plate_uid"])
-                drawer   = str(drow.get("drawer", "?"))
-                sr_key   = str(drow.get("size_range", "STANDARD"))
-                # drawer_size_detail is a list of {label, no_stock}
-                detail   = drow.get("drawer_size_detail") or []
+                uid_key = str(drow["plate_uid"])
+                drawer  = str(drow.get("drawer", "?"))
+                sr_key  = str(drow.get("size_range", "STANDARD"))
+                # drawer_size_detail is [{label, size_range, no_stock}]
+                detail  = drow.get("drawer_size_detail") or []
                 if not detail:
-                    # fallback: build from drawer_sizes string, no_stock=False
-                    raw_sizes = str(drow.get("drawer_sizes", ""))
-                    detail = [{"label": s.strip(), "no_stock": False}
-                              for s in raw_sizes.split(",") if s.strip()]
-                rs = str(drow.get("range_status", "READY")).upper().strip()
+                    raw = str(drow.get("drawer_sizes", ""))
+                    detail = [{"label": s.strip(), "size_range": sr_key, "no_stock": False}
+                              for s in raw.split(",") if s.strip()]
                 out_cds = drow.get("out_case_details", []) or []
-                _drawer_lookup \
-                    .setdefault(uid_key, {}) \
-                    .setdefault(drawer, {}) \
-                    .setdefault(sr_key, [])
-                _drawer_lookup[uid_key][drawer][sr_key] = {
-                    "sizes":       detail,
-                    "range_status": rs,
-                    "out_case_details": out_cds,
-                }
+                (
+                    _drawer_lookup
+                    .setdefault(uid_key, {})
+                    .setdefault(drawer, {})
+                )[sr_key] = {"sizes": detail, "out_case_details": out_cds}
 
         def _plate_row_html(row: pd.Series) -> str:
             uid   = row["plate_uid"]
             badge = avail_badge(int(row["available_units"]), int(row["total_units"]))
 
-            uid_drawers = _drawer_lookup.get(uid, {})   # {drawer: {sr: data}}
-            uid_sr_data = _psr_rich.get(uid, {})
+            uid_drawers = _drawer_lookup.get(uid, {})
 
+            # ── Legend: which size ranges exist for this plate ────────────────
+            all_srs_present: set[str] = set()
+            for sr_map in uid_drawers.values():
+                all_srs_present.update(sr_map.keys())
+            sorted_present = sorted(all_srs_present,
+                key=lambda x: _SR_ORDER.index(x) if x in _SR_ORDER else 99)
+            legend_html = ""
+            if len(sorted_present) > 1:
+                _fallback_dot = "#e5e7eb"
+                items = "".join(
+                    "<span class='sr-legend-item'>"
+                    "<span class='sr-legend-dot' style='background:"
+                    + _SR_DOT.get(sr, _fallback_dot)
+                    + "'></span>"
+                    + sr + "</span>"
+                    for sr in sorted_present
+                )
+                legend_html = f"<div class='sr-legend'>{items}</div>"
+
+            # ── Drawer blocks ─────────────────────────────────────────────────
             drawer_blocks = ""
             for drawer in sorted(uid_drawers.keys()):
-                sr_map = uid_drawers[drawer]  # {size_range: {sizes, range_status, out_case_details}}
+                sr_map = uid_drawers[drawer]  # {size_range: {sizes, out_case_details}}
 
-                # Collect out_case_details across all size ranges in this drawer
-                all_out_cases: list[dict] = []
-                for sr_data in sr_map.values():
-                    all_out_cases.extend(sr_data.get("out_case_details", []))
-                # Deduplicate by case_id
-                seen_cases: set[str] = set()
+                # Collect & deduplicate out cases across all size ranges in this drawer
+                seen: set[str] = set()
                 unique_out: list[dict] = []
-                for cd in all_out_cases:
-                    cid = cd.get("case_id", "")
-                    if cid not in seen_cases:
-                        seen_cases.add(cid)
-                        unique_out.append(cd)
+                for sr_data in sr_map.values():
+                    for cd in (sr_data.get("out_case_details") or []):
+                        cid = cd.get("case_id", "")
+                        if cid not in seen:
+                            seen.add(cid)
+                            unique_out.append(cd)
 
-                drawer_is_out = bool(unique_out)
-
-                # Drawer header
-                hdr_cls = "dh-out" if drawer_is_out else ""
-                out_tags_html = ""
+                hdr_cls = "dh-out" if unique_out else ""
+                out_tags = ""
                 for cd in unique_out:
-                    hosp   = cd.get("hospital", "") or "—"
-                    surg   = cd.get("surgery_date", "") or "—"
+                    hosp  = cd.get("hospital", "") or "—"
+                    surg  = cd.get("surgery_date", "") or "—"
                     is_stk = bool(cd.get("from_stock", False))
-                    tc     = "dht-stock" if is_stk else ""
+                    tc     = "dht-stk" if is_stk else ""
                     stk_s  = " [stk]" if is_stk else ""
-                    out_tags_html += (
+                    out_tags += (
                         f"<span class='dh-out-tag {tc}'>"
-                        f"OUT → {hosp} · surg {surg}{stk_s}"
-                        f"</span>"
+                        f"OUT → {hosp} · surg {surg}{stk_s}</span>"
                     )
 
-                # Chips rows — one sub-group per size_range within this drawer
-                # sorted SHORT→STANDARD→LONG→EXTRA LONG
-                chips_rows_html = ""
-                sorted_srs = sorted(sr_map.keys(),
-                    key=lambda x: _SR_ORDER.index(x) if x in _SR_ORDER else 99)
-
-                # Only show size_range sub-label if more than one range in drawer
-                show_sr_label = len(sorted_srs) > 1
-
-                for sr in sorted_srs:
-                    sr_data    = sr_map[sr]
-                    sr_is_out  = bool(sr_data.get("out_case_details"))
-                    chips_html = ""
+                # All chips merged into one row, colour = size_range (or override)
+                chips_html = ""
+                for sr in sorted(sr_map.keys(),
+                        key=lambda x: _SR_ORDER.index(x) if x in _SR_ORDER else 99):
+                    sr_data   = sr_map[sr]
+                    sr_is_out = bool(sr_data.get("out_case_details"))
+                    base_cls  = _SR_CHIP.get(sr, "sc-std")
                     for sz in sr_data["sizes"]:
-                        lbl      = sz["label"]
+                        lbl      = sz.get("label", "")
                         no_stock = sz.get("no_stock", False)
                         if no_stock:
-                            chip_cls = "sc-none"   # marked no_stock in master_data
+                            chip_cls = "sc-none"
                         elif sr_is_out:
-                            chip_cls = "sc-case"   # out for a case — amber
+                            chip_cls = "sc-case"
                         else:
-                            chip_cls = "sc-ok"     # available
+                            chip_cls = base_cls
                         chips_html += f"<span class='sc {chip_cls}'>{lbl}</span>"
 
-                    sr_label_html = (
-                        f"<span class='sr-sublabel'>{sr}</span>" if show_sr_label else ""
-                    )
-                    drc_cls = "drc-out" if sr_is_out else ""
-                    chips_rows_html += (
-                        f"<div class='dr-chips {drc_cls}'>"
-                        f"{sr_label_html}"
-                        f"{chips_html}"
-                        f"</div>"
-                    )
-
+                drc_cls = "drc-out" if unique_out else ""
                 drawer_blocks += (
                     f"<div class='dr-block'>"
                     f"<div class='dr-hdr {hdr_cls}'>"
-                    f"<span>{drawer}</span>"
-                    f"<span>{out_tags_html}</span>"
+                    f"<span>{drawer}</span><span>{out_tags}</span>"
                     f"</div>"
-                    f"{chips_rows_html}"
+                    f"<div class='dr-chips {drc_cls}'>{chips_html}</div>"
                     f"</div>"
                 )
 
@@ -836,6 +805,7 @@ with inv_tabs[1]:
                 f"<span>{badge}</span>"
                 f"</div>"
                 f"<div class='inv-sub'>{uid} &nbsp;·&nbsp; {row['screw_sizes'] or ''}</div>"
+                f"{legend_html}"
                 f"{drawer_blocks}"
                 f"</div>"
             )
@@ -844,69 +814,6 @@ with inv_tabs[1]:
             "".join(_plate_row_html(r) for _, r in plate_sum.iterrows()),
             unsafe_allow_html=True,
         )
-
-        with st.expander("📋 Plate size range detail"):
-            psr = pd.DataFrame(report["plate_size_range_availability"])
-            pdd = pd.DataFrame(report.get("plate_drawer_detail", []))
-            if "proper_name" not in psr.columns:
-                psr["proper_name"] = psr.get("plate_name", "")
-            if "screw_sizes" not in psr.columns:
-                psr["screw_sizes"] = ""
-            psr["uid_norm"] = psr["plate_uid"].astype(str).str.upper().str.strip()
-            psr["order_rank"] = psr["uid_norm"].map(PLATE_UID_RANK).fillna(10_000).astype(int)
-            psr = psr.sort_values(["order_rank", "uid_norm", "size_range"])
-            if search_query:
-                psr = psr[
-                    psr["plate_uid"].str.contains(search_query, case=False, na=False)
-                    | psr["proper_name"].str.contains(search_query, case=False, na=False)
-                    | psr["screw_sizes"].str.contains(search_query, case=False, na=False)
-                ]
-                if not pdd.empty:
-                    pdd = pdd[
-                        pdd["plate_uid"].str.contains(search_query, case=False, na=False)
-                        | pdd["proper_name"].str.contains(search_query, case=False, na=False)
-                        | pdd["screw_sizes"].str.contains(search_query, case=False, na=False)
-                        | pdd["drawer"].str.contains(search_query, case=False, na=False)
-                        | pdd["drawer_sizes"].str.contains(search_query, case=False, na=False)
-                    ]
-            st.dataframe(
-                psr[[
-                    "plate_uid", "proper_name", "screw_sizes", "size_range", "drawer_locations",
-                    "available_units", "out_units", "total_units", "availability", "range_status",
-                ]].rename(columns={
-                    "plate_uid": "UID", "proper_name": "Proper Name", "screw_sizes": "Screw Sizes", "size_range": "Size",
-                    "drawer_locations": "Drawers", "available_units": "Avail",
-                    "out_units": "Out", "total_units": "Total", "availability": "Avail/Total", "range_status": "Status",
-                }),
-                use_container_width=True, hide_index=True,
-            )
-            if not pdd.empty:
-                if "proper_name" not in pdd.columns:
-                    pdd["proper_name"] = ""
-                if "screw_sizes" not in pdd.columns:
-                    pdd["screw_sizes"] = ""
-                pdd["uid_norm"] = pdd["plate_uid"].astype(str).str.upper().str.strip()
-                pdd["order_rank"] = pdd["uid_norm"].map(PLATE_UID_RANK).fillna(10_000).astype(int)
-                pdd = pdd.sort_values(["order_rank", "uid_norm", "size_range", "drawer"])
-                st.markdown("##### Drawer view")
-                st.dataframe(
-                    pdd[[
-                        "plate_uid", "proper_name", "screw_sizes", "size_range", "drawer",
-                        "drawer_sizes", "drawer_count", "availability", "range_status",
-                    ]].rename(columns={
-                        "plate_uid": "UID",
-                        "proper_name": "Proper Name",
-                        "screw_sizes": "Screw Sizes",
-                        "size_range": "Size Range",
-                        "drawer": "Drawer",
-                        "drawer_sizes": "Sizes In Drawer",
-                        "drawer_count": "Count",
-                        "availability": "Avail/Total",
-                        "range_status": "Status",
-                    }),
-                    use_container_width=True,
-                    hide_index=True,
-                )
 
 
 # ── Powertools ────────────────────────────────────────────────────────────────
