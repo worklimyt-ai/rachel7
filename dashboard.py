@@ -403,8 +403,10 @@ with inv_tabs[0]:
 
             summary_rows.append({
                 "Category": label,
+                "CategoryNorm": cat_norm,
                 "In Office": in_count,
                 "Out": out_count,
+                "Available": available,
                 "Available/Total": f"{available}/{total}",
                 "In Office Sets": in_list,
                 "Out (Hospital • Surgery)": out_list,
@@ -438,9 +440,9 @@ with inv_tabs[0]:
             ]
 
         def _set_row_html(r: dict) -> str:
-            cat_norm = r["Category"].upper().strip()
-            avail_val = avail_lookup.get(cat_norm, r["In Office"])
-            total_val = total_lookup.get(cat_norm, r["In Office"] + r["Out"])
+            cat_norm = r["CategoryNorm"]
+            avail_val = int(r.get("Available", 0))
+            total_val = int(total_lookup.get(cat_norm, r["In Office"] + r["Out"]))
             total_val = total_val if total_val > 0 else (r["In Office"] + r["Out"])
             badge = avail_badge(avail_val, total_val)
 
@@ -506,54 +508,67 @@ with inv_tabs[0]:
                 if key:
                     pt_avail_lookup[key] = _safe_int(r.get("available", 0))
 
-        def _avail_total(category_keys: list[str]) -> int:
+        summary_lookup: dict[str, int] = {}
+        for row in summary_rows:
+            row_norm = str(row.get("CategoryNorm", "")).strip().upper()
+            if row_norm:
+                summary_lookup[row_norm] = _safe_int(row.get("Available", 0))
+
+        def _copy_count(category_keys: list[str], mode: str = "sum") -> int:
             total_val = 0
+            values: list[int] = []
             for key in category_keys:
                 key_norm = str(key).upper().strip()
                 if key_norm in _POWERTOOL_CATS:
-                    total_val += pt_avail_lookup.get(key_norm, 0)
+                    values.append(pt_avail_lookup.get(key_norm, 0))
                 else:
-                    total_val += avail_lookup.get(key_norm, 0)
-            return int(total_val)
+                    values.append(summary_lookup.get(key_norm, 0))
+            if not values:
+                return 0
+            if mode == "min":
+                return int(min(values))
+            if mode == "max":
+                return int(max(values))
+            return int(sum(values))
 
         copy_lines = ["*Office Sets availability*", ""]
-        copy_map: list[tuple[str, list[str]]] = [
-            ("Comus mini 1.5", ["1.5-2.0"]),
-            ("Comus mini 2.0", ["2.0-2.4"]),
-            ("2.4", ["2.4-2.7"]),
-            ("2.7", ["2.7-4.0"]),
-            ("3.5", ["3.5-6.5"]),
-            ("Canna 2.5", ["CANNA 2.5"]),
-            ("Canna 3.5", ["CANNA 3.5"]),
-            ("Canna 4.0", ["CANNA 4.0"]),
-            ("Canna 5.2", ["CANNA 5.2"]),
-            ("Std canna 2.4", ["STD CANNA 2.4"]),
-            ("Std canna 3.0", ["STD CANNA 3.0"]),
-            ("Std canna 4.0", ["STD CANNA 4.0"]),
-            ("~Std canna 6.5", ["STD CANNA 6.5/7.3"]),
-            ("PFN", ["PFN"]),
-            ("Reamer set", ["REAMER"]),
-            ("ILN Femur", ["ILN FEMUR"]),
-            ("ILN Tibia", ["ILN TIBIA"]),
-            ("ILN Humerus", ["ILN HUMERUS"]),
-            ("ILN Radius & Ulna", ["ILN RADIUS ULNA"]),
-            ("TENS", ["TENS"]),
-            ("Fibular Nail", ["FIBULAR NAIL"]),
-            ("FNS", ["FNS"]),
-            ("Foot set", ["FOOT SET"]),
-            ("Distal Femoral", ["DISTAL FEMORAL"]),
-            ("PFN ll 170-240", ["PFN II 170-240"]),
-            ("PFN ll 340-420", ["PFN II 340-420 SYSTEM", "PFN II 340-420 IMPLANT"]),
-            ("Ankle Nail", ["ANKLE ARTHRODESIS NAIL"]),
-            ("Coatlmon Cable", ["COATLMON CABLE SYSTEM"]),
-            ("ROI", ["ROI"]),
+        copy_map: list[tuple[str, list[str], str]] = [
+            ("Comus mini 1.5 (1.5-2.0)", ["1.5-2.0"], "sum"),
+            ("Comus mini 2.0 (2.0-2.4)", ["2.0-2.4"], "sum"),
+            ("2.4 (2.4-2.7)", ["2.4-2.7"], "sum"),
+            ("2.7 (2.7-4.0)", ["2.7-4.0"], "sum"),
+            ("3.5 (3.5-6.5)", ["3.5-6.5"], "sum"),
+            ("Canna 2.5", ["CANNA 2.5"], "sum"),
+            ("Canna 3.5", ["CANNA 3.5"], "sum"),
+            ("Canna 4.0", ["CANNA 4.0"], "sum"),
+            ("Canna 5.2", ["CANNA 5.2"], "sum"),
+            ("Std canna 2.4", ["STD CANNA 2.4"], "sum"),
+            ("Std canna 3.0", ["STD CANNA 3.0"], "sum"),
+            ("Std canna 4.0", ["STD CANNA 4.0"], "sum"),
+            ("Std canna 6.5 (STD CANNA 6.5/7.3)", ["STD CANNA 6.5/7.3"], "sum"),
+            ("PFN", ["PFN"], "sum"),
+            ("Reamer set", ["REAMER"], "sum"),
+            ("ILN Femur", ["ILN FEMUR"], "sum"),
+            ("ILN Tibia", ["ILN TIBIA"], "sum"),
+            ("ILN Humerus", ["ILN HUMERUS"], "sum"),
+            ("ILN Radius & Ulna", ["ILN RADIUS ULNA"], "sum"),
+            ("TENS", ["TENS"], "sum"),
+            ("Fibular Nail", ["FIBULAR NAIL"], "sum"),
+            ("FNS", ["FNS"], "sum"),
+            ("Foot set", ["FOOT SET"], "sum"),
+            ("Distal Femoral (RFN)", ["RFN"], "sum"),
+            ("PFN ll 170-240", ["PFN II 170-240"], "sum"),
+            ("PFN ll 340-420", ["PFN II 340-420 SYSTEM", "PFN II 340-420 IMPLANT"], "min"),
+            ("Ankle Nail", ["ANKLE ARTHRODESIS NAIL"], "sum"),
+            ("Coatlmon Cable", ["COATLMON CABLE SYSTEM"], "sum"),
+            ("ROI", ["ROI"], "sum"),
         ]
-        for label, keys in copy_map:
-            copy_lines.append(f"{label} - {_avail_total(keys)}")
+        for label, keys, mode in copy_map:
+            copy_lines.append(f"{label} - {_copy_count(keys, mode=mode)}")
         copy_lines.append("Power")
-        copy_lines.append(f"5503B (normal) - {_avail_total(['P5503'])}")
-        copy_lines.append(f"5400 (kwire) - {_avail_total(['P5400'])}")
-        copy_lines.append(f"8400 (handpiece) - {_avail_total(['P8400'])}")
+        copy_lines.append(f"5503B (normal) - {_copy_count(['P5503'])}")
+        copy_lines.append(f"5400 (kwire) - {_copy_count(['P5400'])}")
+        copy_lines.append(f"8400 (handpiece) - {_copy_count(['P8400'])}")
 
         st.markdown("##### Copy Block")
         st.code("\n".join(copy_lines), language="text")
