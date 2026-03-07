@@ -619,76 +619,69 @@ with inv_tabs[1]:
         # ── CSS for plate drawer/size chip display ───────────────────────────
         st.markdown("""
 <style>
-/* ── Size-range group wrapper ── */
-.sr-group {
-    margin-top: 10px;
-    border-radius: 9px;
+/* ── Per-plate drawer block ── */
+.dr-block {
+    margin-top: 8px;
+    border-radius: 8px;
     overflow: hidden;
     border: 1.5px solid #e5e7eb;
 }
-/* Size-range group — state variants */
-.sr-group.sg-ready   { border-color: #d1fae5; }
-.sr-group.sg-out     { border-color: #fca5a5; }
-.sr-group.sg-nostock { border-color: #e5e7eb; }
-
-/* Size-range header bar */
-.sr-hdr {
+/* Drawer header bar */
+.dr-hdr {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 5px 10px;
-    font-size: 10px;
+    padding: 4px 10px;
+    background: #f3f4f6;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
     font-weight: 700;
-    letter-spacing: .1em;
-    text-transform: uppercase;
+    color: #374151;
+    letter-spacing: .06em;
 }
-.sr-hdr.sh-ready   { background:#f0fdf4; color:#15803d; }
-.sr-hdr.sh-out     { background:#fff1f2; color:#be123c; }
-.sr-hdr.sh-nostock { background:#f3f4f6; color:#6b7280; }
+.dr-hdr.dh-out     { background:#fff1f2; color:#be123c; }
+.dr-hdr.dh-nostock { background:#f3f4f6; color:#9ca3af; }
 
-/* "OUT → Hospital" tag inside header */
-.sr-out-tag {
+/* OUT tag inside drawer header */
+.dh-out-tag {
     font-size: 10px;
     font-weight: 700;
-    letter-spacing: .05em;
     background: #fecdd3;
     color: #9f1239;
     border-radius: 4px;
     padding: 1px 7px;
     margin-left: 6px;
+    letter-spacing: .03em;
 }
-.sr-out-tag.ot-stock { background:#fde68a; color:#92400e; }
+.dh-out-tag.dht-stock { background:#fde68a; color:#92400e; }
 
-/* Drawer row inside a size-range group */
-.dr-row {
+/* Size chips row inside a drawer */
+.dr-chips {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
     gap: 5px;
-    padding: 6px 10px 6px 10px;
-    border-top: 1px solid #f3f4f6;
+    padding: 7px 10px;
     background: #ffffff;
+    border-top: 1px solid #f3f4f6;
 }
-.dr-row.drr-out     { background: #fff8f8; }
-.dr-row.drr-nostock { background: #f9fafb; }
+.dr-chips.drc-out     { background: #fffbf0; }
+.dr-chips.drc-nostock { background: #f9fafb; }
 
-/* Drawer label tag */
-.dr-tag {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
+/* size_range sub-label before chips group */
+.sr-sublabel {
+    font-size: 9px;
     font-weight: 700;
-    color: #6b7280;
-    background: #f3f4f6;
-    border-radius: 4px;
-    padding: 2px 6px;
-    margin-right: 4px;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: #9ca3af;
+    align-self: center;
+    margin-right: 2px;
     white-space: nowrap;
-    flex-shrink: 0;
+    flex-basis: 100%;
+    margin-bottom: 2px;
 }
-.drr-out     .dr-tag { background:#ffe4e6; color:#be123c; }
-.drr-nostock .dr-tag { background:#f3f4f6; color:#9ca3af; }
 
-/* Individual size chip — the tiny rounded boxes */
+/* Individual size chip */
 .sc {
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
@@ -699,21 +692,19 @@ with inv_tabs[1]:
     letter-spacing: .01em;
     border: 1.5px solid transparent;
 }
-/* in stock */
-.sc-ok      { background:#dcfce7; color:#166534; border-color:#86efac; }
-/* out for a case — amber */
-.sc-out     { background:#fef3c7; color:#92400e; border-color:#fcd34d; }
-/* zero stock — red strikethrough */
-.sc-none    { background:#fee2e2; color:#9f1239; border-color:#fca5a5;
-              text-decoration: line-through; opacity: .8; }
+.sc-ok   { background:#dcfce7; color:#166534; border-color:#86efac; }
+.sc-case { background:#fef3c7; color:#92400e; border-color:#fcd34d; }
+.sc-none { background:#fee2e2; color:#9f1239; border-color:#fca5a5;
+           text-decoration: line-through; opacity:.8; }
 </style>
 """, unsafe_allow_html=True)
 
-        # Size-range display order
         _SR_ORDER = ["SHORT", "STANDARD", "LONG", "EXTRA LONG"]
 
-        # ── Build rich lookup from plate_size_range_availability ──────────────
-        # plate_uid → { size_range → {range_status, out_case_details, all_size_labels} }
+        # ── Build drawer-first lookup ─────────────────────────────────────────
+        # plate_uid → { drawer → [ {size_label, size_range, no_stock,
+        #                           range_status, out_case_details} ] }
+        # Also need per-(uid, size_range) out_case_details for case tagging
         _psr_rich: dict[str, dict[str, dict]] = {}
         _psr_raw = pd.DataFrame(report.get("plate_size_range_availability", []))
         if not _psr_raw.empty:
@@ -721,136 +712,120 @@ with inv_tabs[1]:
                 uid_key = str(srow["plate_uid"])
                 sr_key  = str(srow.get("size_range", "STANDARD"))
                 _psr_rich.setdefault(uid_key, {})[sr_key] = {
-                    "range_status":    str(srow.get("range_status", "READY")).upper().strip(),
+                    "range_status":     str(srow.get("range_status", "READY")).upper().strip(),
                     "out_case_details": srow.get("out_case_details", []) or [],
-                    "all_size_labels":  srow.get("all_size_labels", []) or [],
                 }
 
-        # ── Build lookup: plate_uid → { size_range → [ drawer_rows ] } ────────
-        _pdd_lookup: dict[str, dict[str, list[dict]]] = {}
+        # Drawer-first lookup: uid → { drawer → { sr → [size_detail_items] } }
+        _drawer_lookup: dict[str, dict[str, dict[str, list]]] = {}
         _pdd_raw = pd.DataFrame(report.get("plate_drawer_detail", []))
         if not _pdd_raw.empty:
             for _, drow in _pdd_raw.iterrows():
-                uid_key = str(drow["plate_uid"])
-                sr_key  = str(drow.get("size_range", "STANDARD"))
-                sizes_list = drow.get("drawer_sizes_list") or []
-                if not sizes_list and drow.get("drawer_sizes"):
-                    sizes_list = [s.strip() for s in str(drow["drawer_sizes"]).split(",") if s.strip()]
-                _pdd_lookup.setdefault(uid_key, {}).setdefault(sr_key, []).append({
-                    "drawer":      str(drow.get("drawer", "")),
-                    "sizes_list":  sizes_list,
-                    "range_status": str(drow.get("range_status", "READY")).upper().strip(),
-                    "out_case_details": drow.get("out_case_details", []) or [],
-                })
+                uid_key  = str(drow["plate_uid"])
+                drawer   = str(drow.get("drawer", "?"))
+                sr_key   = str(drow.get("size_range", "STANDARD"))
+                # drawer_size_detail is a list of {label, no_stock}
+                detail   = drow.get("drawer_size_detail") or []
+                if not detail:
+                    # fallback: build from drawer_sizes string, no_stock=False
+                    raw_sizes = str(drow.get("drawer_sizes", ""))
+                    detail = [{"label": s.strip(), "no_stock": False}
+                              for s in raw_sizes.split(",") if s.strip()]
+                rs = str(drow.get("range_status", "READY")).upper().strip()
+                out_cds = drow.get("out_case_details", []) or []
+                _drawer_lookup \
+                    .setdefault(uid_key, {}) \
+                    .setdefault(drawer, {}) \
+                    .setdefault(sr_key, [])
+                _drawer_lookup[uid_key][drawer][sr_key] = {
+                    "sizes":       detail,
+                    "range_status": rs,
+                    "out_case_details": out_cds,
+                }
 
         def _plate_row_html(row: pd.Series) -> str:
             uid   = row["plate_uid"]
             badge = avail_badge(int(row["available_units"]), int(row["total_units"]))
 
-            # ── Determine which size ranges exist & in what combinations ───────
+            uid_drawers = _drawer_lookup.get(uid, {})   # {drawer: {sr: data}}
             uid_sr_data = _psr_rich.get(uid, {})
-            uid_drawers = _pdd_lookup.get(uid, {})
-            all_srs     = sorted(uid_sr_data.keys(), key=lambda x: _SR_ORDER.index(x) if x in _SR_ORDER else 99)
 
-            # Figure out grouping: which ranges go out together for the same case
-            # Group consecutive ranges that share a case_id into a "send bundle"
-            # We colour the whole bundle the same OUT colour
-            case_to_srs: dict[str, list[str]] = {}
-            for sr in all_srs:
-                for cd in uid_sr_data[sr].get("out_case_details", []):
-                    case_to_srs.setdefault(cd["case_id"], []).append(sr)
+            drawer_blocks = ""
+            for drawer in sorted(uid_drawers.keys()):
+                sr_map = uid_drawers[drawer]  # {size_range: {sizes, range_status, out_case_details}}
 
-            # Map size_range → case info (first case if multiple)
-            sr_case_map: dict[str, dict] = {}
-            for sr in all_srs:
-                for cd in uid_sr_data[sr].get("out_case_details", []):
-                    if sr not in sr_case_map:
-                        sr_case_map[sr] = cd
+                # Collect out_case_details across all size ranges in this drawer
+                all_out_cases: list[dict] = []
+                for sr_data in sr_map.values():
+                    all_out_cases.extend(sr_data.get("out_case_details", []))
+                # Deduplicate by case_id
+                seen_cases: set[str] = set()
+                unique_out: list[dict] = []
+                for cd in all_out_cases:
+                    cid = cd.get("case_id", "")
+                    if cid not in seen_cases:
+                        seen_cases.add(cid)
+                        unique_out.append(cd)
 
-            sr_blocks = ""
-            for sr in all_srs:
-                sr_info    = uid_sr_data[sr]
-                rs         = sr_info["range_status"]
-                out_cases  = sr_info.get("out_case_details", [])
-                all_labels = sr_info.get("all_size_labels", [])
-                drawer_rows = uid_drawers.get(sr, [])
+                drawer_is_out = bool(unique_out)
 
-                # Determine header style
-                if rs == "READY":
-                    hdr_cls = "sh-ready"; grp_cls = "sg-ready"
-                elif rs == "OUT OF STOCK" and out_cases:
-                    hdr_cls = "sh-out";   grp_cls = "sg-out"
-                else:
-                    hdr_cls = "sh-nostock"; grp_cls = "sg-nostock"
-
-                # Build out tags for header (who took it)
+                # Drawer header
+                hdr_cls = "dh-out" if drawer_is_out else ""
                 out_tags_html = ""
-                for cd in out_cases:
-                    hosp    = cd.get("hospital", "") or "—"
-                    surg    = cd.get("surgery_date", "") or "—"
-                    is_stk  = bool(cd.get("from_stock", False))
-                    ot_cls  = "ot-stock" if is_stk else ""
-                    stock_s = " [stk]" if is_stk else ""
+                for cd in unique_out:
+                    hosp   = cd.get("hospital", "") or "—"
+                    surg   = cd.get("surgery_date", "") or "—"
+                    is_stk = bool(cd.get("from_stock", False))
+                    tc     = "dht-stock" if is_stk else ""
+                    stk_s  = " [stk]" if is_stk else ""
                     out_tags_html += (
-                        f"<span class='sr-out-tag {ot_cls}'>"
-                        f"OUT → {hosp} · surg {surg}{stock_s}"
+                        f"<span class='dh-out-tag {tc}'>"
+                        f"OUT → {hosp} · surg {surg}{stk_s}"
                         f"</span>"
                     )
 
-                # Build drawer rows with per-chip status
-                drawers_html = ""
-                if drawer_rows:
-                    for dr in drawer_rows:
-                        dr_rs  = dr["range_status"]
-                        d_name = dr["drawer"]
-                        sizes  = dr["sizes_list"]
-                        drr_cls = "drr-out" if (dr_rs == "OUT OF STOCK" and out_cases) else (
-                                  "drr-nostock" if dr_rs == "OUT OF STOCK" else "")
+                # Chips rows — one sub-group per size_range within this drawer
+                # sorted SHORT→STANDARD→LONG→EXTRA LONG
+                chips_rows_html = ""
+                sorted_srs = sorted(sr_map.keys(),
+                    key=lambda x: _SR_ORDER.index(x) if x in _SR_ORDER else 99)
 
-                        chips_html = ""
-                        for sz in sizes:
-                            if dr_rs == "OUT OF STOCK" and out_cases:
-                                # size is out for a specific case
-                                chip_cls = "sc-out"
-                            elif dr_rs == "OUT OF STOCK":
-                                # no stock at all
-                                chip_cls = "sc-none"
-                            else:
-                                chip_cls = "sc-ok"
-                            chips_html += f"<span class='sc {chip_cls}'>{sz}</span>"
+                # Only show size_range sub-label if more than one range in drawer
+                show_sr_label = len(sorted_srs) > 1
 
-                        drawers_html += (
-                            f"<div class='dr-row {drr_cls}'>"
-                            f"<span class='dr-tag'>{d_name}</span>"
-                            f"{chips_html}"
-                            f"</div>"
-                        )
-                else:
-                    # No drawers — show size labels as chips (stock items)
+                for sr in sorted_srs:
+                    sr_data    = sr_map[sr]
+                    sr_is_out  = bool(sr_data.get("out_case_details"))
                     chips_html = ""
-                    for sz in all_labels:
-                        if rs == "OUT OF STOCK" and out_cases:
-                            chip_cls = "sc-out"
-                        elif rs == "OUT OF STOCK":
-                            chip_cls = "sc-none"
+                    for sz in sr_data["sizes"]:
+                        lbl      = sz["label"]
+                        no_stock = sz.get("no_stock", False)
+                        if no_stock:
+                            chip_cls = "sc-none"   # marked no_stock in master_data
+                        elif sr_is_out:
+                            chip_cls = "sc-case"   # out for a case — amber
                         else:
-                            chip_cls = "sc-ok"
-                        chips_html += f"<span class='sc {chip_cls}'>{sz}</span>"
-                    if chips_html:
-                        drawers_html = (
-                            f"<div class='dr-row'>"
-                            f"<span class='dr-tag' style='color:#9ca3af'>stock</span>"
-                            f"{chips_html}"
-                            f"</div>"
-                        )
+                            chip_cls = "sc-ok"     # available
+                        chips_html += f"<span class='sc {chip_cls}'>{lbl}</span>"
 
-                sr_blocks += (
-                    f"<div class='sr-group {grp_cls}'>"
-                    f"<div class='sr-hdr {hdr_cls}'>"
-                    f"<span>{sr}</span>"
+                    sr_label_html = (
+                        f"<span class='sr-sublabel'>{sr}</span>" if show_sr_label else ""
+                    )
+                    drc_cls = "drc-out" if sr_is_out else ""
+                    chips_rows_html += (
+                        f"<div class='dr-chips {drc_cls}'>"
+                        f"{sr_label_html}"
+                        f"{chips_html}"
+                        f"</div>"
+                    )
+
+                drawer_blocks += (
+                    f"<div class='dr-block'>"
+                    f"<div class='dr-hdr {hdr_cls}'>"
+                    f"<span>{drawer}</span>"
                     f"<span>{out_tags_html}</span>"
                     f"</div>"
-                    f"{drawers_html}"
+                    f"{chips_rows_html}"
                     f"</div>"
                 )
 
@@ -861,7 +836,7 @@ with inv_tabs[1]:
                 f"<span>{badge}</span>"
                 f"</div>"
                 f"<div class='inv-sub'>{uid} &nbsp;·&nbsp; {row['screw_sizes'] or ''}</div>"
-                f"{sr_blocks}"
+                f"{drawer_blocks}"
                 f"</div>"
             )
 

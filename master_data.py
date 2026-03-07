@@ -8251,7 +8251,8 @@ PLATES = {
         "size_range": "Standard",
         "left_right": "L",
         "size": "5H",
-        "location": "D4"
+        "location": "D4",
+        "status": "no_stock"
     },
     "52202837": {
         "uid": "PFP",
@@ -8271,7 +8272,8 @@ PLATES = {
         "size_range": "Standard",
         "left_right": "L",
         "size": "9H",
-        "location": "D4"
+        "location": "D4",
+        "status": "no_stock"
     },
     "52202841": {
         "uid": "PFP",
@@ -8301,7 +8303,8 @@ PLATES = {
         "size_range": "Standard",
         "left_right": "R",
         "size": "7H",
-        "location": "D4"
+        "location": "D4",
+        "status": "no_stock"
     },
     "52202869": {
         "uid": "PFP",

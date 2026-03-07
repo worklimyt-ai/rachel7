@@ -378,7 +378,10 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
             "drawer_locations": set(),
             "stock_locations":  set(),
             "drawer_size_map": defaultdict(list),
-            "all_size_labels": [],   # all individual size labels in this bucket
+            # drawer_size_detail: drawer → [{label, no_stock}]
+            # Set "status": "no_stock" on a plate entry in master_data.py to mark it
+            "drawer_size_detail": defaultdict(list),
+            "all_size_labels": [],
             "out_details":  [],
         })
         screw_sizes = str(row.get("screw_sizes", "")).strip()
@@ -387,13 +390,19 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
         size_label = str(row.get("size", "")).strip()
         lr_label = str(row.get("left_right", "")).strip()
         plate_label = " ".join(part for part in (size_label, lr_label) if part).strip() or str(sku_code).strip()
+        # "status": "no_stock" in master_data.py flags this individual size as unavailable
+        sku_status = normalize_code(str(row.get("status", ""))).replace(" ", "_")
+        sku_no_stock = sku_status in {"NO_STOCK", "NOSTOCK", "OUT", "OUT_OF_STOCK"}
         for drawer in drawers:
             bucket["drawer_size_map"][drawer].append(plate_label)
+            bucket["drawer_size_detail"][drawer].append({
+                "label":    plate_label,
+                "no_stock": sku_no_stock,
+            })
         bucket["drawer_locations"].update(drawers)
         bucket["stock_locations"].update(others)
         if not drawers and not others:
             bucket["stock_locations"].add("UNSPECIFIED")
-        # Track every individual size label belonging to this bucket
         if plate_label and plate_label not in bucket["all_size_labels"]:
             bucket["all_size_labels"].append(plate_label)
 
@@ -684,7 +693,7 @@ def build_plate_outputs(
                     "surgery_date":   case["surgery_date"],
                     "raw_plate_token":parsed["raw_token"],
                     "from_stock":     parsed["from_stock"],
-                    "out_size_labels": sorted(bucket["all_size_labels"]),
+                    "out_size_labels": sorted(bucket.get("all_size_labels", [])),
                 })
 
     plate_size_range_availability: list[dict[str, Any]] = []
@@ -705,17 +714,18 @@ def build_plate_outputs(
             range_status = "OUT OF STOCK"
         else:
             range_status = "PARTIAL"
-        # Summarise out cases for this bucket (for display)
+
         out_case_details = [
             {
-                "case_id":       d["case_id"],
-                "hospital":      d["hospital"],
-                "surgery_date":  d["surgery_date"],
-                "from_stock":    d["from_stock"],
+                "case_id":        d["case_id"],
+                "hospital":       d["hospital"],
+                "surgery_date":   d["surgery_date"],
+                "from_stock":     d["from_stock"],
                 "out_size_labels": d.get("out_size_labels", []),
             }
             for d in bucket["out_details"]
         ]
+
         row = {
             "plate_uid":             uid,
             "proper_name":           bucket["plate_name"],
@@ -737,24 +747,30 @@ def build_plate_outputs(
             "availability":          f"{available_units}/{total}",
             "range_status":          range_status,
             "out_case_details":      out_case_details,
-            "all_size_labels":       sorted(bucket["all_size_labels"]),
+            "all_size_labels":       sorted(bucket.get("all_size_labels", [])),
         }
         plate_size_range_availability.append(row)
         for drawer in sorted(bucket["drawer_size_map"]):
             labels = sorted(bucket["drawer_size_map"][drawer])
+            # Per-size detail with no_stock flags
+            size_detail = sorted(
+                bucket["drawer_size_detail"].get(drawer, []),
+                key=lambda x: x["label"]
+            )
             plate_drawer_detail.append({
-                "plate_uid": uid,
-                "proper_name": bucket["plate_name"],
-                "screw_sizes": ", ".join(sorted(bucket["screw_sizes_set"])),
-                "size_range": size_range,
-                "drawer": drawer,
-                "drawer_sizes": ", ".join(labels),
+                "plate_uid":        uid,
+                "proper_name":      bucket["plate_name"],
+                "screw_sizes":      ", ".join(sorted(bucket["screw_sizes_set"])),
+                "size_range":       size_range,
+                "drawer":           drawer,
+                "drawer_sizes":     ", ".join(labels),
                 "drawer_sizes_list": labels,
-                "drawer_count": len(labels),
-                "available_units": available_units,
-                "total_units": total,
-                "availability": f"{available_units}/{total}",
-                "range_status": range_status,
+                "drawer_size_detail": size_detail,
+                "drawer_count":     len(labels),
+                "available_units":  available_units,
+                "total_units":      total,
+                "availability":     f"{available_units}/{total}",
+                "range_status":     range_status,
                 "out_case_details": out_case_details,
             })
         for detail in bucket["out_details"]:
