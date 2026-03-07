@@ -263,7 +263,6 @@ SETS = [
     {"category": "P5503", "id": "1006", "home": "PG", "status": "", "uid": "P55031006", "shorthand": "P5503"},
     {"category": "P5503", "id": "2601006", "home": "PG", "status": "", "uid": "P55031006", "shorthand": "P55031006"},
     {"category": "P5503", "id": "4007", "home": "HTI", "status": "", "uid": "P55034007", "shorthand": "P5503"},
-    {"category": "P5503", "id": "10004", "home": "OFFICE", "status": "", "uid": "P550310004", "shorthand": "P5503"},
     {"category": "P5503", "id": "2015", "home": "OFFICE", "status": "BACK IN ACTION 260114", "uid": "P55032015", "shorthand": "P5503"},
     {"category": "P5503", "id": "161", "home": "PG", "status": "", "uid": "P5503161", "shorthand": "P5503"},
     {"category": "P5503", "id": "3009", "home": "OFFICE", "status": "", "uid": "P55033009", "shorthand": "P5503"},
