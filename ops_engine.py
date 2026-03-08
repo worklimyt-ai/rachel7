@@ -164,7 +164,14 @@ def size_range_sort_key(value: Any) -> tuple[int, str]:
     return (order.get(token, 99), token)
 
 
-def plate_label_sort_key(value: Any) -> tuple[int, int, str]:
+CLAVICLE_REVERSED_UIDS = {"DSC", "MSC", "DIA"}
+
+
+def plate_uses_reversed_lr_sequence(uid: Any) -> bool:
+    return normalize_set_code(uid) in CLAVICLE_REVERSED_UIDS
+
+
+def plate_label_sort_key(value: Any, *, reverse_lr: bool = False) -> tuple[int, int, str]:
     token = normalize_code(value)
     side_rank = 1
     numeric_rank = 10_000
@@ -175,15 +182,18 @@ def plate_label_sort_key(value: Any) -> tuple[int, int, str]:
     match = re.search(r"(\d+)", token)
     if match:
         numeric_value = int(match.group(1))
-        if side_rank == 0:
-            numeric_rank = -numeric_value
+        if reverse_lr:
+            numeric_rank = -numeric_value if side_rank == 0 else numeric_value
         else:
-            numeric_rank = numeric_value
+            numeric_rank = numeric_value if side_rank == 0 else -numeric_value
     return (side_rank, numeric_rank, token)
 
 
-def plate_detail_sort_key(detail: dict[str, Any]) -> tuple[int, int, str]:
-    return plate_label_sort_key(detail.get("label", ""))
+def plate_detail_sort_key(uid: Any, detail: dict[str, Any]) -> tuple[int, int, str]:
+    return plate_label_sort_key(
+        detail.get("label", ""),
+        reverse_lr=plate_uses_reversed_lr_sequence(uid),
+    )
 
 
 def drawer_sort_key(value: Any) -> tuple[int, str]:
@@ -843,7 +853,7 @@ def build_plate_outputs(
             # drawer_size_detail carries {label, size_range, no_stock} per chip
             raw_detail = sorted(
                 bucket["drawer_size_detail"].get(drawer, []),
-                key=plate_detail_sort_key,
+                key=lambda x: plate_detail_sort_key(uid, x),
             )
             detail = [
                 {
@@ -873,7 +883,7 @@ def build_plate_outputs(
         for stock_loc in stock_keys:
             raw_detail = sorted(
                 bucket["stock_size_detail"].get(stock_loc, []),
-                key=plate_detail_sort_key,
+                key=lambda x: plate_detail_sort_key(uid, x),
             )
             detail = [
                 {

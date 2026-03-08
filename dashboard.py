@@ -748,6 +748,7 @@ with inv_tabs[1]:
 """, unsafe_allow_html=True)
 
         _SR_ORDER  = ["SHORT", "STANDARD", "LONG", "EXTRA LONG"]
+        _REVERSED_LR_UIDS = {"DSC", "MSC", "DIA"}
         # chip class per size_range when in stock
         _SR_CHIP   = {"SHORT": "sc-sht", "STANDARD": "sc-std",
                       "LONG": "sc-lng", "EXTRA LONG": "sc-xl"}
@@ -761,7 +762,7 @@ with inv_tabs[1]:
                 return (int(text[1:]), text)
             return (10_000, text)
 
-        def _plate_label_sort_key(value: str) -> tuple[int, int, str]:
+        def _plate_label_sort_key(value: str, *, reverse_lr: bool = False) -> tuple[int, int, str]:
             text = str(value or "").strip().upper()
             token = text.replace(" ", "")
             side_rank = 1
@@ -773,10 +774,10 @@ with inv_tabs[1]:
             match = re.search(r"(\d+)", token)
             if match:
                 numeric_value = int(match.group(1))
-                if side_rank == 0:
-                    numeric_rank = -numeric_value
+                if reverse_lr:
+                    numeric_rank = -numeric_value if side_rank == 0 else numeric_value
                 else:
-                    numeric_rank = numeric_value
+                    numeric_rank = numeric_value if side_rank == 0 else -numeric_value
             return (side_rank, numeric_rank, text)
 
         def _has_sided_numeric_label(value: str) -> bool:
@@ -884,14 +885,15 @@ with inv_tabs[1]:
                 use_sided_numeric_order = bool(flat_sizes) and all(
                     _has_sided_numeric_label(sz["label"]) for sz in flat_sizes
                 )
+                reverse_lr = uid in _REVERSED_LR_UIDS
                 ordered_sizes = sorted(
                     flat_sizes,
                     key=lambda sz: (
-                        _plate_label_sort_key(sz["label"])
+                        _plate_label_sort_key(sz["label"], reverse_lr=reverse_lr)
                         if use_sided_numeric_order
                         else (
                             _SR_ORDER.index(sz["size_range"]) if sz["size_range"] in _SR_ORDER else 99,
-                            *_plate_label_sort_key(sz["label"]),
+                            *_plate_label_sort_key(sz["label"], reverse_lr=reverse_lr),
                         )
                     ),
                 )
