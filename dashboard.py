@@ -5,6 +5,7 @@ Run: streamlit run dashboard.py
 
 import streamlit as st
 import pandas as pd
+import re
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -760,6 +761,28 @@ with inv_tabs[1]:
                 return (int(text[1:]), text)
             return (10_000, text)
 
+        def _plate_label_sort_key(value: str) -> tuple[int, int, str]:
+            text = str(value or "").strip().upper()
+            token = text.replace(" ", "")
+            side_rank = 1
+            numeric_rank = 10_000
+            if token.endswith("L"):
+                side_rank = 0
+            elif token.endswith("R"):
+                side_rank = 2
+            match = re.search(r"(\d+)", token)
+            if match:
+                numeric_value = int(match.group(1))
+                if side_rank == 0:
+                    numeric_rank = -numeric_value
+                else:
+                    numeric_rank = numeric_value
+            return (side_rank, numeric_rank, text)
+
+        def _has_sided_numeric_label(value: str) -> bool:
+            text = str(value or "").strip().upper().replace(" ", "")
+            return bool(re.search(r"\d+", text) and text.endswith(("L", "R")))
+
         # ── Build drawer-first lookup from plate_drawer_detail ────────────────
         # uid → { drawer → { size_range → {sizes:[{label,no_stock}], out_case_details} } }
         _drawer_lookup: dict[str, dict[str, dict[str, dict]]] = {}
@@ -847,21 +870,42 @@ with inv_tabs[1]:
 
                 # All chips merged into one row, colour = size_range (or override)
                 chips_html = ""
-                for sr in sorted(sr_map.keys(),
-                        key=lambda x: _SR_ORDER.index(x) if x in _SR_ORDER else 99):
-                    sr_data   = sr_map[sr]
+                flat_sizes: list[dict] = []
+                for sr, sr_data in sr_map.items():
                     sr_is_out = bool(sr_data.get("out_case_details"))
-                    base_cls  = _SR_CHIP.get(sr, "sc-std")
                     for sz in sr_data["sizes"]:
-                        lbl      = sz.get("label", "")
-                        no_stock = sz.get("no_stock", False)
-                        if no_stock:
-                            chip_cls = "sc-none"
-                        elif sr_is_out:
-                            chip_cls = "sc-case"
-                        else:
-                            chip_cls = base_cls
-                        chips_html += f"<span class='sc {chip_cls}'>{lbl}</span>"
+                        flat_sizes.append({
+                            "label": sz.get("label", ""),
+                            "no_stock": bool(sz.get("no_stock", False)),
+                            "size_range": sr,
+                            "sr_is_out": sr_is_out,
+                        })
+
+                use_sided_numeric_order = bool(flat_sizes) and all(
+                    _has_sided_numeric_label(sz["label"]) for sz in flat_sizes
+                )
+                ordered_sizes = sorted(
+                    flat_sizes,
+                    key=lambda sz: (
+                        _plate_label_sort_key(sz["label"])
+                        if use_sided_numeric_order
+                        else (
+                            _SR_ORDER.index(sz["size_range"]) if sz["size_range"] in _SR_ORDER else 99,
+                            *_plate_label_sort_key(sz["label"]),
+                        )
+                    ),
+                )
+
+                for sz in ordered_sizes:
+                    lbl      = sz["label"]
+                    no_stock = sz["no_stock"]
+                    if no_stock:
+                        chip_cls = "sc-none"
+                    elif sz["sr_is_out"]:
+                        chip_cls = "sc-case"
+                    else:
+                        chip_cls = _SR_CHIP.get(sz["size_range"], "sc-std")
+                    chips_html += f"<span class='sc {chip_cls}'>{lbl}</span>"
 
                 drc_cls = "drc-out" if unique_out else ""
                 drawer_blocks += (

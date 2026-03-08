@@ -168,26 +168,22 @@ def plate_label_sort_key(value: Any) -> tuple[int, int, str]:
     token = normalize_code(value)
     side_rank = 1
     numeric_rank = 10_000
-    side = ""
     if token.endswith("L"):
         side_rank = 0
-        side = "L"
     elif token.endswith("R"):
         side_rank = 2
-        side = "R"
     match = re.search(r"(\d+)", token)
     if match:
         numeric_value = int(match.group(1))
-        numeric_rank = numeric_value if side != "R" else -numeric_value
+        if side_rank == 0:
+            numeric_rank = -numeric_value
+        else:
+            numeric_rank = numeric_value
     return (side_rank, numeric_rank, token)
 
 
-def plate_detail_sort_key(detail: dict[str, Any]) -> tuple[int, int, int, str]:
-    master_order = detail.get("_master_order")
-    if isinstance(master_order, int):
-        return (0, master_order, 0, str(detail.get("label", "")))
-    side_rank, numeric_rank, token = plate_label_sort_key(detail.get("label", ""))
-    return (1, side_rank, numeric_rank, token)
+def plate_detail_sort_key(detail: dict[str, Any]) -> tuple[int, int, str]:
+    return plate_label_sort_key(detail.get("label", ""))
 
 
 def drawer_sort_key(value: Any) -> tuple[int, str]:
@@ -405,7 +401,7 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
     uid_ranges:   dict[str, set[str]] = defaultdict(set)
     uid_alias_candidates: dict[str, set[str]] = defaultdict(set)
 
-    for master_order, (sku_code, row) in enumerate(master_plates.items()):
+    for sku_code, row in master_plates.items():
         if not isinstance(row, dict):
             continue
         uid = normalize_set_code(row.get("uid", ""))
@@ -453,7 +449,6 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
                 "label":      plate_label,
                 "size_range": size_range,
                 "no_stock":   sku_no_stock,
-                "_master_order": master_order,
             })
         for stock_loc in others:
             bucket["stock_size_map"][stock_loc].append(plate_label)
@@ -461,7 +456,6 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
                 "label":      plate_label,
                 "size_range": size_range,
                 "no_stock":   sku_no_stock,
-                "_master_order": master_order,
             })
         bucket["total_drawer_units"] += drawer_units
         bucket["total_stock_units"] += stock_units
