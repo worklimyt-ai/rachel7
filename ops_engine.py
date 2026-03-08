@@ -182,6 +182,14 @@ def plate_label_sort_key(value: Any) -> tuple[int, int, str]:
     return (side_rank, numeric_rank, token)
 
 
+def plate_detail_sort_key(detail: dict[str, Any]) -> tuple[int, int, int, str]:
+    master_order = detail.get("_master_order")
+    if isinstance(master_order, int):
+        return (0, master_order, 0, str(detail.get("label", "")))
+    side_rank, numeric_rank, token = plate_label_sort_key(detail.get("label", ""))
+    return (1, side_rank, numeric_rank, token)
+
+
 def drawer_sort_key(value: Any) -> tuple[int, str]:
     token = normalize_code(value)
     if token.startswith("D") and token[1:].isdigit():
@@ -397,7 +405,7 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
     uid_ranges:   dict[str, set[str]] = defaultdict(set)
     uid_alias_candidates: dict[str, set[str]] = defaultdict(set)
 
-    for sku_code, row in master_plates.items():
+    for master_order, (sku_code, row) in enumerate(master_plates.items()):
         if not isinstance(row, dict):
             continue
         uid = normalize_set_code(row.get("uid", ""))
@@ -445,6 +453,7 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
                 "label":      plate_label,
                 "size_range": size_range,
                 "no_stock":   sku_no_stock,
+                "_master_order": master_order,
             })
         for stock_loc in others:
             bucket["stock_size_map"][stock_loc].append(plate_label)
@@ -452,6 +461,7 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
                 "label":      plate_label,
                 "size_range": size_range,
                 "no_stock":   sku_no_stock,
+                "_master_order": master_order,
             })
         bucket["total_drawer_units"] += drawer_units
         bucket["total_stock_units"] += stock_units
@@ -837,10 +847,18 @@ def build_plate_outputs(
 
         for drawer in drawer_keys:
             # drawer_size_detail carries {label, size_range, no_stock} per chip
-            detail = sorted(
+            raw_detail = sorted(
                 bucket["drawer_size_detail"].get(drawer, []),
-                key=lambda x: plate_label_sort_key(x["label"])
+                key=plate_detail_sort_key,
             )
+            detail = [
+                {
+                    "label": d["label"],
+                    "size_range": d["size_range"],
+                    "no_stock": d["no_stock"],
+                }
+                for d in raw_detail
+            ]
             labels = [d["label"] for d in detail]
             plate_drawer_detail.append({
                 "plate_uid":         uid,
@@ -859,10 +877,18 @@ def build_plate_outputs(
                 "drawer_out_case_details": drawer_case_map.get(drawer, []),
             })
         for stock_loc in stock_keys:
-            detail = sorted(
+            raw_detail = sorted(
                 bucket["stock_size_detail"].get(stock_loc, []),
-                key=lambda x: plate_label_sort_key(x["label"])
+                key=plate_detail_sort_key,
             )
+            detail = [
+                {
+                    "label": d["label"],
+                    "size_range": d["size_range"],
+                    "no_stock": d["no_stock"],
+                }
+                for d in raw_detail
+            ]
             labels = [d["label"] for d in detail]
             plate_drawer_detail.append({
                 "plate_uid":         uid,

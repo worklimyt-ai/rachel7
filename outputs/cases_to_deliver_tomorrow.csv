@@ -1,2 +1,3 @@
 case_id,prefix,hospital,patient_doctor,delivery_date,surgery_date,sales_code,return_date,status,smart_status,sets,sets_raw,set_categories,plates,powertools
-C049,BC,QE2,BOOKING,09/03/2026,13/03/2026,,,,⚪ PENDING ALLOCATION,ANKLE (?),ANKLE,"[""ANKLE ARTHRODESIS NAIL""]",,
+C050,BC,HSBU,BOOKING,10/03/2026,12/03/2026,,,,⚪ PENDING ALLOCATION,ILNH (?),ILNH,"[""ILN HUMERUS""]",,
+C051,OC,HSBU,NAVINITA,10/03/2026,11/03/2026,,,,⚪ PENDING ALLOCATION,ILNH (?),ILNH,"[""ILN HUMERUS""]",,P5503
