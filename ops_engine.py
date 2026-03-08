@@ -175,14 +175,19 @@ def plate_label_sort_key(value: Any, *, reverse_lr: bool = False) -> tuple[int, 
     token = normalize_code(value)
     side_rank = 1
     numeric_rank = 10_000
+    has_side = False
     if token.endswith("L"):
         side_rank = 0
+        has_side = True
     elif token.endswith("R"):
         side_rank = 2
+        has_side = True
     match = re.search(r"(\d+)", token)
     if match:
         numeric_value = int(match.group(1))
-        if reverse_lr:
+        if not has_side:
+            numeric_rank = numeric_value
+        elif reverse_lr:
             numeric_rank = -numeric_value if side_rank == 0 else numeric_value
         else:
             numeric_rank = numeric_value if side_rank == 0 else -numeric_value

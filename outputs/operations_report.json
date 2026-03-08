@@ -3586,15 +3586,15 @@
       "screw_sizes": "2.7mm, 3.5mm",
       "size_range": "STANDARD",
       "drawer": "D4",
-      "drawer_sizes": "5H, 3H",
+      "drawer_sizes": "3H, 5H",
       "drawer_size_detail": [
         {
-          "label": "5H",
+          "label": "3H",
           "size_range": "STANDARD",
           "no_stock": false
         },
         {
-          "label": "3H",
+          "label": "5H",
           "size_range": "STANDARD",
           "no_stock": false
         }
@@ -6178,10 +6178,10 @@
       "screw_sizes": "5.0mm",
       "size_range": "STANDARD",
       "drawer": "D5",
-      "drawer_sizes": "12H, 10H, 8H",
+      "drawer_sizes": "8H, 10H, 12H",
       "drawer_size_detail": [
         {
-          "label": "12H",
+          "label": "8H",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -6191,7 +6191,7 @@
           "no_stock": false
         },
         {
-          "label": "8H",
+          "label": "12H",
           "size_range": "STANDARD",
           "no_stock": false
         }
@@ -6224,10 +6224,10 @@
       "screw_sizes": "5.0mm",
       "size_range": "STANDARD",
       "drawer": "D6",
-      "drawer_sizes": "12H, 10H, 8H",
+      "drawer_sizes": "8H, 10H, 12H",
       "drawer_size_detail": [
         {
-          "label": "12H",
+          "label": "8H",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -6237,7 +6237,7 @@
           "no_stock": false
         },
         {
-          "label": "8H",
+          "label": "12H",
           "size_range": "STANDARD",
           "no_stock": false
         }
@@ -6307,15 +6307,15 @@
       "screw_sizes": "5.0mm",
       "size_range": "EXTRA LONG",
       "drawer": "D5",
-      "drawer_sizes": "18h, 16h",
+      "drawer_sizes": "16h, 18h",
       "drawer_size_detail": [
         {
-          "label": "18h",
+          "label": "16h",
           "size_range": "EXTRA LONG",
           "no_stock": false
         },
         {
-          "label": "16h",
+          "label": "18h",
           "size_range": "EXTRA LONG",
           "no_stock": false
         }
@@ -6334,15 +6334,15 @@
       "screw_sizes": "3.5mm",
       "size_range": "STANDARD",
       "drawer": "D1",
-      "drawer_sizes": "10H, 8H",
+      "drawer_sizes": "8H, 10H",
       "drawer_size_detail": [
         {
-          "label": "10H",
+          "label": "8H",
           "size_range": "STANDARD",
           "no_stock": false
         },
         {
-          "label": "8H",
+          "label": "10H",
           "size_range": "STANDARD",
           "no_stock": false
         }
@@ -6361,10 +6361,10 @@
       "screw_sizes": "3.5mm, 4.5mm, 5.0mm",
       "size_range": "STANDARD",
       "drawer": "D6",
-      "drawer_sizes": "12H, 10H, 8H",
+      "drawer_sizes": "8H, 10H, 12H",
       "drawer_size_detail": [
         {
-          "label": "12H",
+          "label": "8H",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -6374,7 +6374,7 @@
           "no_stock": false
         },
         {
-          "label": "8H",
+          "label": "12H",
           "size_range": "STANDARD",
           "no_stock": false
         }
@@ -6840,10 +6840,10 @@
       "screw_sizes": "3.5mm",
       "size_range": "STANDARD",
       "drawer": "D1",
-      "drawer_sizes": "5H, 4H, 3H",
+      "drawer_sizes": "3H, 4H, 5H",
       "drawer_size_detail": [
         {
-          "label": "5H",
+          "label": "3H",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -6853,7 +6853,7 @@
           "no_stock": false
         },
         {
-          "label": "3H",
+          "label": "5H",
           "size_range": "STANDARD",
           "no_stock": false
         }
@@ -6886,10 +6886,10 @@
       "screw_sizes": "3.5mm",
       "size_range": "STANDARD",
       "drawer": "D2",
-      "drawer_sizes": "5H, 4H, 3H",
+      "drawer_sizes": "3H, 4H, 5H",
       "drawer_size_detail": [
         {
-          "label": "5H",
+          "label": "3H",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -6899,7 +6899,7 @@
           "no_stock": false
         },
         {
-          "label": "3H",
+          "label": "5H",
           "size_range": "STANDARD",
           "no_stock": false
         }
@@ -6925,10 +6925,10 @@
       "screw_sizes": "3.5mm",
       "size_range": "STANDARD",
       "drawer": "D3",
-      "drawer_sizes": "5H, 4H, 3H",
+      "drawer_sizes": "3H, 4H, 5H",
       "drawer_size_detail": [
         {
-          "label": "5H",
+          "label": "3H",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -6938,7 +6938,7 @@
           "no_stock": false
         },
         {
-          "label": "3H",
+          "label": "5H",
           "size_range": "STANDARD",
           "no_stock": false
         }
@@ -6964,15 +6964,15 @@
       "screw_sizes": "3.5mm",
       "size_range": "LONG",
       "drawer": "D1",
-      "drawer_sizes": "8H, 6H",
+      "drawer_sizes": "6H, 8H",
       "drawer_size_detail": [
         {
-          "label": "8H",
+          "label": "6H",
           "size_range": "LONG",
           "no_stock": false
         },
         {
-          "label": "6H",
+          "label": "8H",
           "size_range": "LONG",
           "no_stock": false
         }
@@ -7523,10 +7523,10 @@
       "screw_sizes": "3.5mm",
       "size_range": "STANDARD",
       "drawer": "D1",
-      "drawer_sizes": "6H, 4H, 2H",
+      "drawer_sizes": "2H, 4H, 6H",
       "drawer_size_detail": [
         {
-          "label": "6H",
+          "label": "2H",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -7536,7 +7536,7 @@
           "no_stock": false
         },
         {
-          "label": "2H",
+          "label": "6H",
           "size_range": "STANDARD",
           "no_stock": false
         }
@@ -7569,10 +7569,10 @@
       "screw_sizes": "3.5mm",
       "size_range": "STANDARD",
       "drawer": "D3",
-      "drawer_sizes": "6H, 4H, 2H",
+      "drawer_sizes": "2H, 4H, 6H",
       "drawer_size_detail": [
         {
-          "label": "6H",
+          "label": "2H",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -7582,7 +7582,7 @@
           "no_stock": false
         },
         {
-          "label": "2H",
+          "label": "6H",
           "size_range": "STANDARD",
           "no_stock": false
         }
@@ -7608,20 +7608,10 @@
       "screw_sizes": "3.5mm",
       "size_range": "STANDARD",
       "drawer": "D1",
-      "drawer_sizes": "10H, 9H, 8H, 7H, 6H",
+      "drawer_sizes": "6H, 7H, 8H, 9H, 10H",
       "drawer_size_detail": [
         {
-          "label": "10H",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "9H",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "8H",
+          "label": "6H",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -7631,7 +7621,17 @@
           "no_stock": false
         },
         {
-          "label": "6H",
+          "label": "8H",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "9H",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "10H",
           "size_range": "STANDARD",
           "no_stock": false
         }
@@ -7664,20 +7664,10 @@
       "screw_sizes": "3.5mm",
       "size_range": "STANDARD",
       "drawer": "D2",
-      "drawer_sizes": "10H, 9H, 8H, 7H, 6H",
+      "drawer_sizes": "6H, 7H, 8H, 9H, 10H",
       "drawer_size_detail": [
         {
-          "label": "10H",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "9H",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "8H",
+          "label": "6H",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -7687,7 +7677,17 @@
           "no_stock": false
         },
         {
-          "label": "6H",
+          "label": "8H",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "9H",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "10H",
           "size_range": "STANDARD",
           "no_stock": false
         }
@@ -7713,20 +7713,10 @@
       "screw_sizes": "3.5mm",
       "size_range": "STANDARD",
       "drawer": "D3",
-      "drawer_sizes": "10H, 9H, 8H, 7H, 6H",
+      "drawer_sizes": "6H, 7H, 8H, 9H, 10H",
       "drawer_size_detail": [
         {
-          "label": "10H",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "9H",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "8H",
+          "label": "6H",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -7736,7 +7726,17 @@
           "no_stock": false
         },
         {
-          "label": "6H",
+          "label": "8H",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "9H",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "10H",
           "size_range": "STANDARD",
           "no_stock": false
         }
@@ -7762,10 +7762,10 @@
       "screw_sizes": "3.5mm",
       "size_range": "LONG",
       "drawer": "D1",
-      "drawer_sizes": "16H, 14H, 12H",
+      "drawer_sizes": "12H, 14H, 16H",
       "drawer_size_detail": [
         {
-          "label": "16H",
+          "label": "12H",
           "size_range": "LONG",
           "no_stock": false
         },
@@ -7775,7 +7775,7 @@
           "no_stock": false
         },
         {
-          "label": "12H",
+          "label": "16H",
           "size_range": "LONG",
           "no_stock": false
         }
@@ -7794,10 +7794,10 @@
       "screw_sizes": "3.5mm",
       "size_range": "LONG",
       "drawer": "D2",
-      "drawer_sizes": "16H, 14H, 12H",
+      "drawer_sizes": "12H, 14H, 16H",
       "drawer_size_detail": [
         {
-          "label": "16H",
+          "label": "12H",
           "size_range": "LONG",
           "no_stock": false
         },
@@ -7807,7 +7807,7 @@
           "no_stock": false
         },
         {
-          "label": "12H",
+          "label": "16H",
           "size_range": "LONG",
           "no_stock": false
         }
@@ -7826,10 +7826,10 @@
       "screw_sizes": "3.5mm",
       "size_range": "LONG",
       "drawer": "D3",
-      "drawer_sizes": "16H, 14H, 12H",
+      "drawer_sizes": "12H, 14H, 16H",
       "drawer_size_detail": [
         {
-          "label": "16H",
+          "label": "12H",
           "size_range": "LONG",
           "no_stock": false
         },
@@ -7839,7 +7839,7 @@
           "no_stock": false
         },
         {
-          "label": "12H",
+          "label": "16H",
           "size_range": "LONG",
           "no_stock": false
         }
@@ -7858,20 +7858,10 @@
       "screw_sizes": "5.0mm",
       "size_range": "STANDARD",
       "drawer": "D5",
-      "drawer_sizes": "10H, 9H, 8H, 7H, 6H",
+      "drawer_sizes": "6H, 7H, 8H, 9H, 10H",
       "drawer_size_detail": [
         {
-          "label": "10H",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "9H",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "8H",
+          "label": "6H",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -7881,7 +7871,17 @@
           "no_stock": false
         },
         {
-          "label": "6H",
+          "label": "8H",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "9H",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "10H",
           "size_range": "STANDARD",
           "no_stock": false
         }
@@ -7920,20 +7920,10 @@
       "screw_sizes": "5.0mm",
       "size_range": "STANDARD",
       "drawer": "D6",
-      "drawer_sizes": "10H, 9H, 8H, 7H, 6H",
+      "drawer_sizes": "6H, 7H, 8H, 9H, 10H",
       "drawer_size_detail": [
         {
-          "label": "10H",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "9H",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "8H",
+          "label": "6H",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -7943,7 +7933,17 @@
           "no_stock": false
         },
         {
-          "label": "6H",
+          "label": "8H",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "9H",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "10H",
           "size_range": "STANDARD",
           "no_stock": false
         }
@@ -7982,15 +7982,15 @@
       "screw_sizes": "5.0mm",
       "size_range": "LONG",
       "drawer": "D5",
-      "drawer_sizes": "12H, 11H",
+      "drawer_sizes": "11H, 12H",
       "drawer_size_detail": [
         {
-          "label": "12H",
+          "label": "11H",
           "size_range": "LONG",
           "no_stock": false
         },
         {
-          "label": "11H",
+          "label": "12H",
           "size_range": "LONG",
           "no_stock": false
         }
@@ -8031,20 +8031,10 @@
       "screw_sizes": "3.5mm, 3.5mm, 4.5mm, 5.0mm",
       "size_range": "STANDARD",
       "drawer": "D1",
-      "drawer_sizes": "10H, 9H, 8H, 7H, 6H",
+      "drawer_sizes": "6H, 7H, 8H, 9H, 10H",
       "drawer_size_detail": [
         {
-          "label": "10H",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "9H",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "8H",
+          "label": "6H",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -8054,7 +8044,17 @@
           "no_stock": false
         },
         {
-          "label": "6H",
+          "label": "8H",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "9H",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "10H",
           "size_range": "STANDARD",
           "no_stock": false
         }
@@ -8087,20 +8087,10 @@
       "screw_sizes": "3.5mm, 3.5mm, 4.5mm, 5.0mm",
       "size_range": "STANDARD",
       "drawer": "D2",
-      "drawer_sizes": "10H, 9H, 8H, 7H, 6H",
+      "drawer_sizes": "6H, 7H, 8H, 9H, 10H",
       "drawer_size_detail": [
         {
-          "label": "10H",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "9H",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "8H",
+          "label": "6H",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -8110,7 +8100,17 @@
           "no_stock": false
         },
         {
-          "label": "6H",
+          "label": "8H",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "9H",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "10H",
           "size_range": "STANDARD",
           "no_stock": false
         }
@@ -8136,20 +8136,10 @@
       "screw_sizes": "3.5mm, 3.5mm, 4.5mm, 5.0mm",
       "size_range": "STANDARD",
       "drawer": "D3",
-      "drawer_sizes": "10H, 9H, 8H, 7H, 6H",
+      "drawer_sizes": "6H, 7H, 8H, 9H, 10H",
       "drawer_size_detail": [
         {
-          "label": "10H",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "9H",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "8H",
+          "label": "6H",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -8159,7 +8149,17 @@
           "no_stock": false
         },
         {
-          "label": "6H",
+          "label": "8H",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "9H",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "10H",
           "size_range": "STANDARD",
           "no_stock": false
         }
@@ -8185,15 +8185,15 @@
       "screw_sizes": "3.5mm",
       "size_range": "LONG",
       "drawer": "D1",
-      "drawer_sizes": "14H, 12H",
+      "drawer_sizes": "12H, 14H",
       "drawer_size_detail": [
         {
-          "label": "14H",
+          "label": "12H",
           "size_range": "LONG",
           "no_stock": false
         },
         {
-          "label": "12H",
+          "label": "14H",
           "size_range": "LONG",
           "no_stock": false
         }
@@ -8212,15 +8212,15 @@
       "screw_sizes": "3.5mm",
       "size_range": "LONG",
       "drawer": "D2",
-      "drawer_sizes": "14H, 12H",
+      "drawer_sizes": "12H, 14H",
       "drawer_size_detail": [
         {
-          "label": "14H",
+          "label": "12H",
           "size_range": "LONG",
           "no_stock": false
         },
         {
-          "label": "12H",
+          "label": "14H",
           "size_range": "LONG",
           "no_stock": false
         }
@@ -8239,15 +8239,15 @@
       "screw_sizes": "3.5mm",
       "size_range": "LONG",
       "drawer": "D3",
-      "drawer_sizes": "14H, 12H",
+      "drawer_sizes": "12H, 14H",
       "drawer_size_detail": [
         {
-          "label": "14H",
+          "label": "12H",
           "size_range": "LONG",
           "no_stock": false
         },
         {
-          "label": "12H",
+          "label": "14H",
           "size_range": "LONG",
           "no_stock": false
         }
@@ -8266,20 +8266,10 @@
       "screw_sizes": "3.5mm",
       "size_range": "STANDARD",
       "drawer": "D1",
-      "drawer_sizes": "10H, 9H, 8H, 7H, 6H",
+      "drawer_sizes": "6H, 7H, 8H, 9H, 10H",
       "drawer_size_detail": [
         {
-          "label": "10H",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "9H",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "8H",
+          "label": "6H",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -8289,7 +8279,17 @@
           "no_stock": false
         },
         {
-          "label": "6H",
+          "label": "8H",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "9H",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "10H",
           "size_range": "STANDARD",
           "no_stock": false
         }
@@ -8322,20 +8322,10 @@
       "screw_sizes": "3.5mm",
       "size_range": "STANDARD",
       "drawer": "D2",
-      "drawer_sizes": "10H, 9H, 8H, 7H, 6H",
+      "drawer_sizes": "6H, 7H, 8H, 9H, 10H",
       "drawer_size_detail": [
         {
-          "label": "10H",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "9H",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "8H",
+          "label": "6H",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -8345,7 +8335,17 @@
           "no_stock": false
         },
         {
-          "label": "6H",
+          "label": "8H",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "9H",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "10H",
           "size_range": "STANDARD",
           "no_stock": false
         }
@@ -8371,20 +8371,10 @@
       "screw_sizes": "3.5mm",
       "size_range": "STANDARD",
       "drawer": "D3",
-      "drawer_sizes": "10H, 9H, 8H, 7H, 6H",
+      "drawer_sizes": "6H, 7H, 8H, 9H, 10H",
       "drawer_size_detail": [
         {
-          "label": "10H",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "9H",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "8H",
+          "label": "6H",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -8394,7 +8384,17 @@
           "no_stock": false
         },
         {
-          "label": "6H",
+          "label": "8H",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "9H",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "10H",
           "size_range": "STANDARD",
           "no_stock": false
         }
@@ -8420,15 +8420,15 @@
       "screw_sizes": "3.5mm",
       "size_range": "LONG",
       "drawer": "D1",
-      "drawer_sizes": "14H, 12H",
+      "drawer_sizes": "12H, 14H",
       "drawer_size_detail": [
         {
-          "label": "14H",
+          "label": "12H",
           "size_range": "LONG",
           "no_stock": false
         },
         {
-          "label": "12H",
+          "label": "14H",
           "size_range": "LONG",
           "no_stock": false
         }
