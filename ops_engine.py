@@ -668,11 +668,16 @@ def build_set_outputs(
     ]
 
     total_by_category = Counter(item["category"] for item in active_office_sets)
-    out_by_category   = Counter(
-        item["category"]
+
+    # Count physical sets once even if the same UID appears on multiple case rows.
+    unique_out_by_key = {
+        item["set_key"]: item
         for item in set_out_assignments
-        if not is_na_status(item.get("set_status", "")) and not is_standby_status(item.get("set_status", ""))
-    )
+        if item.get("set_key")
+        and not is_na_status(item.get("set_status", ""))
+        and not is_standby_status(item.get("set_status", ""))
+    }
+    out_by_category = Counter(item["category"] for item in unique_out_by_key.values())
 
     set_category_availability: list[dict[str, Any]] = []
     for category in sorted(total_by_category):
@@ -1031,6 +1036,7 @@ def build_powertool_outputs(
                     delivered_assignments.append({
                         "powertool_uid":           item["uid"],
                         "powertool_uid_canonical": item["_power_uid"],
+                        "_power_key":              item["_power_key"],
                         "category":                item["category"],
                         "id":                      item["id"],
                         "home":                    item["home"],
@@ -1050,10 +1056,14 @@ def build_powertool_outputs(
             if unk:
                 unknown_powertool_tokens[unk] += 1
 
-    out_by_cat   = Counter(
-        a["category"] for a in delivered_assignments
-        if not a.get("is_na_hold") and not is_standby_status(a.get("status", ""))
-    )
+    unique_out_by_key = {
+        a["_power_key"]: a
+        for a in delivered_assignments
+        if a.get("_power_key")
+        and not a.get("is_na_hold")
+        and not is_standby_status(a.get("status", ""))
+    }
+    out_by_cat = Counter(a["category"] for a in unique_out_by_key.values())
     total_by_cat = Counter(item["category"] for item in office_powertools)
     na_by_cat    = Counter(item["category"] for item in office_powertools if item.get("_is_na_hold"))
     standby_by_cat = Counter(item["category"] for item in office_powertools if item.get("_is_standby_hold"))
