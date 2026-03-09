@@ -647,7 +647,7 @@ def _compact_set_id(value: str, fallback: str = "") -> str:
 
 
 st.markdown("<div class='sec-header'>Operational Detail — Inventory Snapshot</div>", unsafe_allow_html=True)
-inv_tabs = st.tabs(["🔩 Sets", "🦿 Plates", "⚡ Powertools"])
+inv_tabs = st.tabs(["🧰 Sets", "🦾 Plates", "🔌 Powertools"])
 
 
 # ── Sets ──────────────────────────────────────────────────────────────────────
