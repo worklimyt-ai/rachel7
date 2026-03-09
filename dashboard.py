@@ -6,8 +6,9 @@ Run: streamlit run dashboard.py
 import streamlit as st
 import pandas as pd
 import re
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
+from typing import Optional
 from zoneinfo import ZoneInfo
 
 st.set_page_config(
@@ -345,7 +346,7 @@ def avail_badge(available: int, total: int) -> str:
     return f"<span class='avail-badge avail-ok'>{available}/{total}</span>"
 
 
-def _parse_ui_date(value: str) -> datetime.date | None:
+def _parse_ui_date(value: str) -> Optional[date]:
     text = str(value or "").strip()
     if not text:
         return None
