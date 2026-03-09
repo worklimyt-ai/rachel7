@@ -86,6 +86,17 @@ def parse_date(value: Any) -> date | None:
 def format_date(value: date | None) -> str:
     return value.strftime("%d/%m/%Y") if value else ""
 
+def case_order_key(
+    row_number: int,
+    delivery_date: date | None,
+    surgery_date: date | None,
+) -> tuple[date, date, int]:
+    return (
+        delivery_date or date.min,
+        surgery_date or date.min,
+        row_number,
+    )
+
 # ---------------------------------------------------------------------------
 # String / token normalisers
 # ---------------------------------------------------------------------------
@@ -98,6 +109,23 @@ def normalize_set_code(value: Any) -> str:
 
 def normalize_plate_code(value: Any) -> str:
     return re.sub(r"[^A-Z0-9.\-_*]", "", normalize_code(value))
+
+def normalize_header_name(value: Any) -> str:
+    return re.sub(r"[^A-Z0-9]", "", str(value or "").upper())
+
+def row_value(row: dict[str, Any], *names: str) -> str:
+    for name in names:
+        if name in row:
+            return str(row.get(name, "") or "")
+    normalized = {
+        normalize_header_name(key): value
+        for key, value in row.items()
+    }
+    for name in names:
+        key = normalize_header_name(name)
+        if key in normalized:
+            return str(normalized[key] or "")
+    return ""
 
 def canonical_powertool_uid(value: Any) -> str:
     raw = re.sub(r"[^A-Z0-9]", "", normalize_code(value))
@@ -503,22 +531,25 @@ def summarize_cases(
     set_indexes: dict[str, Any],
     today_kl: date,
 ) -> dict[str, Any]:
-    uid_map      = set_indexes["uid_map"]
-    shorthand_map= set_indexes["shorthand_map"]
-    category_map = set_indexes["category_map"]
+    uid_map       = set_indexes["uid_map"]
+    shorthand_map = set_indexes["shorthand_map"]
+    category_map  = set_indexes["category_map"]
 
-    parsed_cases:       list[dict[str, Any]] = []
-    set_out_assignments:list[dict[str, Any]] = []
-    unknown_set_tokens: Counter[str]         = Counter()
+    parsed_cases: list[dict[str, Any]] = []
+    unknown_set_tokens: Counter[str] = Counter()
 
     for idx, row in enumerate(cases_rows, start=1):
-        delivery_date  = parse_date(row.get("delivery_date", ""))
-        surgery_date   = parse_date(row.get("surgery_date", ""))
-        set_tokens     = split_tokens(row.get("sets", ""))
-        plate_tokens   = split_plate_tokens(row.get("plates", ""))
-        powertool_tokens = split_powertool_tokens(row.get("powertools") or row.get("powertool", ""))
+        delivery_date = parse_date(row_value(row, "delivery_date"))
+        surgery_date = parse_date(row_value(row, "surgery_date"))
+        sets_raw = row_value(row, "sets").strip()
+        sets_returned_raw = row_value(row, "sets_returned").strip()
+        plate_tokens = split_plate_tokens(row_value(row, "plates"))
+        powertools_raw = row_value(row, "powertools", "powertool").strip()
+        powertool_tokens = split_powertool_tokens(powertools_raw)
+        set_tokens = split_tokens(sets_raw)
+        returned_set_tokens = split_tokens(sets_returned_raw)
 
-        uid_hits:       list[dict[str, Any]] = []
+        uid_hits: list[dict[str, Any]] = []
         shorthand_hits: list[dict[str, Any]] = []
         set_display_tokens: list[str] = []
 
@@ -527,7 +558,8 @@ def summarize_cases(
             if not norm:
                 continue
 
-            uid_matches, shorthand_matches = [], []
+            uid_matches: list[dict[str, Any]] = []
+            shorthand_matches: list[dict[str, Any]] = []
             if norm in uid_map:
                 uid_matches = uid_map[norm]
                 uid_hits.extend(uid_matches)
@@ -569,15 +601,15 @@ def summarize_cases(
                     for item in shorthand_matches
                 })
                 if labels:
-                    set_display_tokens.append("/".join(l for l in labels if l.strip()))
+                    set_display_tokens.append("/".join(label for label in labels if label.strip()))
 
-        uid_hit_by_key     = {item["_set_key"]: item for item in uid_hits}
+        uid_hit_by_key = {item["_set_key"]: item for item in uid_hits}
         shorthand_hit_keys = {
             item["_shorthand_norm"]
             for item in shorthand_hits
             if item.get("_shorthand_norm")
         }
-        has_uid_set      = bool(uid_hit_by_key)
+        has_uid_set = bool(uid_hit_by_key)
         has_shorthand_only = bool(shorthand_hit_keys) and not has_uid_set
         set_categories = sorted({
             str(item.get("category", "")).strip()
@@ -585,70 +617,182 @@ def summarize_cases(
             if str(item.get("category", "")).strip()
         })
 
-        case_id       = f"C{idx:03d}"
-        hospital_code = normalize_code(row.get("hospital", ""))
+        returned_hit_by_key: dict[str, dict[str, Any]] = {}
+        returned_display_tokens: list[str] = []
+        for token in returned_set_tokens:
+            norm = normalize_set_code(token)
+            if not norm:
+                continue
+            global_uid_matches = uid_map.get(norm, [])
+            matched_items = [
+                item for item in global_uid_matches
+                if item["_set_key"] in uid_hit_by_key
+            ]
+            if matched_items:
+                for item in matched_items:
+                    returned_hit_by_key[item["_set_key"]] = item
+                labels = sorted({
+                    format_set_display(
+                        item.get("shorthand") or item.get("category"),
+                        item.get("id"),
+                    )
+                    for item in matched_items
+                })
+                if labels:
+                    returned_display_tokens.append("/".join(labels))
+            elif not global_uid_matches:
+                unknown_set_tokens[norm] += 1
+                returned_display_tokens.append(token)
+
+        exact_set_rows = []
+        for item in uid_hit_by_key.values():
+            exact_set_rows.append({
+                "set_key": item["_set_key"],
+                "set_uid": item["uid"],
+                "set_uid_norm": item["_uid_norm"],
+                "category": item["category"],
+                "id": item["id"],
+                "home": item["home"],
+                "set_status": item.get("status", ""),
+                "set_display": format_set_display(
+                    item.get("shorthand") or item.get("category"),
+                    item.get("id"),
+                ),
+            })
+
+        case_id = f"C{idx:03d}"
+        hospital_code = normalize_code(row_value(row, "hospital"))
 
         case_record: dict[str, Any] = {
-            "case_id":          case_id,
-            "row_number":       idx,
-            "prefix":           str(row.get("prefix", "")).strip(),
-            "hospital":         hospital_code,
-            "patient_doctor":   str(row.get("patient_doctor", "")).strip(),
-            "delivery_date":    format_date(delivery_date),
-            "surgery_date":     format_date(surgery_date),
-            "sales_code":       str(row.get("sales_code", "")).strip(),
-            "return_date":      str(row.get("return_date", "")).strip(),
-            "status":           str(row.get("status", "")).strip(),
-            "smart_status":     str(row.get("Smart Status", "")).strip(),
-            "sets_raw":         str(row.get("sets", "")).strip(),
-            "sets_display":     "; ".join(t for t in set_display_tokens if t)
-                                or str(row.get("sets", "")).strip(),
-            "plates_raw":       str(row.get("plates", "")).strip(),
-            "powertools_raw":   str(row.get("powertools") or row.get("powertool", "")).strip(),
-            "has_uid_set":      has_uid_set,
+            "case_id":            case_id,
+            "row_number":         idx,
+            "prefix":             row_value(row, "prefix").strip(),
+            "hospital":           hospital_code,
+            "patient_doctor":     row_value(row, "patient_doctor").strip(),
+            "delivery_date":      format_date(delivery_date),
+            "surgery_date":       format_date(surgery_date),
+            "sales_code":         row_value(row, "sales_code").strip(),
+            "return_date":        row_value(row, "return_date").strip(),
+            "status":             row_value(row, "status").strip(),
+            "smart_status":       row_value(row, "Smart Status").strip(),
+            "sets_raw":           sets_raw,
+            "sets_display":       "; ".join(token for token in set_display_tokens if token) or sets_raw,
+            "sets_returned_raw":  sets_returned_raw,
+            "sets_returned_display": (
+                "; ".join(token for token in returned_display_tokens if token) or sets_returned_raw
+            ),
+            "sets_outstanding_raw": "",
+            "sets_outstanding_display": "",
+            "plates_raw":         row_value(row, "plates").strip(),
+            "powertools_raw":     powertools_raw,
+            "has_uid_set":        has_uid_set,
+            "has_active_uid_set": False,
             "has_shorthand_only": has_shorthand_only,
-            "set_categories":   set_categories,
-            "set_uid_tokens":   sorted({item["_uid_norm"] for item in uid_hit_by_key.values()}),
+            "set_categories":     set_categories,
+            "set_uid_tokens":     sorted({item["_uid_norm"] for item in uid_hit_by_key.values()}),
+            "returned_set_uid_tokens": sorted({
+                item["_uid_norm"] for item in returned_hit_by_key.values()
+            }),
+            "active_set_uid_tokens": [],
             "set_shorthand_tokens": sorted(shorthand_hit_keys),
-            # internal date objects (stripped before export)
             "delivery_date_obj": delivery_date,
             "surgery_date_obj":  surgery_date,
-            "set_tokens":       set_tokens,
-            "plate_tokens":     plate_tokens,
-            "powertool_tokens": powertool_tokens,
+            "set_tokens":        set_tokens,
+            "plate_tokens":      plate_tokens,
+            "powertool_tokens":  powertool_tokens,
+            "_case_order_key":   case_order_key(idx, delivery_date, surgery_date),
+            "_assigned_exact_sets": exact_set_rows,
+            "_returned_set_keys":   set(returned_hit_by_key),
         }
         parsed_cases.append(case_record)
 
-        # Record which OFFICE sets are currently out for this case
-        for item in uid_hit_by_key.values():
+    out_candidates_by_key: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for case in parsed_cases:
+        days_since = (
+            (today_kl - case["surgery_date_obj"]).days
+            if case.get("surgery_date_obj") else None
+        )
+        for item in case["_assigned_exact_sets"]:
+            if item["set_key"] in case["_returned_set_keys"]:
+                continue
             if item.get("home") != "OFFICE":
                 continue
-            days_since = (today_kl - surgery_date).days if surgery_date else None
-            set_out_assignments.append({
-                "set_key":          item["_set_key"],
-                "set_uid":          item["uid"],
-                "category":         item["category"],
-                "id":               item["id"],
-                "set_display":      format_set_display(
-                                        item.get("shorthand") or item.get("category"),
-                                        item.get("id"),
-                                    ),
-                "home":             item["home"],
-                "set_status":       item.get("status", ""),
-                "location_now":     hospital_code or "UNKNOWN",
-                "case_id":          case_id,
-                "delivery_date":    format_date(delivery_date),
-                "surgery_date":     format_date(surgery_date),
+            out_candidates_by_key[item["set_key"]].append({
+                "set_key":            item["set_key"],
+                "set_uid":            item["set_uid"],
+                "category":           item["category"],
+                "id":                 item["id"],
+                "set_display":        item["set_display"],
+                "home":               item["home"],
+                "set_status":         item.get("set_status", ""),
+                "location_now":       case["hospital"] or "UNKNOWN",
+                "case_id":            case["case_id"],
+                "delivery_date":      case["delivery_date"],
+                "surgery_date":       case["surgery_date"],
                 "days_since_surgery": days_since,
-                "case_status":      str(row.get("status", "")).strip(),
-                "smart_status":     str(row.get("Smart Status", "")).strip(),
-                "patient_doctor":   str(row.get("patient_doctor", "")).strip(),
+                "case_status":        case["status"],
+                "smart_status":       case["smart_status"],
+                "patient_doctor":     case["patient_doctor"],
+                "_case_order_key":    case["_case_order_key"],
             })
 
+    set_out_assignments: list[dict[str, Any]] = []
+    active_office_keys_by_case: dict[str, set[str]] = defaultdict(set)
+    for set_key, rows in out_candidates_by_key.items():
+        ordered_rows = sorted(rows, key=lambda row: row["_case_order_key"])
+        winner = dict(ordered_rows[-1])
+        related_case_ids = [row["case_id"] for row in ordered_rows]
+        related_hospitals = sorted({
+            row["location_now"]
+            for row in ordered_rows
+            if row.get("location_now")
+        })
+        winner["ownership_related_cases"] = ";".join(related_case_ids)
+        winner["ownership_related_hospitals"] = ";".join(related_hospitals)
+        if len(ordered_rows) > 1:
+            winner["ownership_status"] = (
+                "REVIEW_CONFLICT"
+                if len(related_hospitals) > 1 else
+                "CARRY_OVER"
+            )
+        else:
+            winner["ownership_status"] = ""
+        winner.pop("_case_order_key", None)
+        set_out_assignments.append(winner)
+        active_office_keys_by_case[winner["case_id"]].add(set_key)
+
+    set_out_assignments.sort(key=lambda row: (row["category"], row["id"], row["set_uid"]))
+
+    for case in parsed_cases:
+        active_exact_sets = []
+        for item in case["_assigned_exact_sets"]:
+            if item["set_key"] in case["_returned_set_keys"]:
+                continue
+            if item.get("home") == "OFFICE":
+                if item["set_key"] not in active_office_keys_by_case.get(case["case_id"], set()):
+                    continue
+            active_exact_sets.append(item)
+        active_exact_sets.sort(key=lambda item: (item["category"], item["id"], item["set_uid"]))
+        case["active_set_uid_tokens"] = sorted({
+            item["set_uid_norm"] for item in active_exact_sets
+        })
+        case["has_active_uid_set"] = bool(case["active_set_uid_tokens"])
+        if active_exact_sets:
+            case["sets_outstanding_raw"] = ";".join(item["set_uid"] for item in active_exact_sets)
+            case["sets_outstanding_display"] = "; ".join(
+                item["set_display"] for item in active_exact_sets
+            )
+        elif case["has_shorthand_only"]:
+            case["sets_outstanding_raw"] = case["sets_raw"]
+            case["sets_outstanding_display"] = case["sets_display"]
+        case.pop("_case_order_key", None)
+        case.pop("_assigned_exact_sets", None)
+        case.pop("_returned_set_keys", None)
+
     return {
-        "parsed_cases":       parsed_cases,
-        "set_out_assignments":set_out_assignments,
-        "unknown_set_tokens": unknown_set_tokens,
+        "parsed_cases":        parsed_cases,
+        "set_out_assignments": set_out_assignments,
+        "unknown_set_tokens":  unknown_set_tokens,
     }
 
 # ---------------------------------------------------------------------------
@@ -1218,21 +1362,25 @@ def build_case_buckets(
 
     def _strip(case: dict[str, Any]) -> dict[str, Any]:
         return {
-            "case_id":       case["case_id"],
-            "prefix":        case["prefix"],
-            "hospital":      case["hospital"],
-            "patient_doctor":case["patient_doctor"],
-            "delivery_date": case["delivery_date"],
-            "surgery_date":  case["surgery_date"],
-            "sales_code":    case["sales_code"],
-            "return_date":   case["return_date"],
-            "status":        case["status"],
-            "smart_status":  case["smart_status"],
-            "sets":          case["sets_display"],
-            "sets_raw":      case["sets_raw"],
-            "set_categories":case.get("set_categories", []),
-            "plates":        case["plates_raw"],
-            "powertools":    case["powertools_raw"],
+            "case_id":                case["case_id"],
+            "prefix":                 case["prefix"],
+            "hospital":               case["hospital"],
+            "patient_doctor":         case["patient_doctor"],
+            "delivery_date":          case["delivery_date"],
+            "surgery_date":           case["surgery_date"],
+            "sales_code":             case["sales_code"],
+            "return_date":            case["return_date"],
+            "status":                 case["status"],
+            "smart_status":           case["smart_status"],
+            "sets":                   case["sets_display"],
+            "sets_raw":               case["sets_raw"],
+            "sets_returned":          case.get("sets_returned_display", ""),
+            "sets_returned_raw":      case.get("sets_returned_raw", ""),
+            "sets_outstanding":       case.get("sets_outstanding_display", ""),
+            "sets_outstanding_raw":   case.get("sets_outstanding_raw", ""),
+            "set_categories":         case.get("set_categories", []),
+            "plates":                 case["plates_raw"],
+            "powertools":             case["powertools_raw"],
         }
 
     return {name: [_strip(c) for c in items] for name, items in buckets.items()}
@@ -1381,21 +1529,28 @@ def build_operations_report(
 
     cases_all = [
         {
-            "case_id":            c["case_id"],
-            "prefix":             c["prefix"],
-            "hospital":           c["hospital"],
-            "patient_doctor":     c["patient_doctor"],
-            "delivery_date":      c["delivery_date"],
-            "surgery_date":       c["surgery_date"],
-            "sales_code":         c["sales_code"],
-            "return_date":        c["return_date"],
-            "status":             c["status"],
-            "smart_status":       c["smart_status"],
-            "sets_raw":           c["sets_raw"],
-            "sets":               c["sets_display"],
-            "set_categories":     c.get("set_categories", []),
-            "has_uid_set":        c["has_uid_set"],
-            "has_shorthand_only": c["has_shorthand_only"],
+            "case_id":                 c["case_id"],
+            "prefix":                  c["prefix"],
+            "hospital":                c["hospital"],
+            "patient_doctor":          c["patient_doctor"],
+            "delivery_date":           c["delivery_date"],
+            "surgery_date":            c["surgery_date"],
+            "sales_code":              c["sales_code"],
+            "return_date":             c["return_date"],
+            "status":                  c["status"],
+            "smart_status":            c["smart_status"],
+            "sets_raw":                c["sets_raw"],
+            "sets":                    c["sets_display"],
+            "sets_returned_raw":       c.get("sets_returned_raw", ""),
+            "sets_returned":           c.get("sets_returned_display", ""),
+            "sets_outstanding_raw":    c.get("sets_outstanding_raw", ""),
+            "sets_outstanding":        c.get("sets_outstanding_display", ""),
+            "set_categories":          c.get("set_categories", []),
+            "has_uid_set":             c["has_uid_set"],
+            "has_active_uid_set":      c.get("has_active_uid_set", False),
+            "has_shorthand_only":      c["has_shorthand_only"],
+            "returned_set_uid_tokens": c.get("returned_set_uid_tokens", []),
+            "active_set_uid_tokens":   c.get("active_set_uid_tokens", []),
         }
         for c in case_summary["parsed_cases"]
     ]
