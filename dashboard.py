@@ -654,6 +654,7 @@ inv_tabs = st.tabs(["🧰 Sets", "🦾 Plates", "🔌 Powertools"])
 with inv_tabs[0]:
     set_avail = pd.DataFrame(report.get("set_category_availability", []))
     set_status_all = pd.DataFrame(report.get("set_office_status", []))
+    pt_avail_df = pd.DataFrame(report.get("powertool_category_availability", []))
 
     if set_avail.empty and set_status_all.empty:
         st.info("No set data.")
@@ -880,11 +881,21 @@ with inv_tabs[0]:
             if row_norm:
                 summary_lookup[row_norm] = _safe_int(row.get("Available", 0))
 
+        pt_avail_lookup: dict[str, int] = {}
+        if not pt_avail_df.empty and "category" in pt_avail_df.columns:
+            for _, r in pt_avail_df.iterrows():
+                key = str(r.get("category", "")).upper().strip()
+                if key:
+                    pt_avail_lookup[key] = _safe_int(r.get("available", 0))
+
         def _copy_count(category_keys: list[str], mode: str = "sum") -> int:
             values: list[int] = []
             for key in category_keys:
                 key_norm = str(key).upper().strip()
-                values.append(summary_lookup.get(key_norm, 0))
+                if key_norm in _POWERTOOL_CATS:
+                    values.append(pt_avail_lookup.get(key_norm, 0))
+                else:
+                    values.append(summary_lookup.get(key_norm, 0))
             if not values:
                 return 0
             if mode == "min":
@@ -895,11 +906,11 @@ with inv_tabs[0]:
 
         copy_lines = ["*Office Sets availability*", ""]
         copy_map: list[tuple[str, list[str], str]] = [
-            ("Comus mini 1.5 (1.5-2.0)", ["1.5-2.0"], "sum"),
-            ("Comus mini 2.0 (2.0-2.4)", ["2.0-2.4"], "sum"),
-            ("2.4 (2.4-2.7)", ["2.4-2.7"], "sum"),
-            ("2.7 (2.7-4.0)", ["2.7-4.0"], "sum"),
-            ("3.5 (3.5-6.5)", ["3.5-6.5"], "sum"),
+            ("1.5-2.0", ["1.5-2.0"], "sum"),
+            ("2.0-2.4", ["2.0-2.4"], "sum"),
+            ("2.4-2.7", ["2.4-2.7"], "sum"),
+            ("2.7-4.0", ["2.7-4.0"], "sum"),
+            ("3.5 - 6.5", ["3.5-6.5"], "sum"),
             ("Canna 2.5", ["CANNA 2.5"], "sum"),
             ("Canna 3.5", ["CANNA 3.5"], "sum"),
             ("Canna 4.0", ["CANNA 4.0"], "sum"),
@@ -907,7 +918,7 @@ with inv_tabs[0]:
             ("Std canna 2.4", ["STD CANNA 2.4"], "sum"),
             ("Std canna 3.0", ["STD CANNA 3.0"], "sum"),
             ("Std canna 4.0", ["STD CANNA 4.0"], "sum"),
-            ("Std canna 6.5 (STD CANNA 6.5/7.3)", ["STD CANNA 6.5/7.3"], "sum"),
+            ("Std canna 6.5", ["STD CANNA 6.5/7.3"], "sum"),
             ("PFN", ["PFN"], "sum"),
             ("Reamer set", ["REAMER"], "sum"),
             ("ILN Femur", ["ILN FEMUR"], "sum"),
@@ -927,6 +938,11 @@ with inv_tabs[0]:
         ]
         for label, keys, mode in copy_map:
             copy_lines.append(f"{label} - {_copy_count(keys, mode=mode)}")
+        copy_lines.append("")
+        copy_lines.append("Power")
+        copy_lines.append(f"5503B (normal) - {_copy_count(['P5503'])}")
+        copy_lines.append(f"5400 (kwire) - {_copy_count(['P5400'])}")
+        copy_lines.append(f"8400 (handpiece) - {_copy_count(['P8400'])}")
 
         st.markdown("##### Copy Block")
         st.code("\n".join(copy_lines), language="text")

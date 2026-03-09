@@ -168,13 +168,6 @@ def split_plate_tokens(value: Any) -> list[str]:
             out.append(sub)
     return out
 
-def parse_locations(raw_location: Any) -> tuple[list[str], list[str]]:
-    drawers, others = [], []
-    for part in split_tokens(raw_location, pattern=r"[,]+"):
-        token = normalize_code(part)
-        (drawers if re.match(r"^D\d+$", token) else others).append(token) if token else None
-    return drawers, others
-
 def location_no_stock_state(value: Any) -> bool | None:
     token = normalize_code(value)
     if token in {"NOSTOCK", "NO_STOCK", "OUT", "OUTOFSTOCK", "OUT_OF_STOCK", "MISSING", "NS"}:
@@ -290,6 +283,28 @@ def format_set_display(shorthand: Any, set_id: Any) -> str:
     if not short:
         return str(set_id or "").strip()
     return f"{short} ({compact_set_id(set_id)})"
+
+
+def serialize_case_common(case: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "case_id":              case["case_id"],
+        "prefix":               case["prefix"],
+        "hospital":             case["hospital"],
+        "patient_doctor":       case["patient_doctor"],
+        "delivery_date":        case["delivery_date"],
+        "surgery_date":         case["surgery_date"],
+        "sales_code":           case["sales_code"],
+        "return_date":          case["return_date"],
+        "status":               case["status"],
+        "smart_status":         case["smart_status"],
+        "sets_raw":             case["sets_raw"],
+        "sets":                 case["sets_display"],
+        "sets_returned_raw":    case.get("sets_returned_raw", ""),
+        "sets_returned":        case.get("sets_returned_display", ""),
+        "sets_outstanding_raw": case.get("sets_outstanding_raw", ""),
+        "sets_outstanding":     case.get("sets_outstanding_display", ""),
+        "set_categories":       case.get("set_categories", []),
+    }
 
 def is_na_status(value: Any) -> bool:
     return "NA" in normalize_code(value)
@@ -1459,25 +1474,9 @@ def build_case_buckets(
 
     def _strip(case: dict[str, Any]) -> dict[str, Any]:
         return {
-            "case_id":                case["case_id"],
-            "prefix":                 case["prefix"],
-            "hospital":               case["hospital"],
-            "patient_doctor":         case["patient_doctor"],
-            "delivery_date":          case["delivery_date"],
-            "surgery_date":           case["surgery_date"],
-            "sales_code":             case["sales_code"],
-            "return_date":            case["return_date"],
-            "status":                 case["status"],
-            "smart_status":           case["smart_status"],
-            "sets":                   case["sets_display"],
-            "sets_raw":               case["sets_raw"],
-            "sets_returned":          case.get("sets_returned_display", ""),
-            "sets_returned_raw":      case.get("sets_returned_raw", ""),
-            "sets_outstanding":       case.get("sets_outstanding_display", ""),
-            "sets_outstanding_raw":   case.get("sets_outstanding_raw", ""),
-            "set_categories":         case.get("set_categories", []),
-            "plates":                 case["plates_raw"],
-            "powertools":             case["powertools_raw"],
+            **serialize_case_common(case),
+            "plates":     case["plates_raw"],
+            "powertools": case["powertools_raw"],
         }
 
     return {name: [_strip(c) for c in items] for name, items in buckets.items()}
@@ -1494,25 +1493,28 @@ def build_distance_rows(
     for case in cases:
         raw_code = case["hospital"]
         resolved_code, resolved_by = resolve_hospital_code(raw_code, hospitals)
+        base_row = {
+            "route_group":           route_tag,
+            "case_id":               case["case_id"],
+            "hospital":              raw_code,
+            "resolved_by":           resolved_by,
+            "delivery_date":         case["delivery_date"],
+            "surgery_date":          case["surgery_date"],
+            "sets":                  case.get("sets", ""),
+            "plates":                case.get("plates", ""),
+            "sales_code":            case.get("sales_code", ""),
+        }
 
         if resolved_code is None:
             unresolved[raw_code] += 1
             rows.append({
-                "route_group":          route_tag,
-                "case_id":              case["case_id"],
-                "hospital":             raw_code,
+                **base_row,
                 "resolved_hospital":    "",
                 "hospital_name":        "Unknown hospital code",
                 "office_to_hospital_km":"",
                 "office_est_drive_km":  "",
                 "office_est_drive_min": "",
                 "tbs_to_hospital_km":   "",
-                "resolved_by":          resolved_by,
-                "delivery_date":        case["delivery_date"],
-                "surgery_date":         case["surgery_date"],
-                "sets":                 case.get("sets", ""),
-                "plates":               case.get("plates", ""),
-                "sales_code":           case.get("sales_code", ""),
             })
             continue
 
@@ -1524,21 +1526,13 @@ def build_distance_rows(
         drive_min = estimated_drive_minutes(drive_km)
 
         rows.append({
-            "route_group":          route_tag,
-            "case_id":              case["case_id"],
-            "hospital":             raw_code,
+            **base_row,
             "resolved_hospital":    resolved_code,
             "hospital_name":        meta.get("name", ""),
             "office_to_hospital_km":round(straight, 2),
             "office_est_drive_km":  round(drive_km, 2),
             "office_est_drive_min": round(drive_min, 1),
             "tbs_to_hospital_km":   round(tbs_dist, 2),
-            "resolved_by":          resolved_by,
-            "delivery_date":        case["delivery_date"],
-            "surgery_date":         case["surgery_date"],
-            "sets":                 case.get("sets", ""),
-            "plates":               case.get("plates", ""),
-            "sales_code":           case.get("sales_code", ""),
         })
 
     rows.sort(key=lambda r: (
@@ -1626,23 +1620,7 @@ def build_operations_report(
 
     cases_all = [
         {
-            "case_id":                 c["case_id"],
-            "prefix":                  c["prefix"],
-            "hospital":                c["hospital"],
-            "patient_doctor":          c["patient_doctor"],
-            "delivery_date":           c["delivery_date"],
-            "surgery_date":            c["surgery_date"],
-            "sales_code":              c["sales_code"],
-            "return_date":             c["return_date"],
-            "status":                  c["status"],
-            "smart_status":            c["smart_status"],
-            "sets_raw":                c["sets_raw"],
-            "sets":                    c["sets_display"],
-            "sets_returned_raw":       c.get("sets_returned_raw", ""),
-            "sets_returned":           c.get("sets_returned_display", ""),
-            "sets_outstanding_raw":    c.get("sets_outstanding_raw", ""),
-            "sets_outstanding":        c.get("sets_outstanding_display", ""),
-            "set_categories":          c.get("set_categories", []),
+            **serialize_case_common(c),
             "has_uid_set":             c["has_uid_set"],
             "has_active_uid_set":      c.get("has_active_uid_set", False),
             "has_shorthand_only":      c["has_shorthand_only"],
