@@ -90,35 +90,16 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
     color: #6b7280;
     margin-top: 4px;
 }
-.office-set-strip {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 10px;
-}
-.office-set-chip {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 8px;
-    padding: 7px 12px;
-    border-radius: 10px;
-    background: #f0fdf4;
-    color: #166534;
+.office-set-ids {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 22px;
+    font-size: 24px;
     font-weight: 700;
-    line-height: 1;
-    letter-spacing: -.03em;
+    letter-spacing: -.04em;
+    line-height: 1.15;
+    color: #166534;
 }
-.office-set-chip.is-standby {
-    background: #fff7ed;
+.office-set-ids.is-standby {
     color: #b45309;
-}
-.office-set-state {
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    opacity: .88;
 }
 .office-set-empty {
     color: #9ca3af;
@@ -197,6 +178,13 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
         0 0 0 2px rgba(34,197,94,.18),
         0 0 12px rgba(34,197,94,.52);
 }
+.out-hosp-wrap.led-retro.is-sales .out-hosp-led {
+    background: #2563eb;
+    box-shadow:
+        inset 0 1px 2px rgba(255,255,255,.65),
+        0 0 0 2px rgba(37,99,235,.18),
+        0 0 12px rgba(37,99,235,.55);
+}
 .out-hosp-wrap.led-lens .out-hosp-led {
     width: 12px;
     height: 12px;
@@ -246,16 +234,115 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
         0 1px 2px rgba(20,83,45,.18),
         0 0 10px rgba(34,197,94,.32);
 }
+.out-hosp-wrap.led-lens.is-sales .out-hosp-led {
+    border-color: #1d4ed8;
+    background: radial-gradient(circle at 32% 28%, #dbeafe 0 18%, #93c5fd 19% 30%, #2563eb 31% 64%, #1e3a8a 100%);
+    box-shadow:
+        inset 0 1px 1px rgba(255,255,255,.88),
+        inset 0 -2px 3px rgba(30,58,138,.28),
+        0 1px 2px rgba(30,58,138,.18),
+        0 0 10px rgba(37,99,235,.36);
+}
+.out-hosp-wrap.led-panel .out-hosp-led {
+    width: 14px;
+    height: 14px;
+    border: 1px solid #475569;
+    background:
+        radial-gradient(circle at 36% 32%, rgba(255,255,255,.95) 0 12%, rgba(255,255,255,.28) 13% 18%, transparent 19% 100%),
+        radial-gradient(circle at 50% 52%, #64748b 0 52%, #1f2937 72%, #0f172a 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.35),
+        inset 0 -2px 3px rgba(0,0,0,.45),
+        0 0 0 2px #cbd5e1,
+        0 1px 2px rgba(15,23,42,.35);
+}
+.out-hosp-wrap.led-panel .out-hosp-led::before {
+    content: "";
+    position: absolute;
+    inset: 2px;
+    border-radius: 999px;
+    background: radial-gradient(circle at 34% 30%, rgba(255,255,255,.88) 0 16%, rgba(255,255,255,.15) 17% 26%, transparent 27% 100%);
+    opacity: .95;
+}
+.out-hosp-wrap.led-panel .out-hosp-led::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 999px;
+    opacity: 0;
+    transition: opacity .15s ease;
+}
+.out-hosp-wrap.led-panel.is-future .out-hosp-led {
+    border-color: #78350f;
+    background:
+        radial-gradient(circle at 36% 32%, rgba(255,255,255,.95) 0 12%, rgba(255,248,220,.35) 13% 18%, transparent 19% 100%),
+        radial-gradient(circle at 50% 52%, #fbbf24 0 52%, #d97706 72%, #78350f 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.4),
+        inset 0 -2px 3px rgba(120,53,15,.5),
+        0 0 0 2px #cbd5e1,
+        0 0 14px rgba(245,158,11,.35);
+}
+.out-hosp-wrap.led-panel.is-future .out-hosp-led::after {
+    opacity: 1;
+    background: radial-gradient(circle, rgba(251,191,36,.42) 0, rgba(245,158,11,.16) 45%, rgba(245,158,11,0) 72%);
+}
+.out-hosp-wrap.led-panel.is-today .out-hosp-led {
+    border-color: #7f1d1d;
+    background:
+        radial-gradient(circle at 36% 32%, rgba(255,255,255,.95) 0 12%, rgba(255,230,230,.35) 13% 18%, transparent 19% 100%),
+        radial-gradient(circle at 50% 52%, #fb7185 0 52%, #dc2626 72%, #7f1d1d 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.4),
+        inset 0 -2px 3px rgba(127,29,29,.55),
+        0 0 0 2px #cbd5e1,
+        0 0 14px rgba(220,38,38,.42);
+}
+.out-hosp-wrap.led-panel.is-today .out-hosp-led::after {
+    opacity: 1;
+    background: radial-gradient(circle, rgba(251,113,133,.42) 0, rgba(220,38,38,.16) 45%, rgba(220,38,38,0) 72%);
+}
+.out-hosp-wrap.led-panel.is-past .out-hosp-led {
+    border-color: #14532d;
+    background:
+        radial-gradient(circle at 36% 32%, rgba(255,255,255,.95) 0 12%, rgba(220,252,231,.35) 13% 18%, transparent 19% 100%),
+        radial-gradient(circle at 50% 52%, #4ade80 0 52%, #16a34a 72%, #14532d 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.4),
+        inset 0 -2px 3px rgba(20,83,45,.55),
+        0 0 0 2px #cbd5e1,
+        0 0 14px rgba(34,197,94,.34);
+}
+.out-hosp-wrap.led-panel.is-past .out-hosp-led::after {
+    opacity: 1;
+    background: radial-gradient(circle, rgba(74,222,128,.36) 0, rgba(34,197,94,.14) 45%, rgba(34,197,94,0) 72%);
+}
+.out-hosp-wrap.led-panel.is-sales .out-hosp-led {
+    border-color: #1e3a8a;
+    background:
+        radial-gradient(circle at 36% 32%, rgba(255,255,255,.95) 0 12%, rgba(219,234,254,.35) 13% 18%, transparent 19% 100%),
+        radial-gradient(circle at 50% 52%, #60a5fa 0 52%, #2563eb 72%, #1e3a8a 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.4),
+        inset 0 -2px 3px rgba(30,58,138,.52),
+        0 0 0 2px #cbd5e1,
+        0 0 14px rgba(37,99,235,.40);
+}
+.out-hosp-wrap.led-panel.is-sales .out-hosp-led::after {
+    opacity: 1;
+    background: radial-gradient(circle, rgba(96,165,250,.40) 0, rgba(37,99,235,.16) 45%, rgba(37,99,235,0) 72%);
+}
 .out-hosp-wrap.is-past .out-hosp-name { color: #166534; }
+.out-hosp-wrap.is-sales .out-hosp-name { color: #1d4ed8; }
 .out-hosp-wrap.is-plate {
     gap: 9px;
 }
 .out-hosp-wrap.is-plate .out-hosp-led {
-    width: 13px;
-    height: 13px;
+    width: 15px;
+    height: 15px;
 }
 .out-hosp-wrap.is-plate .out-hosp-name {
-    font-size: 17px;
+    font-size: 18px;
     line-height: 1;
 }
 .out-surg  { color: #4b5563; font-size: 14px; }
@@ -283,7 +370,7 @@ DEFAULT_MASTER_DATA_PATH = str(Path(__file__).resolve().with_name("master_data.p
 
 # Powertool categories — excluded from the Sets tab
 _POWERTOOL_CATS = {"P5503", "P5400", "P8400"}
-HOSPITAL_LED_STYLE = "lens"
+HOSPITAL_LED_STYLE = "panel"
 
 # Priority order for "In Office" control-tower view
 OFFICE_VIEW_ORDER = [
@@ -456,6 +543,16 @@ if st.session_state.get("load_error"):
 
 report = st.session_state["report"]
 meta   = report["meta"]
+cases_all_df = pd.DataFrame(report.get("cases_all", []))
+case_sales_lookup: dict[str, str] = {}
+if not cases_all_df.empty and "case_id" in cases_all_df.columns:
+    if "sales_code" not in cases_all_df.columns:
+        cases_all_df["sales_code"] = ""
+    case_sales_lookup = {
+        str(r.get("case_id", "")).strip(): str(r.get("sales_code", "") or "").strip()
+        for _, r in cases_all_df.iterrows()
+        if str(r.get("case_id", "")).strip()
+    }
 now_kl = datetime.now(KL_TZ)
 try:
     report_today = datetime.strptime(str(meta.get("today_kl", "")).strip(), "%Y-%m-%d").date()
@@ -503,7 +600,9 @@ def _parse_ui_date(value: str) -> Optional[date]:
     return None
 
 
-def _hospital_status_class(value: str) -> str:
+def _hospital_status_class(value: str, sales_code: str = "") -> str:
+    if str(sales_code or "").strip():
+        return "is-sales"
     surgery_date = _parse_ui_date(value)
     if surgery_date is None:
         return ""
@@ -514,10 +613,16 @@ def _hospital_status_class(value: str) -> str:
     return "is-past"
 
 
-def _hospital_with_led(hospital: str, surgery_value: str, *, variant: str = "") -> str:
+def _hospital_with_led(
+    hospital: str,
+    surgery_value: str,
+    *,
+    variant: str = "",
+    sales_code: str = "",
+) -> str:
     hosp_text = escape(str(hospital or "—"))
-    status_class = _hospital_status_class(surgery_value)
-    led_style = HOSPITAL_LED_STYLE if HOSPITAL_LED_STYLE in {"retro", "lens"} else "lens"
+    status_class = _hospital_status_class(surgery_value, sales_code=sales_code)
+    led_style = HOSPITAL_LED_STYLE if HOSPITAL_LED_STYLE in {"retro", "lens", "panel"} else "panel"
     variant_class = f"is-{variant}" if variant else ""
     class_attr = " ".join(
         part for part in ("out-hosp-wrap", f"led-{led_style}", variant_class, status_class) if part
@@ -528,6 +633,17 @@ def _hospital_with_led(hospital: str, surgery_value: str, *, variant: str = "") 
         f"<span class='out-hosp-name'>{hosp_text}</span>"
         f"</span>"
     )
+
+
+def _compact_set_id(value: str, fallback: str = "") -> str:
+    text = str(value or "").strip()
+    if not text:
+        text = str(fallback or "").strip()
+    if not text:
+        return ""
+    if re.fullmatch(r"\d+", text):
+        return str(int(text))
+    return text
 
 
 st.markdown("<div class='sec-header'>Operational Detail — Inventory Snapshot</div>", unsafe_allow_html=True)
@@ -627,11 +743,19 @@ with inv_tabs[0]:
                 continue
 
             office_items = [
-                {"name": str(r["set_name"]), "standby": False}
+                {
+                    "name": str(r["set_name"]),
+                    "label": _compact_set_id(r.get("id", ""), r.get("set_name", "")),
+                    "standby": False,
+                }
                 for _, r in office_rows.iterrows()
             ]
             standby_items = [
-                {"name": str(r["set_name"]), "standby": True}
+                {
+                    "name": str(r["set_name"]),
+                    "label": _compact_set_id(r.get("id", ""), r.get("set_name", "")),
+                    "standby": True,
+                }
                 for _, r in standby_rows.iterrows()
             ]
             in_list = "; ".join(sorted([item["name"] for item in office_items + standby_items]))
@@ -662,6 +786,7 @@ with inv_tabs[0]:
                     "Hospital": str(r.get("location_now", "")),
                     "Surgery Date": str(r.get("surgery_date", "")),
                     "Case": str(r.get("case_id", "")),
+                    "Sales Code": case_sales_lookup.get(str(r.get("case_id", "")).strip(), ""),
                 })
 
         # Build out-details lookup: category_norm → list of dicts
@@ -693,24 +818,21 @@ with inv_tabs[0]:
             office_items = list(r.get("OfficeItems", []))
             standby_items = list(r.get("StandbyItems", []))
             if office_items or standby_items:
-                in_sets_html = "<div class='office-set-strip'>"
-                in_sets_html += "".join(
-                    f"<span class='office-set-chip'>{escape(str(item['name']))}</span>"
-                    for item in office_items
-                )
-                in_sets_html += "".join(
-                    f"<span class='office-set-chip is-standby'>"
-                    f"{escape(str(item['name']))}<span class='office-set-state'>standby</span>"
-                    f"</span>"
-                    for item in standby_items
-                )
-                in_sets_html += "</div>"
+                office_labels = [escape(str(item.get("label", ""))) for item in office_items if str(item.get("label", "")).strip()]
+                standby_labels = [escape(str(item.get("label", ""))) for item in standby_items if str(item.get("label", "")).strip()]
+                if office_labels:
+                    in_sets_html += f"<div class='office-set-ids'>{', '.join(office_labels)}</div>"
+                if standby_labels:
+                    in_sets_html += f"<div class='office-set-ids is-standby'>{', '.join(standby_labels)} [standby]</div>"
+                if not in_sets_html:
+                    in_sets_html = "<span class='office-set-empty'>none available</span>"
             else:
                 in_sets_html = "<span class='office-set-empty'>none available</span>"
 
             left_col = (
                 f"<div style='flex:0 0 39%;padding-right:20px'>"
                 f"<div style='display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px'>"
+                f"<span class='inv-name' style='font-size:20px'>{r['Category']}</span>"
                 f"{badge}"
                 f"</div>"
                 f"{in_sets_html}"
@@ -726,7 +848,7 @@ with inv_tabs[0]:
                         f"<span class='out-tag'>OUT</span> "
                         f"<span class='out-set'>{o['Set']}</span>"
                         f"<span class='out-sep'> → </span>"
-                        f"{_hospital_with_led(o['Hospital'], o['Surgery Date'])}"
+                        f"{_hospital_with_led(o['Hospital'], o['Surgery Date'], sales_code=o.get('Sales Code', ''))}"
                         f"<span class='out-sep'> · </span>"
                         f"<span class='out-surg'>surg {o['Surgery Date'] or '—'}</span>"
                         f"</div>"
@@ -1066,6 +1188,7 @@ with inv_tabs[1]:
                         seen.add(key)
                         unique_out.append({
                             "size_range": sr,
+                            "case_id": cd.get("case_id", ""),
                             "hospital": cd.get("hospital", ""),
                             "surgery_date": cd.get("surgery_date", ""),
                             "from_stock": bool(cd.get("from_stock", False)),
@@ -1082,7 +1205,7 @@ with inv_tabs[1]:
                         f"<span class='dh-out-tag {tc}'>"
                         f"<span class='dh-out-sr'>{escape(str(cd['size_range']))} out</span>"
                         f"<span class='out-sep'>→</span>"
-                        f"{_hospital_with_led(hosp, surg, variant='plate')}"
+                        f"{_hospital_with_led(hosp, surg, variant='plate', sales_code=case_sales_lookup.get(str(cd.get('case_id', '')).strip(), ''))}"
                         f"<span class='out-sep'>·</span>"
                         f"<span class='dh-out-surg'>surg {escape(str(surg))}</span>"
                         f"{stk_s}"
@@ -1202,6 +1325,7 @@ with inv_tabs[2]:
                     "uid": str(pr.get("powertool_uid", "") or "").strip(),
                     "hospital": str(pr.get("hospital", "") or "").strip(),
                     "surgery": str(pr.get("surgery_date", "") or "").strip(),
+                    "case_id": str(pr.get("case_id", "") or "").strip(),
                 })
 
         avail_lookup: dict[str, int] = {}
@@ -1289,11 +1413,13 @@ with inv_tabs[2]:
                         "uid": uid,
                         "hospital": str(r.get("hospital", "")).strip(),
                         "surgery": str(r.get("surgery_date", "")).strip(),
+                        "case_id": str(r.get("case_id", "")).strip(),
                     }
                 out_items.append({
                     "uid": uid,
                     "hospital": matched.get("hospital", "") or str(r.get("hospital", "")).strip(),
                     "surgery": matched.get("surgery", "") or str(r.get("surgery_date", "")).strip(),
+                    "case_id": matched.get("case_id", "") or str(r.get("case_id", "")).strip(),
                     "standby": "STANDBY" in str(r.get("availability_norm", "")).upper(),
                 })
 
@@ -1364,7 +1490,7 @@ with inv_tabs[2]:
                         f"<span class='out-tag'>OUT</span> "
                         f"<span class='out-set'>{o['uid']}</span>"
                         f"<span class='out-sep'> → </span>"
-                        f"{_hospital_with_led(o['hospital'], o['surgery'])}"
+                        f"{_hospital_with_led(o['hospital'], o['surgery'], sales_code=case_sales_lookup.get(str(o.get('case_id', '')).strip(), ''))}"
                         f"<span class='out-sep'> · </span>"
                         f"<span class='out-surg'>surg {o['surgery'] or '—'}</span>"
                         f"<span style='display:inline-block;margin-left:8px;color:#4b5563;font-size:14px;font-weight:700'>"
