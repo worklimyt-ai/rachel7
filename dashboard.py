@@ -90,6 +90,41 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
     color: #6b7280;
     margin-top: 4px;
 }
+.office-set-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+}
+.office-set-chip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 7px 12px;
+    border-radius: 10px;
+    background: #f0fdf4;
+    color: #166534;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -.03em;
+}
+.office-set-chip.is-standby {
+    background: #fff7ed;
+    color: #b45309;
+}
+.office-set-state {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    opacity: .88;
+}
+.office-set-empty {
+    color: #9ca3af;
+    font-size: 12px;
+    font-style: italic;
+}
 .out-line {
     font-size: 15px;
     color: #374151;
@@ -212,6 +247,17 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
         0 0 10px rgba(34,197,94,.32);
 }
 .out-hosp-wrap.is-past .out-hosp-name { color: #166534; }
+.out-hosp-wrap.is-plate {
+    gap: 9px;
+}
+.out-hosp-wrap.is-plate .out-hosp-led {
+    width: 13px;
+    height: 13px;
+}
+.out-hosp-wrap.is-plate .out-hosp-name {
+    font-size: 17px;
+    line-height: 1;
+}
 .out-surg  { color: #4b5563; font-size: 14px; }
 .out-days  { color: #9ca3af; font-size: 12px; }
 .out-stock { color: #9ca3af; font-style: italic; font-size: 13px; }
@@ -237,7 +283,6 @@ DEFAULT_MASTER_DATA_PATH = str(Path(__file__).resolve().with_name("master_data.p
 
 # Powertool categories — excluded from the Sets tab
 _POWERTOOL_CATS = {"P5503", "P5400", "P8400"}
-_SNAPSHOT_HIDDEN_POWERTOOL_CATS = {"P5503", "P5400", "P8400"}
 HOSPITAL_LED_STYLE = "lens"
 
 # Priority order for "In Office" control-tower view
@@ -469,11 +514,14 @@ def _hospital_status_class(value: str) -> str:
     return "is-past"
 
 
-def _hospital_with_led(hospital: str, surgery_value: str) -> str:
+def _hospital_with_led(hospital: str, surgery_value: str, *, variant: str = "") -> str:
     hosp_text = escape(str(hospital or "—"))
     status_class = _hospital_status_class(surgery_value)
     led_style = HOSPITAL_LED_STYLE if HOSPITAL_LED_STYLE in {"retro", "lens"} else "lens"
-    class_attr = f"out-hosp-wrap led-{led_style} {status_class}".strip()
+    variant_class = f"is-{variant}" if variant else ""
+    class_attr = " ".join(
+        part for part in ("out-hosp-wrap", f"led-{led_style}", variant_class, status_class) if part
+    )
     return (
         f"<span class='{class_attr}'>"
         f"<span class='out-hosp-led'></span>"
@@ -490,7 +538,6 @@ inv_tabs = st.tabs(["🔩 Sets", "🦿 Plates", "⚡ Powertools"])
 with inv_tabs[0]:
     set_avail = pd.DataFrame(report.get("set_category_availability", []))
     set_status_all = pd.DataFrame(report.get("set_office_status", []))
-    pt_avail_df = pd.DataFrame(report.get("powertool_category_availability", []))
 
     if set_avail.empty and set_status_all.empty:
         st.info("No set data.")
@@ -641,31 +688,32 @@ with inv_tabs[0]:
             total_val = total_val if total_val > 0 else (r["In Office"] + r["Out"])
             badge = avail_badge(avail_val, total_val)
 
-            # Left: category name + badge + in-office set names
+            # Left: availability badge + prominent in-office set names
             in_sets_html = ""
             office_items = list(r.get("OfficeItems", []))
             standby_items = list(r.get("StandbyItems", []))
             if office_items or standby_items:
-                in_sets_html = "".join(
-                    f"<span style='display:inline-block;background:#f0fdf4;color:#166534;"
-                    f"font-family:\"JetBrains Mono\",monospace;font-size:11px;font-weight:600;"
-                    f"border-radius:4px;padding:1px 7px;margin:2px 4px 2px 0'>{item['name']}</span>"
+                in_sets_html = "<div class='office-set-strip'>"
+                in_sets_html += "".join(
+                    f"<span class='office-set-chip'>{escape(str(item['name']))}</span>"
                     for item in office_items
                 )
                 in_sets_html += "".join(
-                    f"<span style='display:inline-block;background:#fff7ed;color:#b45309;"
-                    f"font-family:\"JetBrains Mono\",monospace;font-size:11px;font-weight:600;"
-                    f"border-radius:4px;padding:1px 7px;margin:2px 4px 2px 0'>{item['name']} [standby]</span>"
+                    f"<span class='office-set-chip is-standby'>"
+                    f"{escape(str(item['name']))}<span class='office-set-state'>standby</span>"
+                    f"</span>"
                     for item in standby_items
                 )
+                in_sets_html += "</div>"
+            else:
+                in_sets_html = "<span class='office-set-empty'>none available</span>"
 
             left_col = (
                 f"<div style='flex:0 0 39%;padding-right:20px'>"
-                f"<div style='display:flex;align-items:center;gap:12px;flex-wrap:wrap'>"
-                f"<span class='inv-name' style='font-size:20px'>{r['Category']}</span>"
+                f"<div style='display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px'>"
                 f"{badge}"
                 f"</div>"
-                f"<div style='margin-top:6px'>{in_sets_html}</div>"
+                f"{in_sets_html}"
                 f"</div>"
             )
 
@@ -704,13 +752,6 @@ with inv_tabs[0]:
         else:
             st.info("No matching sets.")
 
-        pt_avail_lookup: dict[str, int] = {}
-        if not pt_avail_df.empty and "category" in pt_avail_df.columns:
-            for _, r in pt_avail_df.iterrows():
-                key = str(r.get("category", "")).upper().strip()
-                if key:
-                    pt_avail_lookup[key] = _safe_int(r.get("available", 0))
-
         summary_lookup: dict[str, int] = {}
         for row in summary_rows:
             row_norm = str(row.get("CategoryNorm", "")).strip().upper()
@@ -718,14 +759,10 @@ with inv_tabs[0]:
                 summary_lookup[row_norm] = _safe_int(row.get("Available", 0))
 
         def _copy_count(category_keys: list[str], mode: str = "sum") -> int:
-            total_val = 0
             values: list[int] = []
             for key in category_keys:
                 key_norm = str(key).upper().strip()
-                if key_norm in _POWERTOOL_CATS:
-                    values.append(pt_avail_lookup.get(key_norm, 0))
-                else:
-                    values.append(summary_lookup.get(key_norm, 0))
+                values.append(summary_lookup.get(key_norm, 0))
             if not values:
                 return 0
             if mode == "min":
@@ -768,10 +805,6 @@ with inv_tabs[0]:
         ]
         for label, keys, mode in copy_map:
             copy_lines.append(f"{label} - {_copy_count(keys, mode=mode)}")
-        copy_lines.append("Power")
-        copy_lines.append(f"5503B (normal) - {_copy_count(['P5503'])}")
-        copy_lines.append(f"5400 (kwire) - {_copy_count(['P5400'])}")
-        copy_lines.append(f"8400 (handpiece) - {_copy_count(['P8400'])}")
 
         st.markdown("##### Copy Block")
         st.code("\n".join(copy_lines), language="text")
@@ -831,8 +864,10 @@ with inv_tabs[1]:
 /* Drawer header */
 .dr-hdr {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
     padding: 4px 10px;
     background: #f3f4f6;
     font-family: 'JetBrains Mono', monospace;
@@ -842,13 +877,44 @@ with inv_tabs[1]:
     letter-spacing: .06em;
 }
 .dr-hdr.dh-out { background:#fff1f2; color:#be123c; }
+.dh-out-list {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+}
 /* OUT → hospital tag in header */
 .dh-out-tag {
-    font-size: 10px; font-weight: 700;
-    background: #fecdd3; color: #9f1239;
-    border-radius: 4px; padding: 1px 7px; margin-left: 6px;
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    background: #fecdd3;
+    color: #9f1239;
+    border-radius: 6px;
+    padding: 4px 8px;
 }
 .dh-out-tag.dht-stk { background:#fde68a; color:#92400e; }
+.dh-out-sr {
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+.dh-out-surg {
+    color: #7f1d1d;
+    font-size: 13px;
+    font-weight: 700;
+}
+.dh-out-tag.dht-stk .dh-out-surg { color:#92400e; }
+.dh-out-stock {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+}
 /* Chip row */
 .dr-chips {
     display: flex; flex-wrap: wrap; gap: 5px;
@@ -1011,10 +1077,16 @@ with inv_tabs[1]:
                     hosp = cd["hospital"] or "—"
                     surg = cd["surgery_date"] or "—"
                     tc = "dht-stk" if cd["from_stock"] else ""
-                    stk_s = " [stk]" if cd["from_stock"] else ""
+                    stk_s = "<span class='dh-out-stock'>[stk]</span>" if cd["from_stock"] else ""
                     out_tags += (
                         f"<span class='dh-out-tag {tc}'>"
-                        f"{cd['size_range']} OUT → {hosp} · surg {surg}{stk_s}</span>"
+                        f"<span class='dh-out-sr'>{escape(str(cd['size_range']))} out</span>"
+                        f"<span class='out-sep'>→</span>"
+                        f"{_hospital_with_led(hosp, surg, variant='plate')}"
+                        f"<span class='out-sep'>·</span>"
+                        f"<span class='dh-out-surg'>surg {escape(str(surg))}</span>"
+                        f"{stk_s}"
+                        f"</span>"
                     )
 
                 # All chips merged into one row, colour = size_range (or override)
@@ -1061,7 +1133,7 @@ with inv_tabs[1]:
                 drawer_blocks += (
                     f"<div class='dr-block'>"
                     f"<div class='dr-hdr {hdr_cls}'>"
-                    f"<span>{drawer}</span><span>{out_tags}</span>"
+                    f"<span>{drawer}</span><span class='dh-out-list'>{out_tags}</span>"
                     f"</div>"
                     f"<div class='dr-chips {drc_cls}'>{chips_html}</div>"
                     f"</div>"
@@ -1092,18 +1164,6 @@ with inv_tabs[2]:
     pt_del   = pd.DataFrame(report["powertool_delivered"])
     pt_uid   = pd.DataFrame(report.get("powertool_uid_availability", []))
     pt_u30   = pd.DataFrame(report.get("powertool_usage_30d", []))
-
-    if "category" not in pt_uid.columns:
-        pt_uid["category"] = ""
-    pt_uid = pt_uid[
-        ~pt_uid["category"].astype(str).str.upper().str.strip().isin(_SNAPSHOT_HIDDEN_POWERTOOL_CATS)
-    ]
-
-    if "category" not in pt_avail.columns:
-        pt_avail["category"] = ""
-    pt_avail = pt_avail[
-        ~pt_avail["category"].astype(str).str.upper().str.strip().isin(_SNAPSHOT_HIDDEN_POWERTOOL_CATS)
-    ]
 
     if pt_avail.empty and pt_uid.empty:
         st.info("No powertool data.")
@@ -1156,10 +1216,7 @@ with inv_tabs[2]:
                 hold_lookup[key] = _safe_int(r.get("na_hold", 0))
                 standby_lookup[key] = _safe_int(r.get("standby_hold", 0))
 
-        ordered_cats = [
-            c for c in ["P5503", "P5400", "P8400"]
-            if c not in _SNAPSHOT_HIDDEN_POWERTOOL_CATS
-        ]
+        ordered_cats = ["P5503", "P5400", "P8400"]
         discovered = sorted({
             *pt_uid["category_norm"].astype(str).tolist(),
             *pt_avail["category_norm"].astype(str).tolist(),
