@@ -128,6 +128,10 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
     height: 11px;
     border-radius: 999px;
     display: inline-block;
+    position: relative;
+    flex: 0 0 auto;
+}
+.out-hosp-wrap.led-retro .out-hosp-led {
     background: #9ca3af;
     border: 1px solid rgba(255,255,255,.85);
     box-shadow:
@@ -135,7 +139,7 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
         0 0 0 2px rgba(156,163,175,.16),
         0 0 10px rgba(107,114,128,.25);
 }
-.out-hosp-wrap.is-future .out-hosp-led {
+.out-hosp-wrap.led-retro.is-future .out-hosp-led {
     background: #f59e0b;
     box-shadow:
         inset 0 1px 2px rgba(255,255,255,.65),
@@ -143,7 +147,7 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
         0 0 12px rgba(245,158,11,.55);
 }
 .out-hosp-wrap.is-future .out-hosp-name { color: #92400e; }
-.out-hosp-wrap.is-today .out-hosp-led {
+.out-hosp-wrap.led-retro.is-today .out-hosp-led {
     background: #ef4444;
     box-shadow:
         inset 0 1px 2px rgba(255,255,255,.65),
@@ -151,12 +155,61 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
         0 0 12px rgba(239,68,68,.62);
 }
 .out-hosp-wrap.is-today .out-hosp-name { color: #991b1b; }
-.out-hosp-wrap.is-past .out-hosp-led {
+.out-hosp-wrap.led-retro.is-past .out-hosp-led {
     background: #22c55e;
     box-shadow:
         inset 0 1px 2px rgba(255,255,255,.65),
         0 0 0 2px rgba(34,197,94,.18),
         0 0 12px rgba(34,197,94,.52);
+}
+.out-hosp-wrap.led-lens .out-hosp-led {
+    width: 12px;
+    height: 12px;
+    border: 1px solid #cbd5e1;
+    background: radial-gradient(circle at 32% 28%, rgba(255,255,255,.95) 0 18%, rgba(255,255,255,.45) 19% 30%, #cbd5e1 31% 100%);
+    box-shadow:
+        inset 0 1px 1px rgba(255,255,255,.88),
+        inset 0 -2px 3px rgba(15,23,42,.24),
+        0 1px 2px rgba(15,23,42,.18),
+        0 0 0 1px rgba(255,255,255,.4);
+}
+.out-hosp-wrap.led-lens .out-hosp-led::after {
+    content: "";
+    position: absolute;
+    top: 1px;
+    left: 2px;
+    width: 5px;
+    height: 3px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.55);
+    transform: rotate(-18deg);
+}
+.out-hosp-wrap.led-lens.is-future .out-hosp-led {
+    border-color: #d97706;
+    background: radial-gradient(circle at 32% 28%, #fff8e1 0 18%, #fde68a 19% 30%, #f59e0b 31% 64%, #b45309 100%);
+    box-shadow:
+        inset 0 1px 1px rgba(255,255,255,.88),
+        inset 0 -2px 3px rgba(120,53,15,.28),
+        0 1px 2px rgba(120,53,15,.18),
+        0 0 10px rgba(245,158,11,.35);
+}
+.out-hosp-wrap.led-lens.is-today .out-hosp-led {
+    border-color: #b91c1c;
+    background: radial-gradient(circle at 32% 28%, #ffe4e6 0 18%, #fda4af 19% 30%, #ef4444 31% 64%, #991b1b 100%);
+    box-shadow:
+        inset 0 1px 1px rgba(255,255,255,.88),
+        inset 0 -2px 3px rgba(127,29,29,.3),
+        0 1px 2px rgba(127,29,29,.18),
+        0 0 10px rgba(239,68,68,.38);
+}
+.out-hosp-wrap.led-lens.is-past .out-hosp-led {
+    border-color: #15803d;
+    background: radial-gradient(circle at 32% 28%, #dcfce7 0 18%, #86efac 19% 30%, #22c55e 31% 64%, #166534 100%);
+    box-shadow:
+        inset 0 1px 1px rgba(255,255,255,.88),
+        inset 0 -2px 3px rgba(20,83,45,.28),
+        0 1px 2px rgba(20,83,45,.18),
+        0 0 10px rgba(34,197,94,.32);
 }
 .out-hosp-wrap.is-past .out-hosp-name { color: #166534; }
 .out-surg  { color: #4b5563; font-size: 14px; }
@@ -184,6 +237,8 @@ DEFAULT_MASTER_DATA_PATH = str(Path(__file__).resolve().with_name("master_data.p
 
 # Powertool categories — excluded from the Sets tab
 _POWERTOOL_CATS = {"P5503", "P5400", "P8400"}
+_SNAPSHOT_HIDDEN_POWERTOOL_CATS = {"P5503", "P5400", "P8400"}
+HOSPITAL_LED_STYLE = "lens"
 
 # Priority order for "In Office" control-tower view
 OFFICE_VIEW_ORDER = [
@@ -417,7 +472,8 @@ def _hospital_status_class(value: str) -> str:
 def _hospital_with_led(hospital: str, surgery_value: str) -> str:
     hosp_text = escape(str(hospital or "—"))
     status_class = _hospital_status_class(surgery_value)
-    class_attr = f"out-hosp-wrap {status_class}".strip()
+    led_style = HOSPITAL_LED_STYLE if HOSPITAL_LED_STYLE in {"retro", "lens"} else "lens"
+    class_attr = f"out-hosp-wrap led-{led_style} {status_class}".strip()
     return (
         f"<span class='{class_attr}'>"
         f"<span class='out-hosp-led'></span>"
@@ -1037,6 +1093,18 @@ with inv_tabs[2]:
     pt_uid   = pd.DataFrame(report.get("powertool_uid_availability", []))
     pt_u30   = pd.DataFrame(report.get("powertool_usage_30d", []))
 
+    if "category" not in pt_uid.columns:
+        pt_uid["category"] = ""
+    pt_uid = pt_uid[
+        ~pt_uid["category"].astype(str).str.upper().str.strip().isin(_SNAPSHOT_HIDDEN_POWERTOOL_CATS)
+    ]
+
+    if "category" not in pt_avail.columns:
+        pt_avail["category"] = ""
+    pt_avail = pt_avail[
+        ~pt_avail["category"].astype(str).str.upper().str.strip().isin(_SNAPSHOT_HIDDEN_POWERTOOL_CATS)
+    ]
+
     if pt_avail.empty and pt_uid.empty:
         st.info("No powertool data.")
     else:
@@ -1052,8 +1120,6 @@ with inv_tabs[2]:
         pt_uid["availability_norm"] = pt_uid["availability"].astype(str).str.upper().str.strip()
         pt_uid["uid_name"] = pt_uid["powertool_uid"].astype(str).str.strip()
 
-        if "category" not in pt_avail.columns:
-            pt_avail["category"] = ""
         pt_avail = pt_avail.copy()
         pt_avail["category_norm"] = pt_avail["category"].astype(str).str.upper().str.strip()
 
@@ -1090,7 +1156,10 @@ with inv_tabs[2]:
                 hold_lookup[key] = _safe_int(r.get("na_hold", 0))
                 standby_lookup[key] = _safe_int(r.get("standby_hold", 0))
 
-        ordered_cats = ["P5503", "P5400", "P8400"]
+        ordered_cats = [
+            c for c in ["P5503", "P5400", "P8400"]
+            if c not in _SNAPSHOT_HIDDEN_POWERTOOL_CATS
+        ]
         discovered = sorted({
             *pt_uid["category_norm"].astype(str).tolist(),
             *pt_avail["category_norm"].astype(str).tolist(),
