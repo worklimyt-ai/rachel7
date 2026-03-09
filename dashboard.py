@@ -311,6 +311,10 @@ if st.session_state.get("load_error"):
 report = st.session_state["report"]
 meta   = report["meta"]
 now_kl = datetime.now(KL_TZ)
+try:
+    report_today = datetime.strptime(str(meta.get("today_kl", "")).strip(), "%Y-%m-%d").date()
+except ValueError:
+    report_today = now_kl.date()
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -339,6 +343,29 @@ def avail_badge(available: int, total: int) -> str:
     if available / total <= 0.25:
         return f"<span class='avail-badge avail-low'>{available}/{total}</span>"
     return f"<span class='avail-badge avail-ok'>{available}/{total}</span>"
+
+
+def _parse_ui_date(value: str) -> datetime.date | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(text, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def _hospital_color_for_surgery(value: str) -> str:
+    surgery_date = _parse_ui_date(value)
+    if surgery_date is None:
+        return "#111827"
+    if surgery_date > report_today:
+        return "#c2410c"
+    if surgery_date == report_today:
+        return "#dc2626"
+    return "#16a34a"
 
 
 st.markdown("<div class='sec-header'>Operational Detail — Inventory Snapshot</div>", unsafe_allow_html=True)
@@ -532,14 +559,16 @@ with inv_tabs[0]:
             out_items = _set_out.get(cat_norm, [])
             if out_items:
                 out_lines = "".join(
-                    f"<div class='out-line'>"
-                    f"<span class='out-tag'>OUT</span> "
-                    f"<span class='out-set'>{o['Set']}</span>"
-                    f"<span class='out-sep'> → </span>"
-                    f"<span class='out-hosp'>{o['Hospital'] or '—'}</span>"
-                    f"<span class='out-sep'> · </span>"
-                    f"<span class='out-surg'>surg {o['Surgery Date'] or '—'}</span>"
-                    + f"</div>"
+                    (
+                        f"<div class='out-line'>"
+                        f"<span class='out-tag'>OUT</span> "
+                        f"<span class='out-set'>{o['Set']}</span>"
+                        f"<span class='out-sep'> → </span>"
+                        f"<span class='out-hosp' style='color:{_hospital_color_for_surgery(o['Surgery Date'])}'>{o['Hospital'] or '—'}</span>"
+                        f"<span class='out-sep'> · </span>"
+                        f"<span class='out-surg'>surg {o['Surgery Date'] or '—'}</span>"
+                        f"</div>"
+                    )
                     for o in out_items
                 )
             else:
@@ -1146,17 +1175,19 @@ with inv_tabs[2]:
 
             if row["out_items"]:
                 out_lines = "".join(
-                    f"<div class='out-line'>"
-                    f"<span class='out-tag'>OUT</span> "
-                    f"<span class='out-set'>{o['uid']}</span>"
-                    f"<span class='out-sep'> → </span>"
-                    f"<span class='out-hosp'>{o['hospital'] or '—'}</span>"
-                    f"<span class='out-sep'> · </span>"
-                    f"<span class='out-surg'>surg {o['surgery'] or '—'}</span>"
-                    f"<span style='display:inline-block;margin-left:8px;color:#4b5563;font-size:14px;font-weight:700'>"
-                    f"30d use {usage_by_uid.get(o['uid'], 0)}</span>"
-                    + ("<span style='margin-left:8px;color:#b45309;font-size:12px;font-weight:700'>[standby]</span>" if o.get('standby') else "")
-                    + f"</div>"
+                    (
+                        f"<div class='out-line'>"
+                        f"<span class='out-tag'>OUT</span> "
+                        f"<span class='out-set'>{o['uid']}</span>"
+                        f"<span class='out-sep'> → </span>"
+                        f"<span class='out-hosp' style='color:{_hospital_color_for_surgery(o['surgery'])}'>{o['hospital'] or '—'}</span>"
+                        f"<span class='out-sep'> · </span>"
+                        f"<span class='out-surg'>surg {o['surgery'] or '—'}</span>"
+                        f"<span style='display:inline-block;margin-left:8px;color:#4b5563;font-size:14px;font-weight:700'>"
+                        f"30d use {usage_by_uid.get(o['uid'], 0)}</span>"
+                        + ("<span style='margin-left:8px;color:#b45309;font-size:12px;font-weight:700'>[standby]</span>" if o.get('standby') else "")
+                        + f"</div>"
+                    )
                     for o in row["out_items"]
                 )
             else:

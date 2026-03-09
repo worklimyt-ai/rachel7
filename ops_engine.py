@@ -175,6 +175,50 @@ def parse_locations(raw_location: Any) -> tuple[list[str], list[str]]:
         (drawers if re.match(r"^D\d+$", token) else others).append(token) if token else None
     return drawers, others
 
+def location_no_stock_state(value: Any) -> bool | None:
+    token = normalize_code(value)
+    if token in {"NOSTOCK", "NO_STOCK", "OUT", "OUTOFSTOCK", "OUT_OF_STOCK", "MISSING", "NS"}:
+        return True
+    if token in {"AVAILABLE", "IN", "INSTOCK", "IN_STOCK", "OK"}:
+        return False
+    return None
+
+def parse_plate_locations(
+    raw_location: Any,
+    *,
+    default_no_stock: bool = False,
+) -> list[dict[str, Any]]:
+    locations: list[dict[str, Any]] = []
+    for part in split_tokens(raw_location, pattern=r"[,]+"):
+        text = str(part or "").strip()
+        if not text:
+            continue
+        match = re.match(r"^(.*?)\[(.*?)\]\s*$", text)
+        token_text = match.group(1).strip() if match else text
+        token = normalize_code(token_text)
+        if not token:
+            continue
+        no_stock = default_no_stock
+        if match:
+            flag_text = match.group(2).strip()
+            flags = [
+                flag.strip() for flag in re.split(r"[|/;]+", flag_text)
+                if flag.strip()
+            ]
+            explicit_state = None
+            for flag in flags:
+                state = location_no_stock_state(flag)
+                if state is not None:
+                    explicit_state = state
+            if explicit_state is not None:
+                no_stock = explicit_state
+        locations.append({
+            "name": token,
+            "is_drawer": bool(re.match(r"^D\d+$", token)),
+            "no_stock": no_stock,
+        })
+    return locations
+
 def canonical_size_range(value: Any) -> str:
     token = normalize_code(value).replace("_", " ").replace("-", " ")
     if "EXTRA" in token and "LONG" in token:
@@ -268,18 +312,26 @@ def parse_plate_request(token: str) -> dict[str, Any] | None:
         return None
     from_stock = "*" in raw
     cleaned = raw.replace("*", "")
-    if cleaned.endswith("-EL"):
-        base_uid      = cleaned[:-3]
-        needed_ranges = ["STANDARD", "LONG", "EXTRA LONG"]
-    elif cleaned.endswith("-L"):
-        base_uid      = cleaned[:-2]
-        needed_ranges = ["STANDARD", "LONG"]
-    elif cleaned.endswith("-S"):
-        base_uid      = cleaned[:-2]
-        needed_ranges = ["STANDARD", "SHORT"]
-    else:
-        base_uid      = cleaned
-        needed_ranges = ["STANDARD"]
+    suffix_rules = [
+        ("-XLONLY", ["EXTRA LONG"]),
+        ("XLONLY", ["EXTRA LONG"]),
+        ("-ELONLY", ["EXTRA LONG"]),
+        ("ELONLY", ["EXTRA LONG"]),
+        ("-LONLY", ["LONG"]),
+        ("LONLY", ["LONG"]),
+        ("-SONLY", ["SHORT"]),
+        ("SONLY", ["SHORT"]),
+        ("-EL", ["STANDARD", "LONG", "EXTRA LONG"]),
+        ("-L", ["STANDARD", "LONG"]),
+        ("-S", ["STANDARD", "SHORT"]),
+    ]
+    base_uid = cleaned
+    needed_ranges = ["STANDARD"]
+    for suffix, ranges in suffix_rules:
+        if cleaned.endswith(suffix):
+            base_uid = cleaned[:-len(suffix)]
+            needed_ranges = ranges
+            break
     uid_norm = normalize_set_code(base_uid)
     if not uid_norm:
         return None
@@ -452,9 +504,6 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
             continue
         size_range = canonical_size_range(row.get("size_range", "STANDARD"))
         key = (uid, size_range)
-        drawers, others = parse_locations(row.get("location", ""))
-        drawer_units = len(drawers)
-        stock_units  = len(others) or (1 if not drawers and not others else 0)
 
         bucket = size_buckets.setdefault(key, {
             "plate_uid":    uid,
@@ -486,20 +535,28 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
         # Detect "status": "no_stock" (or "out", "out_of_stock") on this SKU
         sku_status   = normalize_code(str(row.get("status", "")))  # uppercased, no spaces
         sku_no_stock = sku_status in {"NO_STOCK", "NOSTOCK", "OUT", "OUTOFSTOCK"}
-        for drawer in drawers:
-            bucket["drawer_size_map"][drawer].append(plate_label)
-            bucket["drawer_size_detail"][drawer].append({
+        locations = parse_plate_locations(
+            row.get("location", ""),
+            default_no_stock=sku_no_stock,
+        )
+        drawers = [loc["name"] for loc in locations if loc["is_drawer"]]
+        others = [loc["name"] for loc in locations if not loc["is_drawer"]]
+        drawer_units = len(drawers)
+        stock_units  = len(others) or (1 if not drawers and not others else 0)
+        for location in locations:
+            detail_row = {
                 "label":      plate_label,
                 "size_range": size_range,
-                "no_stock":   sku_no_stock,
-            })
-        for stock_loc in others:
-            bucket["stock_size_map"][stock_loc].append(plate_label)
-            bucket["stock_size_detail"][stock_loc].append({
-                "label":      plate_label,
-                "size_range": size_range,
-                "no_stock":   sku_no_stock,
-            })
+                "no_stock":   bool(location["no_stock"]),
+            }
+            if location["is_drawer"]:
+                drawer = location["name"]
+                bucket["drawer_size_map"][drawer].append(plate_label)
+                bucket["drawer_size_detail"][drawer].append(detail_row)
+            else:
+                stock_loc = location["name"]
+                bucket["stock_size_map"][stock_loc].append(plate_label)
+                bucket["stock_size_detail"][stock_loc].append(detail_row)
         bucket["total_drawer_units"] += drawer_units
         bucket["total_stock_units"] += stock_units
         bucket["drawer_locations"].update(drawers)
@@ -1087,19 +1144,21 @@ def build_plate_outputs(
             "plate_name":   row["plate_name"],
             "screw_sizes_set": set(),
             "set_category": row["set_category"],
-            "total_units":  0,
-            "out_units":    0,
-            "available_units": 0,
+            "aggregate_total_units":  0,
+            "aggregate_out_units":    0,
+            "aggregate_available_units": 0,
             "size_ranges":  [],
             "size_ranges_detail": [],
             "missing_ranges": [],
             "partial_ranges": [],
+            "summary_basis": "ALL_RANGES",
+            "_standard_row": None,
         })
         for ss in [p.strip() for p in str(row.get("screw_sizes", "")).split(",") if p.strip()]:
             s["screw_sizes_set"].add(ss)
-        s["total_units"]    += row["total_units"]
-        s["out_units"]      += row["out_units"]
-        s["available_units"]+= row["available_units"]
+        s["aggregate_total_units"]    += row["total_units"]
+        s["aggregate_out_units"]      += row["out_units"]
+        s["aggregate_available_units"]+= row["available_units"]
         s["size_ranges_detail"].append({
             "size_range": row["size_range"],
             "text": f"{row['size_range']}({row['available_units']}/{row['total_units']})",
@@ -1108,6 +1167,9 @@ def build_plate_outputs(
             s["missing_ranges"].append(row["size_range"])
         elif row["available_units"] < row["total_units"]:
             s["partial_ranges"].append(row["size_range"])
+        if row["size_range"] == "STANDARD":
+            s["_standard_row"] = row
+            s["summary_basis"] = "STANDARD"
 
     plate_uid_summary = []
     for uid, s in sorted(uid_summary_map.items()):
@@ -1118,17 +1180,52 @@ def build_plate_outputs(
         s.pop("size_ranges_detail", None)
         s["screw_sizes"] = ", ".join(sorted(s["screw_sizes_set"]))
         s.pop("screw_sizes_set", None)
-        s["availability"] = f"{s['available_units']}/{s['total_units']}"
-        if s["missing_ranges"]:
-            s["status_note"] = "OUT OF STOCK: " + ", ".join(
-                sorted(s["missing_ranges"], key=size_range_sort_key)
-            )
-        elif s["partial_ranges"]:
-            s["status_note"] = "PARTIAL: " + ", ".join(
-                sorted(s["partial_ranges"], key=size_range_sort_key)
-            )
+        standard_row = s.pop("_standard_row", None)
+        if standard_row:
+            s["total_units"] = standard_row["total_units"]
+            s["out_units"] = standard_row["out_units"]
+            s["available_units"] = standard_row["available_units"]
+            s["availability"] = standard_row["availability"]
+            extra_missing = [
+                size_range for size_range in s["missing_ranges"]
+                if size_range != "STANDARD"
+            ]
+            extra_partial = [
+                size_range for size_range in s["partial_ranges"]
+                if size_range != "STANDARD"
+            ]
+            if standard_row["available_units"] == 0:
+                s["status_note"] = "OUT OF STOCK: STANDARD"
+            elif standard_row["available_units"] < standard_row["total_units"]:
+                s["status_note"] = "PARTIAL: STANDARD"
+            elif extra_missing:
+                s["status_note"] = "READY (extras missing: " + ", ".join(
+                    sorted(extra_missing, key=size_range_sort_key)
+                ) + ")"
+            elif extra_partial:
+                s["status_note"] = "READY (extras partial: " + ", ".join(
+                    sorted(extra_partial, key=size_range_sort_key)
+                ) + ")"
+            else:
+                s["status_note"] = "READY"
         else:
-            s["status_note"] = "READY"
+            s["total_units"] = s["aggregate_total_units"]
+            s["out_units"] = s["aggregate_out_units"]
+            s["available_units"] = s["aggregate_available_units"]
+            s["availability"] = f"{s['available_units']}/{s['total_units']}"
+            if s["missing_ranges"]:
+                s["status_note"] = "OUT OF STOCK: " + ", ".join(
+                    sorted(s["missing_ranges"], key=size_range_sort_key)
+                )
+            elif s["partial_ranges"]:
+                s["status_note"] = "PARTIAL: " + ", ".join(
+                    sorted(s["partial_ranges"], key=size_range_sort_key)
+                )
+            else:
+                s["status_note"] = "READY"
+        s.pop("aggregate_total_units", None)
+        s.pop("aggregate_out_units", None)
+        s.pop("aggregate_available_units", None)
         plate_uid_summary.append(s)
 
     return {

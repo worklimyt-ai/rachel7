@@ -279,11 +279,11 @@ SETS = [
     {"category": "P5503", "id": "4015", "home": "OFFICE", "status": "", "uid": "P55034015", "shorthand": "P5503"},
     {"category": "P5503", "id": "2016", "home": "HSB", "status": "", "uid": "P55032016", "shorthand": "P5503"},
     {"category": "P5503", "id": "1007", "home": "OFFICE", "status": "", "uid": "P55031007", "shorthand": "P5503"},
-    {"category": "P5503", "id": "1008", "home": "OFFICE", "status": "BACK IN ACTION 260114", "uid": "P55031008", "shorthand": "P5503"},
+    {"category": "P5503", "id": "1008", "home": "OFFICE", "status": "", "uid": "P55031008", "shorthand": "P5503"},
     {"category": "P5503", "id": "1009", "home": "PG", "status": "", "uid": "P55031009", "shorthand": "P5503"},
     {"category": "P5503", "id": "10004", "home": "OFFICE", "status": "STANDBY", "uid": "P550310004", "shorthand": "P5503"},
     {"category": "P5503", "id": "10006", "home": "HCJ", "status": "", "uid": "P550310006", "shorthand": "P5503"},
-    {"category": "P5503", "id": "10008", "home": "OFFICE", "status": "NA", "uid": "P550310008", "shorthand": "P5503"},
+    {"category": "P5503", "id": "10008", "home": "OFFICE", "status": "", "uid": "P550310008", "shorthand": "P5503"},
     {"category": "P5400", "id": "10007", "home": "OFFICE", "status": "", "uid": "P540010007", "shorthand": "P5400"},
     {"category": "P5400", "id": "10008", "home": "OFFICE", "status": "", "uid": "P540010008", "shorthand": "P5400"},
     {"category": "P5400", "id": "1012", "home": "OFFICE", "status": "NA", "uid": "P54001012", "shorthand": "P5400"},
@@ -6931,7 +6931,7 @@ PLATES = {
         "size_range": "Standard",
         "left_right": "L",
         "size": "4H",
-        "location": "D1, D2"
+        "location": "D1, D2[no_stock]"
     },
     "52200636": {
         "uid": "DMH",
@@ -8261,8 +8261,7 @@ PLATES = {
         "size_range": "Standard",
         "left_right": "L",
         "size": "5H",
-        "location": "D4",
-        "status": "no_stock"
+        "location": "D4[no_stock]",
     },
     "52202837": {
         "uid": "PFP",
@@ -8282,8 +8281,7 @@ PLATES = {
         "size_range": "Standard",
         "left_right": "L",
         "size": "9H",
-        "location": "D4",
-        "status": "no_stock"
+        "location": "D4[no_stock]"
     },
     "52202841": {
         "uid": "PFP",
@@ -8313,8 +8311,7 @@ PLATES = {
         "size_range": "Standard",
         "left_right": "R",
         "size": "7H",
-        "location": "D4",
-        "status": "no_stock"
+        "location": "D4[no_stock]"
     },
     "52202869": {
         "uid": "PFP",
