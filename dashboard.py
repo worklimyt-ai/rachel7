@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 import re
 from datetime import date, datetime
+from html import escape
 from pathlib import Path
 from typing import Optional
 from zoneinfo import ZoneInfo
@@ -113,7 +114,51 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
 }
 .out-sep   { color: #9ca3af; }
 .out-set   { font-family: 'JetBrains Mono', monospace; color: #1d4ed8; font-weight: 600; font-size: 15px; margin-right: 2px; }
-.out-hosp  { font-weight: 700; color: #111827; font-size: 15px; }
+.out-hosp-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 15px;
+    vertical-align: middle;
+}
+.out-hosp-name { color: #111827; }
+.out-hosp-led {
+    width: 11px;
+    height: 11px;
+    border-radius: 999px;
+    display: inline-block;
+    background: #9ca3af;
+    border: 1px solid rgba(255,255,255,.85);
+    box-shadow:
+        inset 0 1px 2px rgba(255,255,255,.65),
+        0 0 0 2px rgba(156,163,175,.16),
+        0 0 10px rgba(107,114,128,.25);
+}
+.out-hosp-wrap.is-future .out-hosp-led {
+    background: #f59e0b;
+    box-shadow:
+        inset 0 1px 2px rgba(255,255,255,.65),
+        0 0 0 2px rgba(245,158,11,.18),
+        0 0 12px rgba(245,158,11,.55);
+}
+.out-hosp-wrap.is-future .out-hosp-name { color: #92400e; }
+.out-hosp-wrap.is-today .out-hosp-led {
+    background: #ef4444;
+    box-shadow:
+        inset 0 1px 2px rgba(255,255,255,.65),
+        0 0 0 2px rgba(239,68,68,.18),
+        0 0 12px rgba(239,68,68,.62);
+}
+.out-hosp-wrap.is-today .out-hosp-name { color: #991b1b; }
+.out-hosp-wrap.is-past .out-hosp-led {
+    background: #22c55e;
+    box-shadow:
+        inset 0 1px 2px rgba(255,255,255,.65),
+        0 0 0 2px rgba(34,197,94,.18),
+        0 0 12px rgba(34,197,94,.52);
+}
+.out-hosp-wrap.is-past .out-hosp-name { color: #166534; }
 .out-surg  { color: #4b5563; font-size: 14px; }
 .out-days  { color: #9ca3af; font-size: 12px; }
 .out-stock { color: #9ca3af; font-style: italic; font-size: 13px; }
@@ -358,15 +403,27 @@ def _parse_ui_date(value: str) -> Optional[date]:
     return None
 
 
-def _hospital_color_for_surgery(value: str) -> str:
+def _hospital_status_class(value: str) -> str:
     surgery_date = _parse_ui_date(value)
     if surgery_date is None:
-        return "#111827"
+        return ""
     if surgery_date > report_today:
-        return "#c2410c"
+        return "is-future"
     if surgery_date == report_today:
-        return "#dc2626"
-    return "#16a34a"
+        return "is-today"
+    return "is-past"
+
+
+def _hospital_with_led(hospital: str, surgery_value: str) -> str:
+    hosp_text = escape(str(hospital or "—"))
+    status_class = _hospital_status_class(surgery_value)
+    class_attr = f"out-hosp-wrap {status_class}".strip()
+    return (
+        f"<span class='{class_attr}'>"
+        f"<span class='out-hosp-led'></span>"
+        f"<span class='out-hosp-name'>{hosp_text}</span>"
+        f"</span>"
+    )
 
 
 st.markdown("<div class='sec-header'>Operational Detail — Inventory Snapshot</div>", unsafe_allow_html=True)
@@ -565,7 +622,7 @@ with inv_tabs[0]:
                         f"<span class='out-tag'>OUT</span> "
                         f"<span class='out-set'>{o['Set']}</span>"
                         f"<span class='out-sep'> → </span>"
-                        f"<span class='out-hosp' style='color:{_hospital_color_for_surgery(o['Surgery Date'])}'>{o['Hospital'] or '—'}</span>"
+                        f"{_hospital_with_led(o['Hospital'], o['Surgery Date'])}"
                         f"<span class='out-sep'> · </span>"
                         f"<span class='out-surg'>surg {o['Surgery Date'] or '—'}</span>"
                         f"</div>"
@@ -1181,7 +1238,7 @@ with inv_tabs[2]:
                         f"<span class='out-tag'>OUT</span> "
                         f"<span class='out-set'>{o['uid']}</span>"
                         f"<span class='out-sep'> → </span>"
-                        f"<span class='out-hosp' style='color:{_hospital_color_for_surgery(o['surgery'])}'>{o['hospital'] or '—'}</span>"
+                        f"{_hospital_with_led(o['hospital'], o['surgery'])}"
                         f"<span class='out-sep'> · </span>"
                         f"<span class='out-surg'>surg {o['surgery'] or '—'}</span>"
                         f"<span style='display:inline-block;margin-left:8px;color:#4b5563;font-size:14px;font-weight:700'>"
