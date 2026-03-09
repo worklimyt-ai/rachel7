@@ -748,7 +748,7 @@ with inv_tabs[1]:
 """, unsafe_allow_html=True)
 
         _SR_ORDER  = ["SHORT", "STANDARD", "LONG", "EXTRA LONG"]
-        _REVERSED_LR_UIDS = {"DSC", "MSC", "DIA"}
+        _REVERSED_LR_UIDS = {"DSC", "MSC", "DIA", "DPLH"}
         # chip class per size_range when in stock
         _SR_CHIP   = {"SHORT": "sc-sht", "STANDARD": "sc-std",
                       "LONG": "sc-lng", "EXTRA LONG": "sc-xl"}

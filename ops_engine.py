@@ -164,7 +164,7 @@ def size_range_sort_key(value: Any) -> tuple[int, str]:
     return (order.get(token, 99), token)
 
 
-CLAVICLE_REVERSED_UIDS = {"DSC", "MSC", "DIA"}
+CLAVICLE_REVERSED_UIDS = {"DSC", "MSC", "DIA", "DPLH"}
 
 
 def plate_uses_reversed_lr_sequence(uid: Any) -> bool:

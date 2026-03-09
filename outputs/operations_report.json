@@ -5565,25 +5565,10 @@
       "screw_sizes": "2.7mm, 3.5mm",
       "size_range": "STANDARD",
       "drawer": "D1",
-      "drawer_sizes": "4H L, 6H L, 8H L, 10H L, 12H L, 14H L, 14H R, 12H R, 10H R, 8H R, 6H R, 4H R",
+      "drawer_sizes": "14H L, 12H L, 10H L, 8H L, 6H L, 4H L, 4H R, 6H R, 8H R, 10H R, 12H R, 14H R",
       "drawer_size_detail": [
         {
-          "label": "4H L",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "6H L",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "8H L",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "10H L",
+          "label": "14H L",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -5593,27 +5578,27 @@
           "no_stock": false
         },
         {
-          "label": "14H L",
+          "label": "10H L",
           "size_range": "STANDARD",
           "no_stock": false
         },
         {
-          "label": "14H R",
+          "label": "8H L",
           "size_range": "STANDARD",
           "no_stock": false
         },
         {
-          "label": "12H R",
+          "label": "6H L",
           "size_range": "STANDARD",
           "no_stock": false
         },
         {
-          "label": "10H R",
+          "label": "4H L",
           "size_range": "STANDARD",
           "no_stock": false
         },
         {
-          "label": "8H R",
+          "label": "4H R",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -5623,7 +5608,22 @@
           "no_stock": false
         },
         {
-          "label": "4H R",
+          "label": "8H R",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "10H R",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "12H R",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "14H R",
           "size_range": "STANDARD",
           "no_stock": false
         }
@@ -5656,25 +5656,10 @@
       "screw_sizes": "2.7mm, 3.5mm",
       "size_range": "STANDARD",
       "drawer": "D2",
-      "drawer_sizes": "4H L, 6H L, 8H L, 10H L, 12H L, 14H L, 14H R, 12H R, 10H R, 8H R, 6H R, 4H R",
+      "drawer_sizes": "14H L, 12H L, 10H L, 8H L, 6H L, 4H L, 4H R, 6H R, 8H R, 10H R, 12H R, 14H R",
       "drawer_size_detail": [
         {
-          "label": "4H L",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "6H L",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "8H L",
-          "size_range": "STANDARD",
-          "no_stock": false
-        },
-        {
-          "label": "10H L",
+          "label": "14H L",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -5684,27 +5669,27 @@
           "no_stock": false
         },
         {
-          "label": "14H L",
+          "label": "10H L",
           "size_range": "STANDARD",
           "no_stock": false
         },
         {
-          "label": "14H R",
+          "label": "8H L",
           "size_range": "STANDARD",
           "no_stock": false
         },
         {
-          "label": "12H R",
+          "label": "6H L",
           "size_range": "STANDARD",
           "no_stock": false
         },
         {
-          "label": "10H R",
+          "label": "4H L",
           "size_range": "STANDARD",
           "no_stock": false
         },
         {
-          "label": "8H R",
+          "label": "4H R",
           "size_range": "STANDARD",
           "no_stock": false
         },
@@ -5714,7 +5699,22 @@
           "no_stock": false
         },
         {
-          "label": "4H R",
+          "label": "8H R",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "10H R",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "12H R",
+          "size_range": "STANDARD",
+          "no_stock": false
+        },
+        {
+          "label": "14H R",
           "size_range": "STANDARD",
           "no_stock": false
         }
