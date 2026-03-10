@@ -133,217 +133,57 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
 .out-hosp-wrap {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 0;
     font-weight: 700;
     font-size: 15px;
     vertical-align: middle;
 }
 .out-hosp-name { color: #111827; }
+/* Status pill — replaces the LED dot */
 .out-hosp-led {
-    width: 11px;
-    height: 11px;
-    border-radius: 999px;
+    display: none; /* hidden; pill is on the wrap itself */
+}
+/* Base pill shape */
+.out-hosp-wrap .out-hosp-name {
     display: inline-block;
-    position: relative;
-    flex: 0 0 auto;
+    padding: 2px 9px 2px 8px;
+    border-radius: 5px;
+    border-left: 3px solid #d1d5db;
+    background: #f9fafb;
+    color: #374151;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.5;
+    letter-spacing: -.01em;
 }
-.out-hosp-wrap.led-retro .out-hosp-led {
-    background: #9ca3af;
-    border: 1px solid rgba(255,255,255,.85);
-    box-shadow:
-        inset 0 1px 2px rgba(255,255,255,.65),
-        0 0 0 2px rgba(156,163,175,.16),
-        0 0 10px rgba(107,114,128,.25);
+/* future  — amber */
+.out-hosp-wrap.is-future .out-hosp-name {
+    border-left-color: #f59e0b;
+    background: #fffbeb;
+    color: #92400e;
 }
-.out-hosp-wrap.led-retro.is-future .out-hosp-led {
-    background: #f59e0b;
-    box-shadow:
-        inset 0 1px 2px rgba(255,255,255,.65),
-        0 0 0 2px rgba(245,158,11,.18),
-        0 0 12px rgba(245,158,11,.55);
+/* today   — red */
+.out-hosp-wrap.is-today .out-hosp-name {
+    border-left-color: #ef4444;
+    background: #fff1f2;
+    color: #991b1b;
 }
-.out-hosp-wrap.is-future .out-hosp-name { color: #92400e; }
-.out-hosp-wrap.led-retro.is-today .out-hosp-led {
-    background: #ef4444;
-    box-shadow:
-        inset 0 1px 2px rgba(255,255,255,.65),
-        0 0 0 2px rgba(239,68,68,.18),
-        0 0 12px rgba(239,68,68,.62);
+/* past    — green */
+.out-hosp-wrap.is-past .out-hosp-name {
+    border-left-color: #22c55e;
+    background: #f0fdf4;
+    color: #166534;
 }
-.out-hosp-wrap.is-today .out-hosp-name { color: #991b1b; }
-.out-hosp-wrap.led-retro.is-past .out-hosp-led {
-    background: #22c55e;
-    box-shadow:
-        inset 0 1px 2px rgba(255,255,255,.65),
-        0 0 0 2px rgba(34,197,94,.18),
-        0 0 12px rgba(34,197,94,.52);
+/* sales   — blue */
+.out-hosp-wrap.is-sales .out-hosp-name {
+    border-left-color: #3b82f6;
+    background: #eff6ff;
+    color: #1d4ed8;
 }
-.out-hosp-wrap.led-retro.is-sales .out-hosp-led {
-    background: #2563eb;
-    box-shadow:
-        inset 0 1px 2px rgba(255,255,255,.65),
-        0 0 0 2px rgba(37,99,235,.18),
-        0 0 12px rgba(37,99,235,.55);
-}
-.out-hosp-wrap.led-lens .out-hosp-led {
-    width: 12px;
-    height: 12px;
-    border: 1px solid #cbd5e1;
-    background: radial-gradient(circle at 32% 28%, rgba(255,255,255,.95) 0 18%, rgba(255,255,255,.45) 19% 30%, #cbd5e1 31% 100%);
-    box-shadow:
-        inset 0 1px 1px rgba(255,255,255,.88),
-        inset 0 -2px 3px rgba(15,23,42,.24),
-        0 1px 2px rgba(15,23,42,.18),
-        0 0 0 1px rgba(255,255,255,.4);
-}
-.out-hosp-wrap.led-lens .out-hosp-led::after {
-    content: "";
-    position: absolute;
-    top: 1px;
-    left: 2px;
-    width: 5px;
-    height: 3px;
-    border-radius: 999px;
-    background: rgba(255,255,255,.55);
-    transform: rotate(-18deg);
-}
-.out-hosp-wrap.led-lens.is-future .out-hosp-led {
-    border-color: #d97706;
-    background: radial-gradient(circle at 32% 28%, #fff8e1 0 18%, #fde68a 19% 30%, #f59e0b 31% 64%, #b45309 100%);
-    box-shadow:
-        inset 0 1px 1px rgba(255,255,255,.88),
-        inset 0 -2px 3px rgba(120,53,15,.28),
-        0 1px 2px rgba(120,53,15,.18),
-        0 0 10px rgba(245,158,11,.35);
-}
-.out-hosp-wrap.led-lens.is-today .out-hosp-led {
-    border-color: #b91c1c;
-    background: radial-gradient(circle at 32% 28%, #ffe4e6 0 18%, #fda4af 19% 30%, #ef4444 31% 64%, #991b1b 100%);
-    box-shadow:
-        inset 0 1px 1px rgba(255,255,255,.88),
-        inset 0 -2px 3px rgba(127,29,29,.3),
-        0 1px 2px rgba(127,29,29,.18),
-        0 0 10px rgba(239,68,68,.38);
-}
-.out-hosp-wrap.led-lens.is-past .out-hosp-led {
-    border-color: #15803d;
-    background: radial-gradient(circle at 32% 28%, #dcfce7 0 18%, #86efac 19% 30%, #22c55e 31% 64%, #166534 100%);
-    box-shadow:
-        inset 0 1px 1px rgba(255,255,255,.88),
-        inset 0 -2px 3px rgba(20,83,45,.28),
-        0 1px 2px rgba(20,83,45,.18),
-        0 0 10px rgba(34,197,94,.32);
-}
-.out-hosp-wrap.led-lens.is-sales .out-hosp-led {
-    border-color: #1d4ed8;
-    background: radial-gradient(circle at 32% 28%, #dbeafe 0 18%, #93c5fd 19% 30%, #2563eb 31% 64%, #1e3a8a 100%);
-    box-shadow:
-        inset 0 1px 1px rgba(255,255,255,.88),
-        inset 0 -2px 3px rgba(30,58,138,.28),
-        0 1px 2px rgba(30,58,138,.18),
-        0 0 10px rgba(37,99,235,.36);
-}
-.out-hosp-wrap.led-panel .out-hosp-led {
-    width: 14px;
-    height: 14px;
-    border: 1px solid #475569;
-    background:
-        radial-gradient(circle at 36% 32%, rgba(255,255,255,.95) 0 12%, rgba(255,255,255,.28) 13% 18%, transparent 19% 100%),
-        radial-gradient(circle at 50% 52%, #64748b 0 52%, #1f2937 72%, #0f172a 100%);
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,.35),
-        inset 0 -2px 3px rgba(0,0,0,.45),
-        0 0 0 2px #cbd5e1,
-        0 1px 2px rgba(15,23,42,.35);
-}
-.out-hosp-wrap.led-panel .out-hosp-led::before {
-    content: "";
-    position: absolute;
-    inset: 2px;
-    border-radius: 999px;
-    background: radial-gradient(circle at 34% 30%, rgba(255,255,255,.88) 0 16%, rgba(255,255,255,.15) 17% 26%, transparent 27% 100%);
-    opacity: .95;
-}
-.out-hosp-wrap.led-panel .out-hosp-led::after {
-    content: "";
-    position: absolute;
-    inset: -4px;
-    border-radius: 999px;
-    opacity: 0;
-    transition: opacity .15s ease;
-}
-.out-hosp-wrap.led-panel.is-future .out-hosp-led {
-    border-color: #78350f;
-    background:
-        radial-gradient(circle at 36% 32%, rgba(255,255,255,.95) 0 12%, rgba(255,248,220,.35) 13% 18%, transparent 19% 100%),
-        radial-gradient(circle at 50% 52%, #fbbf24 0 52%, #d97706 72%, #78350f 100%);
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,.4),
-        inset 0 -2px 3px rgba(120,53,15,.5),
-        0 0 0 2px #cbd5e1,
-        0 0 14px rgba(245,158,11,.35);
-}
-.out-hosp-wrap.led-panel.is-future .out-hosp-led::after {
-    opacity: 1;
-    background: radial-gradient(circle, rgba(251,191,36,.42) 0, rgba(245,158,11,.16) 45%, rgba(245,158,11,0) 72%);
-}
-.out-hosp-wrap.led-panel.is-today .out-hosp-led {
-    border-color: #7f1d1d;
-    background:
-        radial-gradient(circle at 36% 32%, rgba(255,255,255,.95) 0 12%, rgba(255,230,230,.35) 13% 18%, transparent 19% 100%),
-        radial-gradient(circle at 50% 52%, #fb7185 0 52%, #dc2626 72%, #7f1d1d 100%);
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,.4),
-        inset 0 -2px 3px rgba(127,29,29,.55),
-        0 0 0 2px #cbd5e1,
-        0 0 14px rgba(220,38,38,.42);
-}
-.out-hosp-wrap.led-panel.is-today .out-hosp-led::after {
-    opacity: 1;
-    background: radial-gradient(circle, rgba(251,113,133,.42) 0, rgba(220,38,38,.16) 45%, rgba(220,38,38,0) 72%);
-}
-.out-hosp-wrap.led-panel.is-past .out-hosp-led {
-    border-color: #14532d;
-    background:
-        radial-gradient(circle at 36% 32%, rgba(255,255,255,.95) 0 12%, rgba(220,252,231,.35) 13% 18%, transparent 19% 100%),
-        radial-gradient(circle at 50% 52%, #4ade80 0 52%, #16a34a 72%, #14532d 100%);
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,.4),
-        inset 0 -2px 3px rgba(20,83,45,.55),
-        0 0 0 2px #cbd5e1,
-        0 0 14px rgba(34,197,94,.34);
-}
-.out-hosp-wrap.led-panel.is-past .out-hosp-led::after {
-    opacity: 1;
-    background: radial-gradient(circle, rgba(74,222,128,.36) 0, rgba(34,197,94,.14) 45%, rgba(34,197,94,0) 72%);
-}
-.out-hosp-wrap.led-panel.is-sales .out-hosp-led {
-    border-color: #1e3a8a;
-    background:
-        radial-gradient(circle at 36% 32%, rgba(255,255,255,.95) 0 12%, rgba(219,234,254,.35) 13% 18%, transparent 19% 100%),
-        radial-gradient(circle at 50% 52%, #60a5fa 0 52%, #2563eb 72%, #1e3a8a 100%);
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,.4),
-        inset 0 -2px 3px rgba(30,58,138,.52),
-        0 0 0 2px #cbd5e1,
-        0 0 14px rgba(37,99,235,.40);
-}
-.out-hosp-wrap.led-panel.is-sales .out-hosp-led::after {
-    opacity: 1;
-    background: radial-gradient(circle, rgba(96,165,250,.40) 0, rgba(37,99,235,.16) 45%, rgba(37,99,235,0) 72%);
-}
-.out-hosp-wrap.is-past .out-hosp-name { color: #166534; }
-.out-hosp-wrap.is-sales .out-hosp-name { color: #1d4ed8; }
-.out-hosp-wrap.is-plate {
-    gap: 9px;
-}
-.out-hosp-wrap.is-plate .out-hosp-led {
-    width: 15px;
-    height: 15px;
-}
+/* plate variant — slightly larger */
 .out-hosp-wrap.is-plate .out-hosp-name {
-    font-size: 18px;
-    line-height: 1;
+    font-size: 15px;
+    padding: 3px 10px 3px 9px;
 }
 .out-surg  { color: #4b5563; font-size: 14px; }
 .out-days  { color: #9ca3af; font-size: 12px; }
@@ -370,8 +210,6 @@ DEFAULT_MASTER_DATA_PATH = str(Path(__file__).resolve().with_name("master_data.p
 
 # Powertool categories — excluded from the Sets tab
 _POWERTOOL_CATS = {"P5503", "P5400", "P8400"}
-HOSPITAL_LED_STYLE = "panel"
-
 # Priority order for "In Office" control-tower view
 OFFICE_VIEW_ORDER = [
     "STD CANNA 6.5/7.3",
@@ -622,10 +460,9 @@ def _hospital_with_led(
 ) -> str:
     hosp_text = escape(str(hospital or "—"))
     status_class = _hospital_status_class(surgery_value, sales_code=sales_code)
-    led_style = HOSPITAL_LED_STYLE if HOSPITAL_LED_STYLE in {"retro", "lens", "panel"} else "panel"
     variant_class = f"is-{variant}" if variant else ""
     class_attr = " ".join(
-        part for part in ("out-hosp-wrap", f"led-{led_style}", variant_class, status_class) if part
+        part for part in ("out-hosp-wrap", variant_class, status_class) if part
     )
     return (
         f"<span class='{class_attr}'>"
@@ -647,6 +484,11 @@ def _compact_set_id(value: str, fallback: str = "") -> str:
 
 
 st.markdown("<div class='sec-header'>Operational Detail — Inventory Snapshot</div>", unsafe_allow_html=True)
+
+def _safe_int(val) -> int:
+    num = pd.to_numeric(val, errors="coerce")
+    return int(num) if pd.notna(num) else 0
+
 inv_tabs = st.tabs(["🧰 Sets", "🦾 Plates", "🔌 Powertools"])
 
 
@@ -659,10 +501,6 @@ with inv_tabs[0]:
     if set_avail.empty and set_status_all.empty:
         st.info("No set data.")
     else:
-        def _safe_int(val) -> int:
-            num = pd.to_numeric(val, errors="coerce")
-            return int(num) if pd.notna(num) else 0
-
         for col in ("category", "set_display", "id", "location_now", "surgery_date", "patient_doctor", "case_id", "set_status", "home"):
             if col not in set_status_all.columns:
                 set_status_all[col] = ""
@@ -950,7 +788,7 @@ with inv_tabs[0]:
 
 # ── Plates ────────────────────────────────────────────────────────────────────
 with inv_tabs[1]:
-    plate_sum    = pd.DataFrame(report["plate_uid_summary"])
+    plate_sum    = pd.DataFrame(report.get("plate_uid_summary", []))
 
     if plate_sum.empty:
         st.info("No plate data.")
@@ -1299,18 +1137,14 @@ with inv_tabs[1]:
 
 # ── Powertools ────────────────────────────────────────────────────────────────
 with inv_tabs[2]:
-    pt_avail = pd.DataFrame(report["powertool_category_availability"])
-    pt_del   = pd.DataFrame(report["powertool_delivered"])
+    pt_avail = pd.DataFrame(report.get("powertool_category_availability", []))
+    pt_del   = pd.DataFrame(report.get("powertool_delivered", []))
     pt_uid   = pd.DataFrame(report.get("powertool_uid_availability", []))
     pt_u30   = pd.DataFrame(report.get("powertool_usage_30d", []))
 
     if pt_avail.empty and pt_uid.empty:
         st.info("No powertool data.")
     else:
-        def _safe_int(val) -> int:
-            num = pd.to_numeric(val, errors="coerce")
-            return int(num) if pd.notna(num) else 0
-
         for col in ("powertool_uid", "category", "availability", "hospital", "surgery_date", "patient_doctor"):
             if col not in pt_uid.columns:
                 pt_uid[col] = ""
@@ -1539,7 +1373,7 @@ with inv_tabs[2]:
 # SECTION 3 — DATA QUALITY
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 total_unknowns = sum(
-    len(report["unknown"][k])
+    len(report.get("unknown", {}).get(k, []))
     for k in ("set_tokens", "plate_tokens", "powertool_tokens", "hospitals_for_routes")
 )
 if total_unknowns > 0:
@@ -1550,7 +1384,7 @@ if total_unknowns > 0:
             ["set_tokens", "plate_tokens", "powertool_tokens", "hospitals_for_routes"],
         ):
             with tab:
-                df = pd.DataFrame(report["unknown"][key])
+                df = pd.DataFrame(report.get("unknown", {}).get(key, []))
                 if df.empty:
                     st.success("None.")
                 else:
@@ -1561,7 +1395,7 @@ if total_unknowns > 0:
 # SECTION 4 — HOSPITAL DIRECTORY (search-gated)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if search_query:
-    hosp_df  = pd.DataFrame(report["hospital_directory"])
+    hosp_df  = pd.DataFrame(report.get("hospital_directory", []))
     filtered = hosp_df[
         hosp_df["hosp_code"].str.contains(search_query, case=False, na=False)
         | hosp_df["name"].str.contains(search_query, case=False, na=False)

@@ -1014,10 +1014,10 @@ def build_plate_outputs(
         stock_keys = sorted(bucket["stock_size_map"].keys(), key=drawer_sort_key)
         td = len(bucket["drawer_locations"])
         ts = len(bucket["stock_locations"])
-        od = bucket["out_drawer_units"]
-        os_ = bucket["out_stock_units"]
-        total = td + ts
-        out   = od + os_
+        od        = bucket["out_drawer_units"]
+        out_stock = bucket["out_stock_units"]
+        total     = td + ts
+        out       = od + out_stock
         available_units = max(total - out, 0)
         if available_units == total:
             range_status = "READY"
@@ -1064,10 +1064,10 @@ def build_plate_outputs(
             "total_stock_units":     ts,
             "total_units":           total,
             "out_drawer_units":      od,
-            "out_stock_units":       os_,
+            "out_stock_units":       out_stock,
             "out_units":             out,
             "available_drawer_units":max(td - od, 0),
-            "available_stock_units": max(ts - os_, 0),
+            "available_stock_units": max(ts - out_stock, 0),
             "available_units":       available_units,
             "availability":          f"{available_units}/{total}",
             "range_status":          range_status,
@@ -1187,7 +1187,7 @@ def build_plate_outputs(
             s["summary_basis"] = "STANDARD"
 
     plate_uid_summary = []
-    for uid, s in sorted(uid_summary_map.items()):
+    for uid_key, s in sorted(uid_summary_map.items()):
         s["size_ranges"] = ", ".join(
             item["text"]
             for item in sorted(s["size_ranges_detail"], key=lambda item: size_range_sort_key(item["size_range"]))
