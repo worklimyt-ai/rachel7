@@ -1871,6 +1871,47 @@ def build_case_region_summary(
     return summary_rows, case_region_meta
 
 
+def build_archive_region_summary(
+    archive_rows: list[dict[str, str]],
+    hospitals: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    summary_by_region: dict[str, dict[str, Any]] = {}
+
+    for row in archive_rows:
+        raw_hospital = row_value(row, "hospital")
+        resolved_code, _ = resolve_hospital_code(raw_hospital, hospitals)
+        hospital_meta = hospitals.get(resolved_code, {}) if resolved_code else {}
+        region = str(hospital_meta.get("region", "")).strip() or "Unknown"
+        sales_recorded = bool(normalize_code(row_value(row, "sales_code")))
+        cancelled = is_cancelled_case({
+            "status": row_value(row, "status"),
+            "smart_status": row_value(row, "Smart Status"),
+            "prefix": row_value(row, "prefix"),
+        })
+
+        bucket = summary_by_region.setdefault(region, {
+            "region": region,
+            "total_cases": 0,
+            "cancelled_cases": 0,
+            "sales_cases": 0,
+        })
+        bucket["total_cases"] += 1
+        if cancelled:
+            bucket["cancelled_cases"] += 1
+        if sales_recorded:
+            bucket["sales_cases"] += 1
+
+    summary_rows: list[dict[str, Any]] = []
+    for row in sorted(summary_by_region.values(), key=lambda item: (-item["total_cases"], item["region"])):
+        total = int(row["total_cases"])
+        sales = int(row["sales_cases"])
+        summary_rows.append({
+            **row,
+            "sales_total_cases": f"{sales}/{total}" if total else "0/0",
+        })
+    return summary_rows
+
+
 def build_case_buckets(
     parsed_cases: list[dict[str, Any]], today_kl: date
 ) -> dict[str, list[dict[str, Any]]]:
@@ -2037,6 +2078,10 @@ def build_operations_report(
         case_summary["parsed_cases"],
         master["HOSPITALS"],
     )
+    archive_region_summary = build_archive_region_summary(
+        archive_rows,
+        master["HOSPITALS"],
+    )
 
     case_buckets = build_case_buckets(case_summary["parsed_cases"], today)
 
@@ -2159,6 +2204,7 @@ def build_operations_report(
         "powertool_usage_30d":            powertool_outputs["powertool_usage_30d"],
         "hospital_directory":             hospital_directory,
         "case_region_summary":            case_region_summary,
+        "archive_region_summary":         archive_region_summary,
         "cases_all":                      cases_all,
         "case_buckets":                   case_buckets,
         "distance_routes": {

@@ -1526,7 +1526,7 @@ with inv_tabs[3]:
     if not case_rows_all:
         st.info("No case data.")
     else:
-        case_region_summary_df = pd.DataFrame(report.get("case_region_summary", []))
+        case_region_summary_df = pd.DataFrame(report.get("archive_region_summary", []))
         if not case_region_summary_df.empty:
             region_summary_df = case_region_summary_df.rename(columns={
                 "region": "Region",
@@ -1542,7 +1542,7 @@ with inv_tabs[3]:
                 ]
             if not region_search_df.empty:
                 st.markdown(
-                    "<div class='sec-header'>Cases By Region</div>",
+                    "<div class='sec-header'>Archive Cases By Region</div>",
                     unsafe_allow_html=True,
                 )
                 st.dataframe(
