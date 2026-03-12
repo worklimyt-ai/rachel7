@@ -1529,6 +1529,19 @@ with inv_tabs[3]:
         archive_30d = report.get("archive_30d_summary", {}) or {}
         archive_cases_by_region = pd.DataFrame(archive_30d.get("cases_by_region_30d", []))
         archive_cancelled_by_region = pd.DataFrame(archive_30d.get("cancelled_by_region_30d", []))
+        archive_top_regions_sent = pd.DataFrame([
+            {
+                "Region": str(row.get("region", "")).strip() or "Unknown",
+                "Sets Sent": int(row.get("sets_sent", 0) or 0),
+                "Top Categories": "; ".join(
+                    f"{str(item.get('category', '')).strip() or 'Unknown'} ({int(item.get('sets', 0) or 0)})"
+                    for item in row.get("top_categories", [])
+                    if isinstance(item, dict)
+                ),
+            }
+            for row in archive_30d.get("top_regions_sent_30d", [])
+            if isinstance(row, dict)
+        ])
 
         st.markdown(
             "<div class='sec-header'>Archive 30d Summary</div>",
@@ -1548,6 +1561,27 @@ with inv_tabs[3]:
                 st.markdown(
                     f"<div class='kpi-card'><div class='kpi-label'>{escape(str(label))}</div><div class='kpi-value'>{escape(str(value))}</div></div>",
                     unsafe_allow_html=True,
+                )
+
+        st.markdown(
+            "<div class='sec-header'>Top 7 Regions Sent (30d)</div>",
+            unsafe_allow_html=True,
+        )
+        if archive_top_regions_sent.empty:
+            st.info("No delivered UID sets in the past 30 days.")
+        else:
+            if search_query:
+                archive_top_regions_sent = archive_top_regions_sent[
+                    archive_top_regions_sent["Region"].astype(str).str.contains(search_query, case=False, na=False)
+                    | archive_top_regions_sent["Top Categories"].astype(str).str.contains(search_query, case=False, na=False)
+                ]
+            if archive_top_regions_sent.empty:
+                st.info("No matching regions.")
+            else:
+                st.dataframe(
+                    archive_top_regions_sent[["Region", "Sets Sent", "Top Categories"]],
+                    use_container_width=True,
+                    hide_index=True,
                 )
 
         region_cols = st.columns(2)
