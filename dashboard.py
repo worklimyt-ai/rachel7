@@ -1526,6 +1526,31 @@ with inv_tabs[3]:
     if not case_rows_all:
         st.info("No case data.")
     else:
+        case_region_summary_df = pd.DataFrame(report.get("case_region_summary", []))
+        if not case_region_summary_df.empty:
+            region_summary_df = case_region_summary_df.rename(columns={
+                "region": "Region",
+                "total_cases": "Cases",
+                "cancelled_cases": "Cancelled",
+                "sales_cases": "Sales",
+                "sales_total_cases": "Sales/Total",
+            })
+            region_search_df = region_summary_df.copy()
+            if search_query:
+                region_search_df = region_search_df[
+                    region_search_df["Region"].astype(str).str.contains(search_query, case=False, na=False)
+                ]
+            if not region_search_df.empty:
+                st.markdown(
+                    "<div class='sec-header'>Cases By Region</div>",
+                    unsafe_allow_html=True,
+                )
+                st.dataframe(
+                    region_search_df[["Region", "Cases", "Cancelled", "Sales", "Sales/Total"]],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
         def _case_item_labels(items: list[dict] | None) -> list[str]:
             labels: list[str] = []
             for item in items or []:
@@ -1555,6 +1580,7 @@ with inv_tabs[3]:
                 str(case.get("case_id", "")),
                 str(case.get("prefix", "")),
                 str(case.get("hospital", "")),
+                str(case.get("region", "")),
                 str(case.get("delivery_date", "")),
                 str(case.get("surgery_date", "")),
                 str(case.get("smart_status", "")),
@@ -1578,8 +1604,14 @@ with inv_tabs[3]:
             smart_status = escape(str(case.get("smart_status", "")).strip() or str(case.get("status", "")).strip())
             if smart_status:
                 tags.append(f"<span class='case-tag is-status'>{smart_status}</span>")
+            if case.get("is_cancelled_case"):
+                tags.append("<span class='case-tag is-status'>CANCELLED</span>")
 
             lines: list[str] = []
+            region_label = escape(str(case.get("region", "")).strip() or "Unknown")
+            lines.append(
+                f"<div class='case-line'><div class='case-line-label'>Region</div><div class='case-line-value'>{region_label}</div></div>"
+            )
             if set_labels:
                 lines.append(
                     f"<div class='case-line'><div class='case-line-label'>Sets</div><div class='case-line-value'>{escape('; '.join(set_labels))}</div></div>"
