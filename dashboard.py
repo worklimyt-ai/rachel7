@@ -1537,12 +1537,11 @@ with inv_tabs[3]:
         archive_rows_count = int(meta.get("counts", {}).get("archive_rows", 0) or 0)
         if archive_rows_count == 0:
             st.warning("Archive source returned 0 rows, so all 30d archive metrics will be 0.")
-        archive_kpi_cols = st.columns(4)
+        archive_kpi_cols = st.columns(3)
         archive_kpis = [
             ("Cases", archive_30d.get("total_cases_30d", 0)),
             ("Cancelled", archive_30d.get("total_cancelled_cases_30d", 0)),
             ("Sets Delivered", archive_30d.get("sets_delivered_30d", 0)),
-            ("Sets Returned", archive_30d.get("sets_returned_30d", 0)),
         ]
         for col, (label, value) in zip(archive_kpi_cols, archive_kpis):
             with col:

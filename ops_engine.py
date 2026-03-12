@@ -1884,15 +1884,16 @@ def build_case_region_summary(
 def build_archive_30d_summary(
     archive_rows: list[dict[str, str]],
     hospitals: dict[str, dict[str, Any]],
+    set_indexes: dict[str, Any],
     today_kl: date,
 ) -> dict[str, Any]:
+    uid_map = set_indexes["uid_map"]
     window_start = today_kl - timedelta(days=30)
     cases_by_region: Counter[str] = Counter()
     cancelled_by_region: Counter[str] = Counter()
     total_cases = 0
     total_cancelled = 0
     sets_delivered = 0
-    sets_returned = 0
 
     for row in archive_rows:
         row_date = parse_date(row_value(row, "surgery_date")) or parse_date(row_value(row, "delivery_date"))
@@ -1913,14 +1914,11 @@ def build_archive_30d_summary(
         if cancelled:
             total_cancelled += 1
             cancelled_by_region[region] += 1
-        sets_delivered += len(split_tokens(row_value(row, "sets")))
-        if row_value(row, "return_date").strip():
-            returned_tokens = split_tokens(row_value(row, "sets"))
-            if not returned_tokens:
-                returned_tokens = split_tokens(row_value(row, "sets_returned"))
-        else:
-            returned_tokens = split_tokens(row_value(row, "sets_returned"))
-        sets_returned += len(returned_tokens)
+        sets_delivered += sum(
+            1
+            for token in split_tokens(row_value(row, "sets"))
+            if normalize_set_code(token) in uid_map
+        )
 
     return {
         "window_start": format_date(window_start),
@@ -1928,7 +1926,6 @@ def build_archive_30d_summary(
         "total_cases_30d": total_cases,
         "total_cancelled_cases_30d": total_cancelled,
         "sets_delivered_30d": sets_delivered,
-        "sets_returned_30d": sets_returned,
         "cases_by_region_30d": [
             {"region": region, "cases": count}
             for region, count in sorted(cases_by_region.items(), key=lambda item: (-item[1], item[0]))
@@ -2113,6 +2110,7 @@ def build_operations_report(
     archive_30d_summary = build_archive_30d_summary(
         archive_rows,
         master["HOSPITALS"],
+        set_indexes,
         today,
     )
 
