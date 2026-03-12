@@ -1871,45 +1871,56 @@ def build_case_region_summary(
     return summary_rows, case_region_meta
 
 
-def build_archive_region_summary(
+def build_archive_30d_summary(
     archive_rows: list[dict[str, str]],
     hospitals: dict[str, dict[str, Any]],
-) -> list[dict[str, Any]]:
-    summary_by_region: dict[str, dict[str, Any]] = {}
+    today_kl: date,
+) -> dict[str, Any]:
+    window_start = today_kl - timedelta(days=30)
+    cases_by_region: Counter[str] = Counter()
+    cancelled_by_region: Counter[str] = Counter()
+    total_cases = 0
+    total_cancelled = 0
+    sets_delivered = 0
+    sets_returned = 0
 
     for row in archive_rows:
+        row_date = parse_date(row_value(row, "surgery_date")) or parse_date(row_value(row, "delivery_date"))
+        if row_date is None or not (window_start <= row_date <= today_kl):
+            continue
         raw_hospital = row_value(row, "hospital")
         resolved_code, _ = resolve_hospital_code(raw_hospital, hospitals)
         hospital_meta = hospitals.get(resolved_code, {}) if resolved_code else {}
         region = str(hospital_meta.get("region", "")).strip() or "Unknown"
-        sales_recorded = bool(normalize_code(row_value(row, "sales_code")))
         cancelled = is_cancelled_case({
             "status": row_value(row, "status"),
             "smart_status": row_value(row, "Smart Status"),
             "prefix": row_value(row, "prefix"),
         })
-
-        bucket = summary_by_region.setdefault(region, {
-            "region": region,
-            "total_cases": 0,
-            "cancelled_cases": 0,
-            "sales_cases": 0,
-        })
-        bucket["total_cases"] += 1
+        total_cases += 1
+        cases_by_region[region] += 1
         if cancelled:
-            bucket["cancelled_cases"] += 1
-        if sales_recorded:
-            bucket["sales_cases"] += 1
+            total_cancelled += 1
+            cancelled_by_region[region] += 1
+        sets_delivered += len(split_tokens(row_value(row, "sets")))
+        sets_returned += len(split_tokens(row_value(row, "sets_returned")))
 
-    summary_rows: list[dict[str, Any]] = []
-    for row in sorted(summary_by_region.values(), key=lambda item: (-item["total_cases"], item["region"])):
-        total = int(row["total_cases"])
-        sales = int(row["sales_cases"])
-        summary_rows.append({
-            **row,
-            "sales_total_cases": f"{sales}/{total}" if total else "0/0",
-        })
-    return summary_rows
+    return {
+        "window_start": format_date(window_start),
+        "window_end": format_date(today_kl),
+        "total_cases_30d": total_cases,
+        "total_cancelled_cases_30d": total_cancelled,
+        "sets_delivered_30d": sets_delivered,
+        "sets_returned_30d": sets_returned,
+        "cases_by_region_30d": [
+            {"region": region, "cases": count}
+            for region, count in sorted(cases_by_region.items(), key=lambda item: (-item[1], item[0]))
+        ],
+        "cancelled_by_region_30d": [
+            {"region": region, "cancelled_cases": count}
+            for region, count in sorted(cancelled_by_region.items(), key=lambda item: (-item[1], item[0]))
+        ],
+    }
 
 
 def build_case_buckets(
@@ -2078,9 +2089,10 @@ def build_operations_report(
         case_summary["parsed_cases"],
         master["HOSPITALS"],
     )
-    archive_region_summary = build_archive_region_summary(
+    archive_30d_summary = build_archive_30d_summary(
         archive_rows,
         master["HOSPITALS"],
+        today,
     )
 
     case_buckets = build_case_buckets(case_summary["parsed_cases"], today)
@@ -2204,7 +2216,7 @@ def build_operations_report(
         "powertool_usage_30d":            powertool_outputs["powertool_usage_30d"],
         "hospital_directory":             hospital_directory,
         "case_region_summary":            case_region_summary,
-        "archive_region_summary":         archive_region_summary,
+        "archive_30d_summary":           archive_30d_summary,
         "cases_all":                      cases_all,
         "case_buckets":                   case_buckets,
         "distance_routes": {

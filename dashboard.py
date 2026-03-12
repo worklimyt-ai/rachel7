@@ -1526,30 +1526,70 @@ with inv_tabs[3]:
     if not case_rows_all:
         st.info("No case data.")
     else:
-        case_region_summary_df = pd.DataFrame(report.get("archive_region_summary", []))
-        if not case_region_summary_df.empty:
-            region_summary_df = case_region_summary_df.rename(columns={
-                "region": "Region",
-                "total_cases": "Cases",
-                "cancelled_cases": "Cancelled",
-                "sales_cases": "Sales",
-                "sales_total_cases": "Sales/Total",
-            })
-            region_search_df = region_summary_df.copy()
-            if search_query:
-                region_search_df = region_search_df[
-                    region_search_df["Region"].astype(str).str.contains(search_query, case=False, na=False)
-                ]
-            if not region_search_df.empty:
+        archive_30d = report.get("archive_30d_summary", {}) or {}
+        archive_cases_by_region = pd.DataFrame(archive_30d.get("cases_by_region_30d", []))
+        archive_cancelled_by_region = pd.DataFrame(archive_30d.get("cancelled_by_region_30d", []))
+
+        st.markdown(
+            "<div class='sec-header'>Archive 30d Summary</div>",
+            unsafe_allow_html=True,
+        )
+        archive_kpi_cols = st.columns(4)
+        archive_kpis = [
+            ("Cases", archive_30d.get("total_cases_30d", 0)),
+            ("Cancelled", archive_30d.get("total_cancelled_cases_30d", 0)),
+            ("Sets Delivered", archive_30d.get("sets_delivered_30d", 0)),
+            ("Sets Returned", archive_30d.get("sets_returned_30d", 0)),
+        ]
+        for col, (label, value) in zip(archive_kpi_cols, archive_kpis):
+            with col:
                 st.markdown(
-                    "<div class='sec-header'>Archive Cases By Region</div>",
+                    f"<div class='kpi-card'><div class='kpi-label'>{escape(str(label))}</div><div class='kpi-value'>{escape(str(value))}</div></div>",
                     unsafe_allow_html=True,
                 )
-                st.dataframe(
-                    region_search_df[["Region", "Cases", "Cancelled", "Sales", "Sales/Total"]],
-                    use_container_width=True,
-                    hide_index=True,
-                )
+
+        region_cols = st.columns(2)
+        with region_cols[0]:
+            st.markdown(
+                "<div class='sec-header'>Cases By Region (30d)</div>",
+                unsafe_allow_html=True,
+            )
+            if archive_cases_by_region.empty:
+                st.info("No archive cases in the past 30 days.")
+            else:
+                cases_region_df = archive_cases_by_region.rename(columns={
+                    "region": "Region",
+                    "cases": "Cases",
+                })
+                if search_query:
+                    cases_region_df = cases_region_df[
+                        cases_region_df["Region"].astype(str).str.contains(search_query, case=False, na=False)
+                    ]
+                if cases_region_df.empty:
+                    st.info("No matching regions.")
+                else:
+                    st.dataframe(cases_region_df[["Region", "Cases"]], use_container_width=True, hide_index=True)
+
+        with region_cols[1]:
+            st.markdown(
+                "<div class='sec-header'>Cancelled By Region (30d)</div>",
+                unsafe_allow_html=True,
+            )
+            if archive_cancelled_by_region.empty:
+                st.info("No cancelled archive cases in the past 30 days.")
+            else:
+                cancelled_region_df = archive_cancelled_by_region.rename(columns={
+                    "region": "Region",
+                    "cancelled_cases": "Cancelled",
+                })
+                if search_query:
+                    cancelled_region_df = cancelled_region_df[
+                        cancelled_region_df["Region"].astype(str).str.contains(search_query, case=False, na=False)
+                    ]
+                if cancelled_region_df.empty:
+                    st.info("No matching regions.")
+                else:
+                    st.dataframe(cancelled_region_df[["Region", "Cancelled"]], use_container_width=True, hide_index=True)
 
         def _case_item_labels(items: list[dict] | None) -> list[str]:
             labels: list[str] = []
