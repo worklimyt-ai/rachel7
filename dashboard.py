@@ -128,6 +128,10 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
     margin-right: 8px;
     vertical-align: middle;
 }
+.out-tag.out-tag-booked {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
 .out-sep   { color: #9ca3af; }
 .out-set   { font-family: 'JetBrains Mono', monospace; color: #1d4ed8; font-weight: 600; font-size: 15px; margin-right: 2px; }
 .out-hosp-wrap {
@@ -501,7 +505,7 @@ with inv_tabs[0]:
     if set_avail.empty and set_status_all.empty:
         st.info("No set data.")
     else:
-        for col in ("category", "set_display", "id", "location_now", "surgery_date", "patient_doctor", "case_id", "set_status", "home"):
+        for col in ("category", "set_display", "id", "location_now", "surgery_date", "patient_doctor", "case_id", "set_status", "home", "assignment_kind", "delivery_date"):
             if col not in set_status_all.columns:
                 set_status_all[col] = ""
         set_status_all = set_status_all.copy()
@@ -509,6 +513,7 @@ with inv_tabs[0]:
         set_status_all["location_norm"] = set_status_all["location_now"].astype(str).str.upper().str.strip()
         set_status_all["home_norm"] = set_status_all["home"].astype(str).str.upper().str.strip()
         set_status_all["set_status_norm"] = set_status_all["set_status"].astype(str).str.upper().str.strip()
+        set_status_all["assignment_kind_norm"] = set_status_all["assignment_kind"].astype(str).str.upper().str.strip()
         set_status_all["is_na"] = set_status_all["set_status_norm"].str.contains("NA", na=False)
         set_status_all["is_standby"] = (
             set_status_all["home_norm"].eq("STANDBY")
@@ -565,20 +570,26 @@ with inv_tabs[0]:
                 )
                 & (~cat_rows["is_na"])
             ]
+            booked_rows = cat_rows[
+                cat_rows["assignment_kind_norm"].eq("BOOKED")
+                & (~cat_rows["is_na"])
+            ]
             out_case_rows = cat_rows[
                 (~cat_rows["location_norm"].isin(["OFFICE", "STANDBY"]))
                 & (cat_rows["location_norm"] != "")
                 & (~cat_rows["is_na"])
+                & (~cat_rows["assignment_kind_norm"].eq("BOOKED"))
             ]
 
             in_count = int(len(office_rows))
             standby_count = int(len(standby_rows))
+            booked_count = int(len(booked_rows))
             out_count = int(len(out_case_rows))
             available = avail_lookup.get(cat_norm, in_count)
-            total = total_lookup.get(cat_norm, int(len(office_rows) + len(out_case_rows)))
-            total = total if total > 0 else (in_count + out_count)
+            total = total_lookup.get(cat_norm, int(len(office_rows) + len(out_case_rows) + len(booked_rows)))
+            total = total if total > 0 else (in_count + out_count + booked_count)
 
-            if cat_norm not in ordered_core and total == 0 and available == 0 and out_count == 0 and standby_count == 0:
+            if cat_norm not in ordered_core and total == 0 and available == 0 and out_count == 0 and standby_count == 0 and booked_count == 0:
                 continue
 
             office_items = [
@@ -598,17 +609,21 @@ with inv_tabs[0]:
                 for _, r in standby_rows.iterrows()
             ]
             in_list = "; ".join(sorted([item["name"] for item in office_items + standby_items]))
-            out_list = "; ".join(
-                sorted([
+            out_list = "; ".join(sorted(
+                [
                     f"{str(r['set_name'])} @ {str(r['location_now']).strip() or 'OUT'} ({str(r['surgery_date']).strip() or '-'})"
                     for _, r in out_case_rows.iterrows()
-                ])
-            )
+                ] + [
+                    f"{str(r['set_name'])} booked @ {str(r['location_now']).strip() or 'BOOKED'} ({str(r['delivery_date']).strip() or '-'})"
+                    for _, r in booked_rows.iterrows()
+                ]
+            ))
 
             summary_rows.append({
                 "Category": label,
                 "CategoryNorm": cat_norm,
                 "In Office": in_count,
+                "Booked": booked_count,
                 "Out": out_count,
                 "Available": available,
                 "Available/Total": f"{available}/{total}",
@@ -626,6 +641,17 @@ with inv_tabs[0]:
                     "Surgery Date": str(r.get("surgery_date", "")),
                     "Case": str(r.get("case_id", "")),
                     "Sales Code": case_sales_lookup.get(str(r.get("case_id", "")).strip(), ""),
+                })
+            for _, r in booked_rows.iterrows():
+                out_rows.append({
+                    "Category": label,
+                    "Set": str(r.get("set_name", "")),
+                    "Hospital": str(r.get("location_now", "")),
+                    "Surgery Date": "",
+                    "Delivery Date": str(r.get("delivery_date", "")),
+                    "Case": str(r.get("case_id", "")),
+                    "Sales Code": case_sales_lookup.get(str(r.get("case_id", "")).strip(), ""),
+                    "Assignment": "BOOKED",
                 })
 
         # Build out-details lookup: category_norm → list of dicts
@@ -648,8 +674,8 @@ with inv_tabs[0]:
         def _set_row_html(r: dict) -> str:
             cat_norm = r["CategoryNorm"]
             avail_val = int(r.get("Available", 0))
-            total_val = int(total_lookup.get(cat_norm, r["In Office"] + r["Out"]))
-            total_val = total_val if total_val > 0 else (r["In Office"] + r["Out"])
+            total_val = int(total_lookup.get(cat_norm, r["In Office"] + r["Out"] + r.get("Booked", 0)))
+            total_val = total_val if total_val > 0 else (r["In Office"] + r["Out"] + r.get("Booked", 0))
             badge = avail_badge(avail_val, total_val)
 
             # Left: availability badge + prominent in-office set names
@@ -681,8 +707,22 @@ with inv_tabs[0]:
             # Right: OUT lines
             out_items = _set_out.get(cat_norm, [])
             if out_items:
-                out_lines = "".join(
-                    (
+                rendered_lines = []
+                for o in out_items:
+                    assignment = str(o.get("Assignment", "")).strip().upper()
+                    if assignment == "BOOKED":
+                        rendered_lines.append(
+                            f"<div class='out-line'>"
+                            f"<span class='out-tag out-tag-booked'>BOOKED</span> "
+                            f"<span class='out-set'>{o['Set']}</span>"
+                            f"<span class='out-sep'> → </span>"
+                            f"{_hospital_with_led(o['Hospital'], o.get('Delivery Date', ''))}"
+                            f"<span class='out-sep'> · </span>"
+                            f"<span class='out-surg'>deliver {o.get('Delivery Date', '') or '—'}</span>"
+                            f"</div>"
+                        )
+                        continue
+                    rendered_lines.append(
                         f"<div class='out-line'>"
                         f"<span class='out-tag'>OUT</span> "
                         f"<span class='out-set'>{o['Set']}</span>"
@@ -692,8 +732,7 @@ with inv_tabs[0]:
                         f"<span class='out-surg'>surg {o['Surgery Date'] or '—'}</span>"
                         f"</div>"
                     )
-                    for o in out_items
-                )
+                out_lines = "".join(rendered_lines)
             else:
                 out_lines = "<span style='color:#9ca3af;font-size:12px;font-style:italic'>all in office</span>"
 

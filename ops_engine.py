@@ -47,6 +47,7 @@ DEFAULT_MASTER_DATA_PATH = MODULE_DIR / "master_data.py"
 DEFAULT_OUTPUT_DIR = MODULE_DIR / "outputs"
 
 DATE_FORMATS = ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y")
+BOOKING_HOLD_DAYS = 3
 
 # Known CSV code aliases → master_data HOSPITALS keys
 HOSPITAL_ALIASES: dict[str, str] = {
@@ -283,6 +284,23 @@ def format_set_display(shorthand: Any, set_id: Any) -> str:
     if not short:
         return str(set_id or "").strip()
     return f"{short} ({compact_set_id(set_id)})"
+
+
+def is_booking_prefix(value: Any) -> bool:
+    return normalize_code(value).startswith("BC")
+
+
+def booking_hold_start(delivery_date: date | None) -> date | None:
+    if delivery_date is None:
+        return None
+    return delivery_date - timedelta(days=BOOKING_HOLD_DAYS)
+
+
+def is_booking_hold_active(delivery_date: date | None, today_kl: date) -> bool:
+    hold_start = booking_hold_start(delivery_date)
+    if hold_start is None or delivery_date is None:
+        return False
+    return hold_start <= today_kl <= delivery_date
 
 
 def serialize_case_common(case: dict[str, Any]) -> dict[str, Any]:
@@ -594,6 +612,41 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
     }
     return {"size_buckets": size_buckets, "uid_ranges": uid_ranges, "uid_alias_map": uid_alias_map}
 
+
+def finalize_set_assignments(
+    assignments_by_key: dict[str, list[dict[str, Any]]],
+    *,
+    repeated_same_hospital_status: str,
+) -> tuple[list[dict[str, Any]], dict[str, set[str]]]:
+    finalized: list[dict[str, Any]] = []
+    keys_by_case: dict[str, set[str]] = defaultdict(set)
+
+    for set_key, rows in assignments_by_key.items():
+        ordered_rows = sorted(rows, key=lambda row: row["_case_order_key"])
+        winner = dict(ordered_rows[-1])
+        related_case_ids = [row["case_id"] for row in ordered_rows]
+        related_hospitals = sorted({
+            row["location_now"]
+            for row in ordered_rows
+            if row.get("location_now")
+        })
+        winner["ownership_related_cases"] = ";".join(related_case_ids)
+        winner["ownership_related_hospitals"] = ";".join(related_hospitals)
+        if len(ordered_rows) > 1:
+            winner["ownership_status"] = (
+                "REVIEW_CONFLICT"
+                if len(related_hospitals) > 1 else
+                repeated_same_hospital_status
+            )
+        else:
+            winner["ownership_status"] = ""
+        winner.pop("_case_order_key", None)
+        finalized.append(winner)
+        keys_by_case[winner["case_id"]].add(set_key)
+
+    finalized.sort(key=lambda row: (row["category"], row["id"], row["set_uid"]))
+    return finalized, keys_by_case
+
 # ---------------------------------------------------------------------------
 # Case summariser
 # ---------------------------------------------------------------------------
@@ -613,6 +666,10 @@ def summarize_cases(
     for idx, row in enumerate(cases_rows, start=1):
         delivery_date = parse_date(row_value(row, "delivery_date"))
         surgery_date = parse_date(row_value(row, "surgery_date"))
+        prefix = row_value(row, "prefix").strip()
+        is_booking_case = is_booking_prefix(prefix)
+        booking_hold_from = booking_hold_start(delivery_date)
+        booking_is_active = is_booking_case and is_booking_hold_active(delivery_date, today_kl)
         sets_raw = row_value(row, "sets").strip()
         sets_returned_raw = row_value(row, "sets_returned").strip()
         plate_tokens = split_plate_tokens(row_value(row, "plates"))
@@ -738,7 +795,7 @@ def summarize_cases(
         case_record: dict[str, Any] = {
             "case_id":            case_id,
             "row_number":         idx,
-            "prefix":             row_value(row, "prefix").strip(),
+            "prefix":             prefix,
             "hospital":           hospital_code,
             "patient_doctor":     row_value(row, "patient_doctor").strip(),
             "delivery_date":      format_date(delivery_date),
@@ -760,12 +817,16 @@ def summarize_cases(
             "has_uid_set":        has_uid_set,
             "has_active_uid_set": False,
             "has_shorthand_only": has_shorthand_only,
+            "is_booking_case":    is_booking_case,
+            "booking_hold_active": booking_is_active,
+            "booking_hold_start": format_date(booking_hold_from),
             "set_categories":     set_categories,
             "set_uid_tokens":     sorted({item["_uid_norm"] for item in uid_hit_by_key.values()}),
             "returned_set_uid_tokens": sorted({
                 item["_uid_norm"] for item in returned_hit_by_key.values()
             }),
             "active_set_uid_tokens": [],
+            "booked_set_uid_tokens": [],
             "set_shorthand_tokens": sorted(shorthand_hit_keys),
             "delivery_date_obj": delivery_date,
             "surgery_date_obj":  surgery_date,
@@ -779,6 +840,7 @@ def summarize_cases(
         parsed_cases.append(case_record)
 
     out_candidates_by_key: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    booking_candidates_by_key: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for case in parsed_cases:
         days_since = (
             (today_kl - case["surgery_date_obj"]).days
@@ -789,7 +851,14 @@ def summarize_cases(
                 continue
             if item.get("home") != "OFFICE":
                 continue
-            out_candidates_by_key[item["set_key"]].append({
+            if case.get("is_booking_case") and not case.get("booking_hold_active"):
+                continue
+            target_map = (
+                booking_candidates_by_key
+                if case.get("booking_hold_active")
+                else out_candidates_by_key
+            )
+            target_map[item["set_key"]].append({
                 "set_key":            item["set_key"],
                 "set_uid":            item["set_uid"],
                 "category":           item["category"],
@@ -797,6 +866,7 @@ def summarize_cases(
                 "set_display":        item["set_display"],
                 "home":               item["home"],
                 "set_status":         item.get("set_status", ""),
+                "assignment_kind":    "BOOKED" if case.get("booking_hold_active") else "OUT",
                 "location_now":       case["hospital"] or "UNKNOWN",
                 "case_id":            case["case_id"],
                 "delivery_date":      case["delivery_date"],
@@ -808,45 +878,36 @@ def summarize_cases(
                 "_case_order_key":    case["_case_order_key"],
             })
 
-    set_out_assignments: list[dict[str, Any]] = []
-    active_office_keys_by_case: dict[str, set[str]] = defaultdict(set)
-    for set_key, rows in out_candidates_by_key.items():
-        ordered_rows = sorted(rows, key=lambda row: row["_case_order_key"])
-        winner = dict(ordered_rows[-1])
-        related_case_ids = [row["case_id"] for row in ordered_rows]
-        related_hospitals = sorted({
-            row["location_now"]
-            for row in ordered_rows
-            if row.get("location_now")
-        })
-        winner["ownership_related_cases"] = ";".join(related_case_ids)
-        winner["ownership_related_hospitals"] = ";".join(related_hospitals)
-        if len(ordered_rows) > 1:
-            winner["ownership_status"] = (
-                "REVIEW_CONFLICT"
-                if len(related_hospitals) > 1 else
-                "CARRY_OVER"
-            )
-        else:
-            winner["ownership_status"] = ""
-        winner.pop("_case_order_key", None)
-        set_out_assignments.append(winner)
-        active_office_keys_by_case[winner["case_id"]].add(set_key)
-
-    set_out_assignments.sort(key=lambda row: (row["category"], row["id"], row["set_uid"]))
+    set_out_assignments, active_office_keys_by_case = finalize_set_assignments(
+        out_candidates_by_key,
+        repeated_same_hospital_status="CARRY_OVER",
+    )
+    set_booking_assignments, active_booking_keys_by_case = finalize_set_assignments(
+        booking_candidates_by_key,
+        repeated_same_hospital_status="BOOKED_OVERLAP",
+    )
 
     for case in parsed_cases:
         active_exact_sets = []
+        booked_exact_sets = []
         for item in case["_assigned_exact_sets"]:
             if item["set_key"] in case["_returned_set_keys"]:
                 continue
             if item.get("home") == "OFFICE":
+                if case.get("booking_hold_active"):
+                    if item["set_key"] in active_booking_keys_by_case.get(case["case_id"], set()):
+                        booked_exact_sets.append(item)
+                    continue
                 if item["set_key"] not in active_office_keys_by_case.get(case["case_id"], set()):
                     continue
             active_exact_sets.append(item)
         active_exact_sets.sort(key=lambda item: (item["category"], item["id"], item["set_uid"]))
+        booked_exact_sets.sort(key=lambda item: (item["category"], item["id"], item["set_uid"]))
         case["active_set_uid_tokens"] = sorted({
             item["set_uid_norm"] for item in active_exact_sets
+        })
+        case["booked_set_uid_tokens"] = sorted({
+            item["set_uid_norm"] for item in booked_exact_sets
         })
         case["has_active_uid_set"] = bool(case["active_set_uid_tokens"])
         if active_exact_sets:
@@ -864,6 +925,7 @@ def summarize_cases(
     return {
         "parsed_cases":        parsed_cases,
         "set_out_assignments": set_out_assignments,
+        "set_booking_assignments": set_booking_assignments,
         "unknown_set_tokens":  unknown_set_tokens,
     }
 
@@ -872,10 +934,13 @@ def summarize_cases(
 # ---------------------------------------------------------------------------
 
 def build_set_outputs(
-    set_indexes: dict[str, Any], set_out_assignments: list[dict[str, Any]]
+    set_indexes: dict[str, Any],
+    set_out_assignments: list[dict[str, Any]],
+    set_booking_assignments: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     office_sets = set_indexes["office_sets"]
     standby_sets = set_indexes.get("standby_sets", [])
+    booking_assignments = set_booking_assignments or []
 
     # Exclude NA and STANDBY from availability totals.
     active_office_sets = [
@@ -893,25 +958,42 @@ def build_set_outputs(
         and not is_na_status(item.get("set_status", ""))
         and not is_standby_status(item.get("set_status", ""))
     }
+    unique_booked_by_key = {
+        item["set_key"]: item
+        for item in booking_assignments
+        if item.get("set_key")
+        and not is_na_status(item.get("set_status", ""))
+        and not is_standby_status(item.get("set_status", ""))
+    }
+    unique_reserved_by_key = dict(unique_booked_by_key)
+    unique_reserved_by_key.update(unique_out_by_key)
     out_by_category = Counter(item["category"] for item in unique_out_by_key.values())
+    booked_by_category = Counter(item["category"] for item in unique_booked_by_key.values())
+    reserved_by_category = Counter(item["category"] for item in unique_reserved_by_key.values())
 
     set_category_availability: list[dict[str, Any]] = []
     for category in sorted(total_by_category):
         total     = total_by_category[category]
         out       = out_by_category.get(category, 0)
-        available = max(total - out, 0)
+        booked    = booked_by_category.get(category, 0)
+        reserved  = reserved_by_category.get(category, 0)
+        available = max(total - reserved, 0)
         set_category_availability.append({
             "category":    category,
             "total_office": total,
+            "booked_for_case": booked,
             "out_for_case": out,
+            "reserved_total": reserved,
             "available":    available,
             "availability": f"{available}/{total}",
         })
 
     # Per-set location status
     by_set_key: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in booking_assignments:
+        by_set_key[row["set_key"]] = [row]
     for row in set_out_assignments:
-        by_set_key[row["set_key"]].append(row)
+        by_set_key[row["set_key"]] = [row]
 
     set_office_status: list[dict[str, Any]] = []
     visible_sets = office_sets + standby_sets
@@ -926,6 +1008,7 @@ def build_set_outputs(
                                  ),
             "home":              s["home"],
             "set_status":        s.get("status", ""),
+            "assignment_kind":   "",
         }
         if not assignments:
             in_standby = (
@@ -955,6 +1038,7 @@ def build_set_outputs(
                     "case_status":       row["case_status"],
                     "case_id":           row["case_id"],
                     "patient_doctor":    row["patient_doctor"],
+                    "assignment_kind":   row.get("assignment_kind", ""),
                 })
 
     return {
@@ -1469,7 +1553,7 @@ def build_case_buckets(
             buckets["to_follow_up"].append(case)
 
         # Delivered today (UID confirmed)
-        if delivery_date == today_kl and case["has_uid_set"]:
+        if delivery_date == today_kl and case["has_uid_set"] and not case.get("is_booking_case"):
             buckets["delivered_today"].append(case)
 
     def _strip(case: dict[str, Any]) -> dict[str, Any]:
@@ -1563,7 +1647,11 @@ def build_operations_report(
 
     set_indexes   = build_set_indexes(master["SETS"])
     case_summary  = summarize_cases(cases_rows, set_indexes, today)
-    set_outputs   = build_set_outputs(set_indexes, case_summary["set_out_assignments"])
+    set_outputs   = build_set_outputs(
+        set_indexes,
+        case_summary["set_out_assignments"],
+        case_summary.get("set_booking_assignments", []),
+    )
 
     plate_inventory = build_plate_inventory(master["PLATES"])
     plate_outputs   = build_plate_outputs(case_summary["parsed_cases"], plate_inventory)
@@ -1624,8 +1712,12 @@ def build_operations_report(
             "has_uid_set":             c["has_uid_set"],
             "has_active_uid_set":      c.get("has_active_uid_set", False),
             "has_shorthand_only":      c["has_shorthand_only"],
+            "is_booking_case":         c.get("is_booking_case", False),
+            "booking_hold_active":     c.get("booking_hold_active", False),
+            "booking_hold_start":      c.get("booking_hold_start", ""),
             "returned_set_uid_tokens": c.get("returned_set_uid_tokens", []),
             "active_set_uid_tokens":   c.get("active_set_uid_tokens", []),
+            "booked_set_uid_tokens":   c.get("booked_set_uid_tokens", []),
         }
         for c in case_summary["parsed_cases"]
     ]
