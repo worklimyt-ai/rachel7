@@ -1811,13 +1811,23 @@ def build_case_sent_item_details(
 
 
 def is_cancelled_case(case: dict[str, Any]) -> bool:
-    tokens = [
-        normalize_code(case.get("status", "")),
-        normalize_code(case.get("smart_status", "")),
-        normalize_code(case.get("prefix", "")),
-    ]
-    cancel_markers = ("CANCEL", "CANCELLED", "CANCELED", "CXL", "CNCL")
-    return any(any(marker in token for marker in cancel_markers) for token in tokens if token)
+    status_token = normalize_code(case.get("status", ""))
+    smart_status_token = normalize_code(case.get("smart_status", ""))
+    prefix_token = normalize_code(case.get("prefix", ""))
+    cancel_tokens = [status_token, smart_status_token, prefix_token]
+    cancel_markers = ("CANCEL", "CANCELLED", "CANCELED", "CXL", "CNCL", "CNX")
+    if any(any(marker in token for marker in cancel_markers) for token in cancel_tokens if token):
+        return True
+
+    has_sales = bool(normalize_code(case.get("sales_code", "")))
+    if has_sales:
+        return False
+
+    if status_token == "PP":
+        return True
+    if "POSTPON" in smart_status_token or "POSTPON" in status_token:
+        return True
+    return False
 
 
 def build_case_region_summary(
@@ -1896,6 +1906,7 @@ def build_archive_30d_summary(
             "status": row_value(row, "status"),
             "smart_status": row_value(row, "Smart Status"),
             "prefix": row_value(row, "prefix"),
+            "sales_code": row_value(row, "sales_code"),
         })
         total_cases += 1
         cases_by_region[region] += 1
@@ -1903,7 +1914,13 @@ def build_archive_30d_summary(
             total_cancelled += 1
             cancelled_by_region[region] += 1
         sets_delivered += len(split_tokens(row_value(row, "sets")))
-        sets_returned += len(split_tokens(row_value(row, "sets_returned")))
+        if row_value(row, "return_date").strip():
+            returned_tokens = split_tokens(row_value(row, "sets"))
+            if not returned_tokens:
+                returned_tokens = split_tokens(row_value(row, "sets_returned"))
+        else:
+            returned_tokens = split_tokens(row_value(row, "sets_returned"))
+        sets_returned += len(returned_tokens)
 
     return {
         "window_start": format_date(window_start),
@@ -1949,10 +1966,14 @@ def build_case_buckets(
         return_date   = normalize_code(case["return_date"])
         status        = normalize_code(case["status"])
         prefix        = normalize_code(case["prefix"])
+        cancelled     = is_cancelled_case(case)
 
         # Sales code recorded but equipment not yet returned
         if sales_code and not return_date:
             buckets["to_collect"].append(case)
+
+        if cancelled:
+            continue
 
         # Upcoming cases with only shorthand (set not yet assigned)
         if delivery_date and delivery_date >= today_kl and case["has_shorthand_only"]:

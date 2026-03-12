@@ -1534,15 +1534,7 @@ with inv_tabs[3]:
             "<div class='sec-header'>Archive 30d Summary</div>",
             unsafe_allow_html=True,
         )
-        archive_source_label = escape(str(meta.get("sources", {}).get("archive", "")).strip() or "—")
         archive_rows_count = int(meta.get("counts", {}).get("archive_rows", 0) or 0)
-        archive_window = (
-            f"{escape(str(archive_30d.get('window_start', '')).strip() or '—')} → "
-            f"{escape(str(archive_30d.get('window_end', '')).strip() or '—')}"
-        )
-        st.caption(
-            f"Source: {archive_source_label} | Archive rows: {archive_rows_count} | Window: {archive_window}"
-        )
         if archive_rows_count == 0:
             st.warning("Archive source returned 0 rows, so all 30d archive metrics will be 0.")
         archive_kpi_cols = st.columns(4)
