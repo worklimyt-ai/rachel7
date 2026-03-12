@@ -1,4 +1,12 @@
-# master_data_fixed.py
+"""Master data for the Osteo operations tooling."""
+
+from __future__ import annotations
+
+from collections import Counter
+from pathlib import Path
+import re
+
+
 SETS = [
     {"category": "1.5-2.0", "id": "01", "home": "OFFICE", "uid": "1.501", "shorthand": "1.5"},
     {"category": "1.5-2.0", "id": "02", "home": "OFFICE", "uid": "1.502", "shorthand": "1.5"},
@@ -166,7 +174,7 @@ SETS = [
     {"category": "PFN", "id": "16", "home": "OFFICE", "uid": "PFN16", "shorthand": "PFN"},
     {"category": "PFN", "id": "17", "home": "HSY", "uid": "PFN17", "shorthand": "PFN"},
     {"category": "PFN", "id": "18", "home": "PG", "uid": "PFN18", "shorthand": "PFN"},
-    {"category": "PFN", X"id": "19", "home": "OFFICE", "uid": "PFN19", "shorthand": "PFN"},
+    {"category": "PFN", "id": "19", "home": "OFFICE", "uid": "PFN19", "shorthand": "PFN"},
     {"category": "PFN", "id": "20", "home": "HTI", "uid": "PFN20", "shorthand": "PFN"},
     {"category": "PFN", "id": "21", "home": "PG", "uid": "PFN21", "shorthand": "PFN"},
     {"category": "PFN", "id": "22", "home": "OFFICE", "uid": "PFN22", "shorthand": "PFN"},
@@ -7261,7 +7269,7 @@ PLATES = {
         "size": "6H",
         "location": "D3, D4"
     },
-    "52200870": {
+    "52207368": {
         "uid": "DLHII",
         "set": "2.7-4.0",
         "proper_name": "VA 2.7/3.5mm Distal Lateral Humeral Plates II",
@@ -8759,29 +8767,44 @@ HOSPITALS = {
     'IH': {'name': 'Island Hospital Penang', 'lat': 5.4142, 'lng': 100.3287, 'region': 'Penang'},
 }
 
-import pandas as pd
 
-def database_to_sheets():
-    # 1. Convert SETS (Simple list of dicts)
-    df_sets = pd.DataFrame(ALL_SETS)
+_PLATES_START_MARKER = "PLATES = {"
+_PLATES_END_MARKER = "# ── BONEGRAFT"
 
-    # 2. Convert PLATES (Key-Value dict)
-    # We turn the SKU (the key) into its own column called 'sku_code'
-    df_plates = pd.DataFrame.from_dict(PLATE_INVENTORY, orient='index').reset_index()
-    df_plates.rename(columns={'index': 'sku_code'}, inplace=True)
 
-    # 3. Convert HOSPITALS (Key-Value dict)
-    # We turn the Code (the key) into its own column called 'hosp_code'
-    df_hospitals = pd.DataFrame.from_dict(HOSPITALS, orient='index').reset_index()
-    df_hospitals.rename(columns={'index': 'hosp_code'}, inplace=True)
+def _plate_source_block() -> str:
+    source = Path(__file__).read_text(encoding="utf-8")
+    try:
+        _, after_start = source.split(_PLATES_START_MARKER, 1)
+        block, _ = after_start.split(_PLATES_END_MARKER, 1)
+    except ValueError as exc:
+        raise RuntimeError("Could not isolate the PLATES block in master_data.py") from exc
+    return block
 
-    # 4. Save to one Excel file with 3 tabs
-    with pd.ExcelWriter("surgical_database.xlsx") as writer:
-        df_sets.to_excel(writer, sheet_name="Sets_Inventory", index=False)
-        df_plates.to_excel(writer, sheet_name="Plates_Catalog", index=False)
-        df_hospitals.to_excel(writer, sheet_name="Hospital_Directory", index=False)
 
-    print("File 'surgical_database.xlsx' created. Ready for Google Sheets!")
+def duplicate_plate_product_codes() -> dict[str, int]:
+    codes = re.findall(r'^\s*"([^"]+)":\s*{', _plate_source_block(), flags=re.MULTILINE)
+    counts = Counter(codes)
+    return {code: count for code, count in counts.items() if count > 1}
+
+
+def validate_master_data() -> None:
+    duplicates = duplicate_plate_product_codes()
+    if duplicates:
+        summary = ", ".join(f"{code} x{count}" for code, count in sorted(duplicates.items()))
+        raise ValueError(f"Duplicate plate product codes found: {summary}")
+
+
+def main() -> int:
+    validate_master_data()
+    print(
+        f"master_data OK: {len(SETS)} sets, {len(PLATES)} plates, {len(HOSPITALS)} hospitals"
+    )
+    return 0
+
+
+validate_master_data()
+
 
 if __name__ == "__main__":
-    database_to_sheets()
+    raise SystemExit(main())
