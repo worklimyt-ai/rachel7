@@ -1603,21 +1603,27 @@ def build_powertool_outputs(
     }
 
 
-def build_bonegraft_index(master_bonegraft: list[dict[str, Any]]) -> dict[str, dict[str, str]]:
-    index: dict[str, dict[str, str]] = {}
+def build_bonegraft_index(master_bonegraft: list[dict[str, Any]]) -> dict[str, dict[str, dict[str, str]]]:
+    by_ref: dict[str, dict[str, str]] = {}
+    by_alias: dict[str, dict[str, str]] = {}
     for item in master_bonegraft:
         if not isinstance(item, dict):
             continue
         name = str(item.get("name", "")).strip()
         presentation = str(item.get("presentation", "")).strip()
+        ref = str(item.get("ref", "")).strip()
         label = format_bonegraft_label(name, presentation)
         payload = {
             "name": name,
             "presentation": presentation,
             "label": label,
+            "ref": ref,
         }
+        ref_norm = normalize_bonegraft_token(ref)
+        if ref_norm:
+            by_ref[ref_norm] = payload
         aliases: set[str] = set()
-        for raw in (item.get("shorthand", ""), item.get("ref", ""), presentation):
+        for raw in (item.get("shorthand", ""), presentation):
             norm = normalize_bonegraft_token(raw)
             if norm:
                 aliases.add(norm)
@@ -1634,8 +1640,8 @@ def build_bonegraft_index(master_bonegraft: list[dict[str, Any]]) -> dict[str, d
         if presentation_token:
             aliases.add(presentation_token)
         for alias in aliases:
-            index.setdefault(alias, payload)
-    return index
+            by_alias.setdefault(alias, payload)
+    return {"by_ref": by_ref, "by_alias": by_alias}
 
 
 def build_case_sent_item_details(
@@ -1767,7 +1773,7 @@ def build_case_sent_item_details(
             if not raw_token:
                 continue
             norm = normalize_bonegraft_token(raw_token)
-            resolved = bonegraft_index.get(norm)
+            resolved = bonegraft_index["by_ref"].get(norm) or bonegraft_index["by_alias"].get(norm)
             if resolved:
                 bonegraft_items_by_key.setdefault(resolved["label"], {
                     **resolved,
