@@ -162,6 +162,13 @@ def split_powertool_tokens(value: Any) -> list[str]:
         if p.strip()
     ] if text else []
 
+def split_extra_item_tokens(value: Any) -> list[str]:
+    text = str(value or "").strip()
+    return [
+        p.strip() for p in re.split(r"[;,\n\r]+", text)
+        if p.strip()
+    ] if text else []
+
 def split_plate_tokens(value: Any) -> list[str]:
     out: list[str] = []
     for part in split_tokens(value, pattern=r"[;]+"):
@@ -286,6 +293,40 @@ def format_set_display(shorthand: Any, set_id: Any) -> str:
     return f"{short} ({compact_set_id(set_id)})"
 
 
+def format_case_item_label(category: Any, item_id: Any) -> str:
+    category_text = str(category or "").strip()
+    item_text = compact_set_id(item_id)
+    if category_text and item_text:
+        return f"{category_text} ({item_text})"
+    return category_text or item_text
+
+
+def normalize_bonegraft_token(value: Any) -> str:
+    token = str(value or "").strip().upper()
+    if not token:
+        return ""
+    token = token.replace("×", "X").replace("³", "^3")
+    token = re.sub(r"\s+", "", token)
+    token = token.replace("CC", "")
+    token = token.replace("MM", "")
+    token = token.replace(".", "")
+    cube_match = re.fullmatch(r"(\d+)\^?3", token)
+    if cube_match:
+        return f"{cube_match.group(1)}CUBE"
+    cube_dims = re.fullmatch(r"(\d+)X\1X\1", token)
+    if cube_dims:
+        return f"{cube_dims.group(1)}CUBE"
+    return token
+
+
+def format_bonegraft_label(name: Any, presentation: Any) -> str:
+    name_text = str(name or "").strip()
+    presentation_text = str(presentation or "").strip()
+    if name_text and presentation_text:
+        return f"{name_text} - {presentation_text}"
+    return name_text or presentation_text
+
+
 def is_booking_prefix(value: Any) -> bool:
     return normalize_code(value).startswith("BC")
 
@@ -322,6 +363,10 @@ def serialize_case_common(case: dict[str, Any]) -> dict[str, Any]:
         "sets_outstanding_raw": case.get("sets_outstanding_raw", ""),
         "sets_outstanding":     case.get("sets_outstanding_display", ""),
         "set_categories":       case.get("set_categories", []),
+        "plates_raw":           case.get("plates_raw", ""),
+        "powertools_raw":       case.get("powertools_raw", ""),
+        "bonegraft_raw":        case.get("bonegraft_raw", ""),
+        "extra_items_raw":      case.get("extra_items_raw", ""),
     }
 
 def is_na_status(value: Any) -> bool:
@@ -449,14 +494,17 @@ def load_master_data(module_path: str | Path) -> dict[str, Any]:
             else:
                 sys.modules["pandas"] = prev
 
-    sets      = getattr(module, "SETS", None)
-    plates    = getattr(module, "PLATES", None)
-    hospitals = getattr(module, "HOSPITALS", None)
+    sets       = getattr(module, "SETS", None)
+    plates     = getattr(module, "PLATES", None)
+    hospitals  = getattr(module, "HOSPITALS", None)
+    bonegraft  = getattr(module, "BONEGRAFT", [])
     if not (isinstance(sets, list) and isinstance(plates, dict) and isinstance(hospitals, dict)):
         raise RuntimeError(
             "master_data.py must expose SETS (list), PLATES (dict), HOSPITALS (dict)"
         )
-    return {"SETS": sets, "PLATES": plates, "HOSPITALS": hospitals}
+    if not isinstance(bonegraft, list):
+        bonegraft = []
+    return {"SETS": sets, "PLATES": plates, "HOSPITALS": hospitals, "BONEGRAFT": bonegraft}
 
 
 def read_csv_records(source: str | Path) -> list[dict[str, str]]:
@@ -677,6 +725,10 @@ def summarize_cases(
         powertool_tokens = split_powertool_tokens(powertools_raw)
         set_tokens = split_tokens(sets_raw)
         returned_set_tokens = split_tokens(sets_returned_raw)
+        bonegraft_raw = row_value(row, "bonegraft").strip()
+        extra_items_raw = row_value(row, "extra_items", "extra item", "extras").strip()
+        bonegraft_tokens = split_tokens(bonegraft_raw)
+        extra_item_tokens = split_extra_item_tokens(extra_items_raw)
 
         uid_hits: list[dict[str, Any]] = []
         shorthand_hits: list[dict[str, Any]] = []
@@ -814,6 +866,8 @@ def summarize_cases(
             "sets_outstanding_display": "",
             "plates_raw":         row_value(row, "plates").strip(),
             "powertools_raw":     powertools_raw,
+            "bonegraft_raw":      bonegraft_raw,
+            "extra_items_raw":    extra_items_raw,
             "has_uid_set":        has_uid_set,
             "has_active_uid_set": False,
             "has_shorthand_only": has_shorthand_only,
@@ -833,6 +887,9 @@ def summarize_cases(
             "set_tokens":        set_tokens,
             "plate_tokens":      plate_tokens,
             "powertool_tokens":  powertool_tokens,
+            "bonegraft_tokens":  bonegraft_tokens,
+            "extra_item_tokens": extra_item_tokens,
+            "sent_set_items":    [],
             "_case_order_key":   case_order_key(idx, delivery_date, surgery_date),
             "_assigned_exact_sets": exact_set_rows,
             "_returned_set_keys":   set(returned_hit_by_key),
@@ -918,6 +975,30 @@ def summarize_cases(
         elif case["has_shorthand_only"]:
             case["sets_outstanding_raw"] = case["sets_raw"]
             case["sets_outstanding_display"] = case["sets_display"]
+        active_keys = {item["set_key"] for item in active_exact_sets}
+        booked_keys = {item["set_key"] for item in booked_exact_sets}
+        sent_set_items = []
+        for item in case.get("_assigned_exact_sets", []):
+            assignment_kind = ""
+            if item["set_key"] in booked_keys:
+                assignment_kind = "BOOKED"
+            elif item["set_key"] in active_keys:
+                assignment_kind = "OUT"
+            sent_set_items.append({
+                "category": item["category"],
+                "id": item["id"],
+                "assignment_kind": assignment_kind,
+                "label": format_case_item_label(item["category"], item["id"]),
+            })
+        case["sent_set_items"] = sorted(
+            sent_set_items,
+            key=lambda item: (
+                item.get("assignment_kind") == "",
+                item.get("assignment_kind") == "BOOKED",
+                str(item.get("category", "")),
+                compact_set_id(item.get("id", "")),
+            ),
+        )
         case.pop("_case_order_key", None)
         case.pop("_assigned_exact_sets", None)
         case.pop("_returned_set_keys", None)
@@ -970,6 +1051,9 @@ def build_set_outputs(
     out_by_category = Counter(item["category"] for item in unique_out_by_key.values())
     booked_by_category = Counter(item["category"] for item in unique_booked_by_key.values())
     reserved_by_category = Counter(item["category"] for item in unique_reserved_by_key.values())
+    booked_rows_by_category: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for item in unique_booked_by_key.values():
+        booked_rows_by_category[item["category"]].append(item)
 
     set_category_availability: list[dict[str, Any]] = []
     for category in sorted(total_by_category):
@@ -978,6 +1062,18 @@ def build_set_outputs(
         booked    = booked_by_category.get(category, 0)
         reserved  = reserved_by_category.get(category, 0)
         available = max(total - reserved, 0)
+        next_booking = None
+        category_bookings = booked_rows_by_category.get(category, [])
+        if category_bookings:
+            next_booking = min(
+                category_bookings,
+                key=lambda item: (
+                    parse_date(item.get("delivery_date")) or date.max,
+                    parse_date(item.get("surgery_date")) or date.max,
+                    str(item.get("case_id", "")),
+                    str(item.get("id", "")),
+                ),
+            )
         set_category_availability.append({
             "category":    category,
             "total_office": total,
@@ -986,6 +1082,10 @@ def build_set_outputs(
             "reserved_total": reserved,
             "available":    available,
             "availability": f"{available}/{total}",
+            "next_booking_date": str(next_booking.get("delivery_date", "")) if next_booking else "",
+            "next_booking_hospital": str(next_booking.get("location_now", "")) if next_booking else "",
+            "next_booking_case_id": str(next_booking.get("case_id", "")) if next_booking else "",
+            "next_booking_set": str(next_booking.get("set_display", "")) if next_booking else "",
         })
 
     # Per-set location status
@@ -1503,6 +1603,207 @@ def build_powertool_outputs(
     }
 
 
+def build_bonegraft_index(master_bonegraft: list[dict[str, Any]]) -> dict[str, dict[str, str]]:
+    index: dict[str, dict[str, str]] = {}
+    for item in master_bonegraft:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name", "")).strip()
+        presentation = str(item.get("presentation", "")).strip()
+        label = format_bonegraft_label(name, presentation)
+        payload = {
+            "name": name,
+            "presentation": presentation,
+            "label": label,
+        }
+        aliases: set[str] = set()
+        for raw in (item.get("shorthand", ""), item.get("ref", ""), presentation):
+            norm = normalize_bonegraft_token(raw)
+            if norm:
+                aliases.add(norm)
+        shorthand_norm = normalize_bonegraft_token(item.get("shorthand", ""))
+        if shorthand_norm.endswith("5") and len(shorthand_norm) > 2:
+            aliases.add(shorthand_norm[:-1])
+        presentation_token = normalize_bonegraft_token(presentation)
+        if presentation.lower().endswith("cc"):
+            bare_match = re.match(r"^([0-9.]+)\s*cc$", presentation.strip(), flags=re.IGNORECASE)
+            if bare_match:
+                bare_value = normalize_bonegraft_token(bare_match.group(1))
+                if bare_value:
+                    aliases.add(bare_value)
+        if presentation_token:
+            aliases.add(presentation_token)
+        for alias in aliases:
+            index.setdefault(alias, payload)
+    return index
+
+
+def build_case_sent_item_details(
+    parsed_cases: list[dict[str, Any]],
+    plate_inventory: dict[str, Any],
+    powertool_outputs: dict[str, Any],
+    master_bonegraft: list[dict[str, Any]] | None = None,
+) -> dict[str, dict[str, Any]]:
+    size_buckets = plate_inventory["size_buckets"]
+    uid_alias_map = plate_inventory["uid_alias_map"]
+    plate_meta_by_uid: dict[str, dict[str, Any]] = {}
+    for (uid, size_range), bucket in size_buckets.items():
+        meta = plate_meta_by_uid.setdefault(uid, {
+            "proper_name": str(bucket.get("plate_name", "")).strip(),
+            "ranges": set(),
+        })
+        meta["ranges"].add(size_range)
+        if not meta["proper_name"]:
+            meta["proper_name"] = str(bucket.get("proper_name", "")).strip()
+
+    powertool_items_by_case: dict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
+    resolved_powertool_tokens_by_case: dict[str, set[str]] = defaultdict(set)
+    for item in powertool_outputs.get("powertool_delivered", []):
+        case_id = str(item.get("case_id", "")).strip()
+        if not case_id:
+            continue
+        key = str(item.get("_power_key", "")).strip() or f"{item.get('category', '')}|{item.get('id', '')}"
+        label = format_case_item_label(item.get("category", ""), item.get("id", ""))
+        powertool_items_by_case[case_id][key] = {
+            "category": str(item.get("category", "")).strip(),
+            "id": str(item.get("id", "")).strip(),
+            "label": label,
+            "is_resolved": True,
+        }
+        resolved_powertool_tokens_by_case[case_id].add(
+            canonical_powertool_uid(item.get("powertool_uid", ""))
+        )
+        resolved_powertool_tokens_by_case[case_id].add(
+            canonical_powertool_shorthand(item.get("category", ""))
+        )
+
+    bonegraft_index = build_bonegraft_index(master_bonegraft or [])
+    case_items: dict[str, dict[str, Any]] = {}
+    for case in parsed_cases:
+        case_id = str(case.get("case_id", "")).strip()
+        if not case_id:
+            continue
+
+        sent_sets = [
+            dict(item)
+            for item in case.get("sent_set_items", [])
+            if isinstance(item, dict)
+        ]
+
+        plate_items_by_key: dict[str, dict[str, Any]] = {}
+        for token in case.get("plate_tokens", []):
+            parsed = parse_plate_request(str(token))
+            if not parsed:
+                continue
+            raw_token = str(parsed.get("raw_token", "")).strip()
+            resolved_uid = uid_alias_map.get(parsed["base_uid"], parsed["base_uid"])
+            meta = plate_meta_by_uid.get(resolved_uid)
+            if meta:
+                item = plate_items_by_key.setdefault(resolved_uid, {
+                    "plate_uid": resolved_uid,
+                    "proper_name": meta["proper_name"] or raw_token,
+                    "size_ranges": set(),
+                    "is_resolved": True,
+                })
+                resolved_ranges = [
+                    size_range
+                    for size_range in parsed["needed_ranges"]
+                    if (resolved_uid, size_range) in size_buckets
+                ]
+                item["size_ranges"].update(resolved_ranges or parsed["needed_ranges"])
+                continue
+            fallback_key = normalize_plate_code(raw_token) or raw_token
+            plate_items_by_key.setdefault(fallback_key, {
+                "plate_uid": parsed["base_uid"],
+                "proper_name": raw_token,
+                "size_ranges": set(),
+                "is_resolved": False,
+            })
+
+        sent_plates: list[dict[str, Any]] = []
+        for item in plate_items_by_key.values():
+            size_ranges = sorted(item["size_ranges"], key=size_range_sort_key)
+            size_ranges_label = ", ".join(size_ranges)
+            label = item["proper_name"]
+            if size_ranges_label:
+                label = f"{label} ({size_ranges_label})"
+            sent_plates.append({
+                "plate_uid": item["plate_uid"],
+                "proper_name": item["proper_name"],
+                "size_ranges": size_ranges,
+                "size_ranges_label": size_ranges_label,
+                "label": label,
+                "is_resolved": item["is_resolved"],
+            })
+        sent_plates.sort(key=lambda item: (str(item.get("proper_name", "")), str(item.get("size_ranges_label", ""))))
+
+        powertool_items = dict(powertool_items_by_case.get(case_id, {}))
+        resolved_powertool_tokens = resolved_powertool_tokens_by_case.get(case_id, set())
+        for token in case.get("powertool_tokens", []):
+            raw_token = str(token).strip()
+            if not raw_token:
+                continue
+            canonical_uid = canonical_powertool_uid(raw_token)
+            canonical_short = canonical_powertool_shorthand(raw_token)
+            if canonical_uid in resolved_powertool_tokens or canonical_short in resolved_powertool_tokens:
+                continue
+            fallback_key = normalize_code(raw_token)
+            if not fallback_key:
+                continue
+            powertool_items.setdefault(fallback_key, {
+                "category": raw_token,
+                "id": "",
+                "label": raw_token,
+                "is_resolved": False,
+            })
+        sent_powertools = sorted(
+            powertool_items.values(),
+            key=lambda item: (not item.get("is_resolved", False), str(item.get("category", "")), str(item.get("id", ""))),
+        )
+
+        bonegraft_items_by_key: dict[str, dict[str, Any]] = {}
+        for token in case.get("bonegraft_tokens", []):
+            raw_token = str(token).strip()
+            if not raw_token:
+                continue
+            norm = normalize_bonegraft_token(raw_token)
+            resolved = bonegraft_index.get(norm)
+            if resolved:
+                bonegraft_items_by_key.setdefault(resolved["label"], {
+                    **resolved,
+                    "raw_token": raw_token,
+                    "is_resolved": True,
+                })
+                continue
+            bonegraft_items_by_key.setdefault(raw_token, {
+                "name": raw_token,
+                "presentation": "",
+                "label": raw_token,
+                "raw_token": raw_token,
+                "is_resolved": False,
+            })
+        sent_bonegraft = sorted(
+            bonegraft_items_by_key.values(),
+            key=lambda item: (not item.get("is_resolved", False), str(item.get("name", "")), str(item.get("presentation", "")), str(item.get("label", ""))),
+        )
+
+        sent_extra_items = [
+            {"label": str(token).strip()}
+            for token in case.get("extra_item_tokens", [])
+            if str(token).strip()
+        ]
+
+        case_items[case_id] = {
+            "sent_sets": sent_sets,
+            "sent_plates": sent_plates,
+            "sent_powertools": sent_powertools,
+            "sent_bonegraft": sent_bonegraft,
+            "sent_extra_items": sent_extra_items,
+        }
+
+    return case_items
+
+
 def build_case_buckets(
     parsed_cases: list[dict[str, Any]], today_kl: date
 ) -> dict[str, list[dict[str, Any]]]:
@@ -1659,6 +1960,12 @@ def build_operations_report(
     powertool_outputs = build_powertool_outputs(
         case_summary["parsed_cases"], archive_rows, set_indexes, today
     )
+    case_sent_items = build_case_sent_item_details(
+        case_summary["parsed_cases"],
+        plate_inventory,
+        powertool_outputs,
+        master.get("BONEGRAFT", []),
+    )
 
     case_buckets = build_case_buckets(case_summary["parsed_cases"], today)
 
@@ -1718,6 +2025,13 @@ def build_operations_report(
             "returned_set_uid_tokens": c.get("returned_set_uid_tokens", []),
             "active_set_uid_tokens":   c.get("active_set_uid_tokens", []),
             "booked_set_uid_tokens":   c.get("booked_set_uid_tokens", []),
+            **case_sent_items.get(c["case_id"], {
+                "sent_sets": [],
+                "sent_plates": [],
+                "sent_powertools": [],
+                "sent_bonegraft": [],
+                "sent_extra_items": [],
+            }),
         }
         for c in case_summary["parsed_cases"]
     ]

@@ -106,6 +106,94 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
     font-size: 12px;
     font-style: italic;
 }
+.booking-next {
+    margin-top: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1d4ed8;
+    letter-spacing: .01em;
+}
+.case-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .04);
+}
+.case-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+.case-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: #111827;
+}
+.case-sub {
+    color: #6b7280;
+    font-size: 12px;
+    margin-top: 4px;
+}
+.case-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+.case-tag {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+.case-tag.is-booking {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+.case-tag.is-out {
+    background: #fef3c7;
+    color: #92400e;
+}
+.case-tag.is-status {
+    background: #f3f4f6;
+    color: #4b5563;
+}
+.case-lines {
+    display: grid;
+    gap: 8px;
+}
+.case-line {
+    display: grid;
+    grid-template-columns: 96px 1fr;
+    gap: 10px;
+    align-items: start;
+}
+.case-line-label {
+    color: #6b7280;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding-top: 2px;
+}
+.case-line-value {
+    color: #111827;
+    font-size: 14px;
+    line-height: 1.45;
+}
+.case-empty {
+    color: #9ca3af;
+    font-size: 12px;
+    font-style: italic;
+}
 .out-line {
     font-size: 15px;
     color: #374151;
@@ -325,7 +413,7 @@ with st.sidebar:
     )
     refresh = st.button("🔄 Refresh Data", use_container_width=True)
     st.divider()
-    search_query = st.text_input("🔍 Search", placeholder="sets, plates, hospitals…")
+    search_query = st.text_input("🔍 Search", placeholder="cases, sets, plates, hospitals…")
     st.divider()
     st.caption("TZ: Asia/Kuala_Lumpur")
 
@@ -385,6 +473,7 @@ if st.session_state.get("load_error"):
 
 report = st.session_state["report"]
 meta   = report["meta"]
+case_rows_all = report.get("cases_all", [])
 cases_all_df = pd.DataFrame(report.get("cases_all", []))
 case_sales_lookup: dict[str, str] = {}
 if not cases_all_df.empty and "case_id" in cases_all_df.columns:
@@ -493,7 +582,7 @@ def _safe_int(val) -> int:
     num = pd.to_numeric(val, errors="coerce")
     return int(num) if pd.notna(num) else 0
 
-inv_tabs = st.tabs(["🧰 Sets", "🦾 Plates", "🔌 Powertools"])
+inv_tabs = st.tabs(["🧰 Sets", "🦾 Plates", "🔌 Powertools", "📋 Cases"])
 
 
 # ── Sets ──────────────────────────────────────────────────────────────────────
@@ -533,11 +622,18 @@ with inv_tabs[0]:
 
         avail_lookup: dict[str, int] = {}
         total_lookup: dict[str, int] = {}
+        next_booking_lookup: dict[str, dict[str, str]] = {}
         for _, r in set_avail.iterrows():
             key = str(r.get("category_norm", "")).strip()
             if key:
                 avail_lookup[key] = _safe_int(r.get("available", 0))
                 total_lookup[key] = _safe_int(r.get("total_office", 0))
+                next_booking_lookup[key] = {
+                    "date": str(r.get("next_booking_date", "")).strip(),
+                    "hospital": str(r.get("next_booking_hospital", "")).strip(),
+                    "case_id": str(r.get("next_booking_case_id", "")).strip(),
+                    "set": str(r.get("next_booking_set", "")).strip(),
+                }
 
         display_by_norm: dict[str, str] = {c.upper(): c for c in OFFICE_VIEW_ORDER}
         for src_df in (set_status_all, set_avail):
@@ -629,6 +725,7 @@ with inv_tabs[0]:
                 "Available/Total": f"{available}/{total}",
                 "OfficeItems": office_items,
                 "StandbyItems": standby_items,
+                "NextBooking": next_booking_lookup.get(cat_norm, {}),
                 "In Office Sets": in_list,
                 "Out (Hospital • Surgery)": out_list,
             })
@@ -694,6 +791,21 @@ with inv_tabs[0]:
             else:
                 in_sets_html = "<span class='office-set-empty'>none available</span>"
 
+            next_booking = dict(r.get("NextBooking", {}))
+            next_booking_date = escape(str(next_booking.get("date", "")).strip())
+            next_booking_hospital = escape(str(next_booking.get("hospital", "")).strip())
+            next_booking_set = escape(str(next_booking.get("set", "")).strip())
+            next_booking_case = escape(str(next_booking.get("case_id", "")).strip())
+            next_booking_parts = [part for part in [next_booking_date, next_booking_hospital] if part]
+            next_booking_html = ""
+            if next_booking_parts:
+                next_booking_label = " · ".join(next_booking_parts)
+                if next_booking_set:
+                    next_booking_label += f" · {next_booking_set}"
+                if next_booking_case:
+                    next_booking_label += f" · {next_booking_case}"
+                next_booking_html = f"<div class='booking-next'>next booking {next_booking_label}</div>"
+
             left_col = (
                 f"<div style='flex:0 0 39%;padding-right:20px'>"
                 f"<div style='display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px'>"
@@ -701,6 +813,7 @@ with inv_tabs[0]:
                 f"{badge}"
                 f"</div>"
                 f"{in_sets_html}"
+                f"{next_booking_html}"
                 f"</div>"
             )
 
@@ -1406,6 +1519,109 @@ with inv_tabs[2]:
             )
         else:
             st.info("No matching powertools.")
+
+
+# ── Cases ─────────────────────────────────────────────────────────────────────
+with inv_tabs[3]:
+    if not case_rows_all:
+        st.info("No case data.")
+    else:
+        def _case_item_labels(items: list[dict] | None) -> list[str]:
+            labels: list[str] = []
+            for item in items or []:
+                if not isinstance(item, dict):
+                    continue
+                label = str(item.get("label", "")).strip()
+                if label:
+                    labels.append(label)
+            return labels
+
+        def _case_sort_key(case: dict) -> tuple[date, date, str]:
+            return (
+                _parse_ui_date(str(case.get("delivery_date", ""))) or date.max,
+                _parse_ui_date(str(case.get("surgery_date", ""))) or date.max,
+                str(case.get("case_id", "")),
+            )
+
+        filtered_cases: list[str] = []
+        for case in sorted(case_rows_all, key=_case_sort_key):
+            set_labels = _case_item_labels(case.get("sent_sets"))
+            plate_labels = _case_item_labels(case.get("sent_plates"))
+            powertool_labels = _case_item_labels(case.get("sent_powertools"))
+            bonegraft_labels = _case_item_labels(case.get("sent_bonegraft"))
+            extra_labels = _case_item_labels(case.get("sent_extra_items"))
+
+            search_blob = " ".join([
+                str(case.get("case_id", "")),
+                str(case.get("prefix", "")),
+                str(case.get("hospital", "")),
+                str(case.get("delivery_date", "")),
+                str(case.get("surgery_date", "")),
+                str(case.get("smart_status", "")),
+                str(case.get("status", "")),
+                " ".join(set_labels),
+                " ".join(plate_labels),
+                " ".join(powertool_labels),
+                " ".join(bonegraft_labels),
+                " ".join(extra_labels),
+            ]).lower()
+            if search_query and search_query.lower() not in search_blob:
+                continue
+
+            tags = [
+                f"<span class='case-tag is-status'>{escape(str(case.get('prefix', '')).strip() or 'CASE')}</span>"
+            ]
+            if case.get("is_booking_case") and case.get("booking_hold_active"):
+                tags.append("<span class='case-tag is-booking'>BOOKED</span>")
+            elif any([set_labels, plate_labels, powertool_labels, bonegraft_labels, extra_labels]):
+                tags.append("<span class='case-tag is-out'>SENT OUT</span>")
+            smart_status = escape(str(case.get("smart_status", "")).strip() or str(case.get("status", "")).strip())
+            if smart_status:
+                tags.append(f"<span class='case-tag is-status'>{smart_status}</span>")
+
+            lines: list[str] = []
+            if set_labels:
+                lines.append(
+                    f"<div class='case-line'><div class='case-line-label'>Sets</div><div class='case-line-value'>{escape('; '.join(set_labels))}</div></div>"
+                )
+            if plate_labels:
+                lines.append(
+                    f"<div class='case-line'><div class='case-line-label'>Plates</div><div class='case-line-value'>{escape('; '.join(plate_labels))}</div></div>"
+                )
+            if powertool_labels:
+                lines.append(
+                    f"<div class='case-line'><div class='case-line-label'>Powertool</div><div class='case-line-value'>{escape('; '.join(powertool_labels))}</div></div>"
+                )
+            if bonegraft_labels:
+                lines.append(
+                    f"<div class='case-line'><div class='case-line-label'>Bonegraft</div><div class='case-line-value'>{escape('; '.join(bonegraft_labels))}</div></div>"
+                )
+            if extra_labels:
+                lines.append(
+                    f"<div class='case-line'><div class='case-line-label'>Extra Items</div><div class='case-line-value'>{escape('; '.join(extra_labels))}</div></div>"
+                )
+            if not lines:
+                lines.append(
+                    "<div class='case-empty'>No sent items recorded for this case.</div>"
+                )
+
+            filtered_cases.append(
+                "<div class='case-card'>"
+                "<div class='case-head'>"
+                "<div>"
+                f"<div class='case-title'>{escape(str(case.get('case_id', '')).strip() or 'Case')} · {escape(str(case.get('hospital', '')).strip() or 'Unknown hospital')}</div>"
+                f"<div class='case-sub'>deliver {escape(str(case.get('delivery_date', '')).strip() or '—')} · surg {escape(str(case.get('surgery_date', '')).strip() or '—')}</div>"
+                "</div>"
+                f"<div class='case-tags'>{''.join(tags)}</div>"
+                "</div>"
+                f"<div class='case-lines'>{''.join(lines)}</div>"
+                "</div>"
+            )
+
+        if filtered_cases:
+            st.markdown("".join(filtered_cases), unsafe_allow_html=True)
+        else:
+            st.info("No matching cases.")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
