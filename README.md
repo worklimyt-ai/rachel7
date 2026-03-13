@@ -46,6 +46,9 @@ Main output:
 - `outputs/operations_report.json`
 - plus CSVs for each section (sets, plates, powertools, buckets, routes, unknowns)
 
+Google Sheets entry guide:
+- `GOOGLE_SHEETS_INPUT_GUIDE.md`
+
 ## Run dashboard
 ```bash
 uv run streamlit run dashboard.py
