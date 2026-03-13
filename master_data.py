@@ -36,7 +36,7 @@ SETS = [
     {"category": "2.4-2.7", "id": "12", "home": "OFFICE", "uid": "2.412", "shorthand": "2.4"},
     {"category": "2.4-2.7", "id": "13", "home": "IPOH", "uid": "2.413", "shorthand": "2.4"},
     {"category": "2.4-2.7", "id": "14", "home": "OFFICE", "uid": "2.414", "shorthand": "2.4"},
-    {"category": "2.4-2.7", "id": "15", "home": "", "uid": "2.415", "shorthand": "2.4"},
+    {"category": "2.4-2.7", "id": "15", "home": "OFFICE", "uid": "2.415", "shorthand": "2.4"},
     {"category": "2.4-2.7", "id": "16", "home": "OFFICE", "uid": "2.416", "shorthand": "2.4"},
     {"category": "2.4-2.7", "id": "17", "home": "KPJJ", "uid": "2.417", "shorthand": "2.4"},
     {"category": "2.4-2.7", "id": "18", "home": "HSM", "uid": "2.418", "shorthand": "2.4"},
