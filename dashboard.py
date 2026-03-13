@@ -1568,7 +1568,7 @@ with inv_tabs[3]:
             unsafe_allow_html=True,
         )
         if archive_top_regions_sent.empty:
-            st.info("No delivered UID sets in the past 30 days.")
+            st.info("No delivered matching master-data UID sets in the past 30 days.")
         else:
             if search_query:
                 archive_top_regions_sent = archive_top_regions_sent[

@@ -1730,7 +1730,7 @@ def build_case_sent_item_details(
         for item in plate_items_by_key.values():
             size_ranges = sorted(item["size_ranges"], key=size_range_sort_key)
             size_ranges_label = ", ".join(size_ranges)
-            label = item["proper_name"]
+            label = item["plate_uid"] if item.get("is_resolved") else item["proper_name"]
             if size_ranges_label:
                 label = f"{label} ({size_ranges_label})"
             sent_plates.append({
@@ -1741,7 +1741,7 @@ def build_case_sent_item_details(
                 "label": label,
                 "is_resolved": item["is_resolved"],
             })
-        sent_plates.sort(key=lambda item: (str(item.get("proper_name", "")), str(item.get("size_ranges_label", ""))))
+        sent_plates.sort(key=lambda item: (str(item.get("plate_uid", "")), str(item.get("size_ranges_label", ""))))
 
         powertool_items = dict(powertool_items_by_case.get(case_id, {}))
         resolved_powertool_tokens = resolved_powertool_tokens_by_case.get(case_id, set())
