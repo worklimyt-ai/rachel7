@@ -1891,8 +1891,6 @@ def build_archive_30d_summary(
     window_start = today_kl - timedelta(days=30)
     cases_by_region: Counter[str] = Counter()
     cancelled_by_region: Counter[str] = Counter()
-    sent_by_region: Counter[str] = Counter()
-    sent_category_by_region: dict[str, Counter[str]] = defaultdict(Counter)
     total_cases = 0
     total_cancelled = 0
     sets_delivered = 0
@@ -1922,10 +1920,7 @@ def build_archive_30d_summary(
             if uid_norm not in uid_map:
                 continue
             matched_set_count += 1
-            category = str(uid_map[uid_norm][0].get("category", "")).strip() or "Unknown"
-            sent_category_by_region[region][category] += 1
         sets_delivered += matched_set_count
-        sent_by_region[region] += matched_set_count
 
     return {
         "window_start": format_date(window_start),
@@ -1933,23 +1928,6 @@ def build_archive_30d_summary(
         "total_cases_30d": total_cases,
         "total_cancelled_cases_30d": total_cancelled,
         "sets_delivered_30d": sets_delivered,
-        "top_regions_sent_30d": [
-            {
-                "region": region,
-                "sets_sent": sent_count,
-                "top_categories": [
-                    {"category": category, "sets": category_count}
-                    for category, category_count in sorted(
-                        sent_category_by_region[region].items(),
-                        key=lambda item: (-item[1], item[0]),
-                    )[:7]
-                ],
-            }
-            for region, sent_count in sorted(
-                sent_by_region.items(),
-                key=lambda item: (-item[1], item[0]),
-            )[:7]
-        ],
         "cases_by_region_30d": [
             {"region": region, "cases": count}
             for region, count in sorted(cases_by_region.items(), key=lambda item: (-item[1], item[0]))
