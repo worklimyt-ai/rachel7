@@ -7461,7 +7461,7 @@ PLATES = {
         "size_range": "EXTRA LONG",
         "left_right": "L",
         "size": "20H",
-        "location": "D4"
+        "location": "D4[no_stock]"
     },
     "52202066": {
         "uid": "DLT",
@@ -7873,7 +7873,7 @@ PLATES = {
         "size_range": "Standard",
         "left_right": "L",
         "size": "5H",
-        "location": "D5, D6"
+        "location": "D5[no_stock], D6"
     },
     "52205147": {
         "uid": "PLTII",
@@ -7913,7 +7913,7 @@ PLATES = {
         "size_range": "Standard",
         "left_right": "R",
         "size": "5H",
-        "location": "D5, D6"
+        "location": "D5, D6[no_stock]"
     },
     "52205177": {
         "uid": "PLTII",
@@ -8477,7 +8477,7 @@ PLATES = {
         "size_range": "Standard",
         "left_right": "R",
         "size": "8H",
-        "location": "D4"
+        "location": "D4[no_stock]"
     },
     "52206068": {
         "uid": "DLTII",
