@@ -235,6 +235,7 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
 .out-hosp-led {
     display: none; /* hidden; pill is on the wrap itself */
 }
+
 /* Base pill shape */
 .out-hosp-wrap .out-hosp-name {
     display: inline-block;
@@ -248,29 +249,56 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
     line-height: 1.5;
     letter-spacing: -.01em;
 }
-/* future  — amber */
-.out-hosp-wrap.is-future .out-hosp-name {
+/* delivered — teal */
+.out-hosp-wrap.is-delivered .out-hosp-name {
+    border-left-color: #0ea5a4;
+    background: #f0fdfa;
+    color: #0f766e;
+}
+/* surgery — amber */
+.out-hosp-wrap.is-surgery .out-hosp-name {
     border-left-color: #f59e0b;
     background: #fffbeb;
     color: #92400e;
 }
-/* today   — red */
-.out-hosp-wrap.is-today .out-hosp-name {
-    border-left-color: #ef4444;
-    background: #fff1f2;
-    color: #991b1b;
-}
-/* past    — green */
-.out-hosp-wrap.is-past .out-hosp-name {
-    border-left-color: #22c55e;
-    background: #f0fdf4;
-    color: #166534;
-}
-/* sales   — blue */
+/* sales posted — blue */
+.out-hosp-wrap.is-sales-posted .out-hosp-name,
 .out-hosp-wrap.is-sales .out-hosp-name {
     border-left-color: #3b82f6;
     background: #eff6ff;
     color: #1d4ed8;
+}
+/* in transit (ITS / SAIFUL) — cyan */
+.out-hosp-wrap.is-in-transit .out-hosp-name {
+    border-left-color: #0ea5e9;
+    background: #ecfeff;
+    color: #0369a1;
+}
+.out-hosp-wrap.is-in-transit.is-its .out-hosp-name {
+    border-left-color: #0ea5e9;
+}
+.out-hosp-wrap.is-in-transit.is-itd .out-hosp-name {
+    border-left-color: #06b6d4;
+}
+/* checking — purple */
+.out-hosp-wrap.is-checking .out-hosp-name {
+    border-left-color: #8b5cf6;
+    background: #f5f3ff;
+    color: #6d28d9;
+}
+/* shelf — green */
+.out-hosp-wrap.is-shelf .out-hosp-name {
+    border-left-color: #22c55e;
+    background: #f0fdf4;
+    color: #166534;
+}
+/* backwards-compatible legacy statuses */
+.out-hosp-wrap.is-future .out-hosp-name,
+.out-hosp-wrap.is-today .out-hosp-name,
+.out-hosp-wrap.is-past .out-hosp-name {
+    border-left-color: #22c55e;
+    background: #f0fdf4;
+    color: #166534;
 }
 /* plate variant — slightly larger */
 .out-hosp-wrap.is-plate .out-hosp-name {
@@ -531,17 +559,58 @@ def _parse_ui_date(value: str) -> Optional[date]:
     return None
 
 
-def _hospital_status_class(value: str, sales_code: str = "") -> str:
+def _hospital_status_class(
+    surgery_value: str,
+    *,
+    sales_code: str = "",
+    case_status: str = "",
+    is_booked: bool = False,
+    delivery_value: str = "",
+) -> str:
+    status = str(case_status or "").strip().upper()
+    booked_delivery_value = str(delivery_value or "").strip()
+    if not booked_delivery_value and is_booked:
+        booked_delivery_value = str(surgery_value or "").strip()
+    if is_booked and booked_delivery_value:
+        return "is-delivered"
+    if _parse_ui_date(surgery_value) is not None:
+        return "is-surgery"
     if str(sales_code or "").strip():
-        return "is-sales"
-    surgery_date = _parse_ui_date(value)
-    if surgery_date is None:
-        return ""
-    if surgery_date > report_today:
-        return "is-future"
-    if surgery_date == report_today:
-        return "is-today"
-    return "is-past"
+        return "is-sales-posted"
+    if status in {"ITS", "ITD"}:
+        return f"is-in-transit is-{status.lower()}"
+    if status == "ITO":
+        return "is-checking"
+    if status in {"CNX", "PP", "COMPLETED"}:
+        return "is-checking"
+    return "is-shelf"
+
+
+def _hospital_status_label(
+    surgery_value: str,
+    *,
+    sales_code: str = "",
+    case_status: str = "",
+    is_booked: bool = False,
+    delivery_value: str = "",
+) -> str:
+    status = str(case_status or "").strip().upper()
+    booked_delivery_value = str(delivery_value or "").strip()
+    if not booked_delivery_value and is_booked:
+        booked_delivery_value = str(surgery_value or "").strip()
+    if is_booked and booked_delivery_value:
+        return "Delivered"
+    if _parse_ui_date(surgery_value) is not None:
+        return "Surgery"
+    if str(sales_code or "").strip():
+        return "Sales posted"
+    if status in {"ITS", "ITD"}:
+        return "In transit with Saiful" if status == "ITS" else "In transit with Dylan"
+    if status == "ITO":
+        return "Checking"
+    if status in {"CNX", "PP", "COMPLETED"}:
+        return "Checking"
+    return "Shelf"
 
 
 def _hospital_with_led(
@@ -550,15 +619,31 @@ def _hospital_with_led(
     *,
     variant: str = "",
     sales_code: str = "",
+    case_status: str = "",
+    is_booked: bool = False,
+    delivery_value: str = "",
 ) -> str:
     hosp_text = escape(str(hospital or "—"))
-    status_class = _hospital_status_class(surgery_value, sales_code=sales_code)
+    status_class = _hospital_status_class(
+        surgery_value,
+        sales_code=sales_code,
+        case_status=case_status,
+        is_booked=is_booked,
+        delivery_value=delivery_value,
+    )
+    status_label = _hospital_status_label(
+        surgery_value,
+        sales_code=sales_code,
+        case_status=case_status,
+        is_booked=is_booked,
+        delivery_value=delivery_value,
+    )
     variant_class = f"is-{variant}" if variant else ""
     class_attr = " ".join(
         part for part in ("out-hosp-wrap", variant_class, status_class) if part
     )
     return (
-        f"<span class='{class_attr}'>"
+        f"<span class='{class_attr}' title='{escape(status_label)}'>"
         f"<span class='out-hosp-led'></span>"
         f"<span class='out-hosp-name'>{hosp_text}</span>"
         f"</span>"
@@ -594,7 +679,20 @@ with inv_tabs[0]:
     if set_avail.empty and set_status_all.empty:
         st.info("No set data.")
     else:
-        for col in ("category", "set_display", "id", "location_now", "surgery_date", "patient_doctor", "case_id", "set_status", "home", "assignment_kind", "delivery_date"):
+        for col in (
+            "category",
+            "set_display",
+            "id",
+            "location_now",
+            "surgery_date",
+            "patient_doctor",
+            "case_id",
+            "set_status",
+            "home",
+            "assignment_kind",
+            "delivery_date",
+            "case_status",
+        ):
             if col not in set_status_all.columns:
                 set_status_all[col] = ""
         set_status_all = set_status_all.copy()
@@ -737,6 +835,7 @@ with inv_tabs[0]:
                     "Hospital": str(r.get("location_now", "")),
                     "Surgery Date": str(r.get("surgery_date", "")),
                     "Case": str(r.get("case_id", "")),
+                    "Case Status": str(r.get("case_status", "")),
                     "Sales Code": case_sales_lookup.get(str(r.get("case_id", "")).strip(), ""),
                 })
             for _, r in booked_rows.iterrows():
@@ -747,6 +846,7 @@ with inv_tabs[0]:
                     "Surgery Date": "",
                     "Delivery Date": str(r.get("delivery_date", "")),
                     "Case": str(r.get("case_id", "")),
+                    "Case Status": str(r.get("case_status", "")),
                     "Sales Code": case_sales_lookup.get(str(r.get("case_id", "")).strip(), ""),
                     "Assignment": "BOOKED",
                 })
@@ -829,7 +929,7 @@ with inv_tabs[0]:
                             f"<span class='out-tag out-tag-booked'>BOOKED</span> "
                             f"<span class='out-set'>{o['Set']}</span>"
                             f"<span class='out-sep'> → </span>"
-                            f"{_hospital_with_led(o['Hospital'], o.get('Delivery Date', ''))}"
+                            f"{_hospital_with_led(o['Hospital'], o.get('Delivery Date', ''), is_booked=True, sales_code=o.get('Sales Code', ''), case_status=o.get('Case Status', ''))}"
                             f"<span class='out-sep'> · </span>"
                             f"<span class='out-surg'>deliver {o.get('Delivery Date', '') or '—'}</span>"
                             f"</div>"
@@ -840,7 +940,7 @@ with inv_tabs[0]:
                         f"<span class='out-tag'>OUT</span> "
                         f"<span class='out-set'>{o['Set']}</span>"
                         f"<span class='out-sep'> → </span>"
-                        f"{_hospital_with_led(o['Hospital'], o['Surgery Date'], sales_code=o.get('Sales Code', ''))}"
+                        f"{_hospital_with_led(o['Hospital'], o['Surgery Date'], sales_code=o.get('Sales Code', ''), case_status=o.get('Case Status', ''))}"
                         f"<span class='out-sep'> · </span>"
                         f"<span class='out-surg'>surg {o['Surgery Date'] or '—'}</span>"
                         f"</div>"

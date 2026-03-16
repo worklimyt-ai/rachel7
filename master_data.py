@@ -7227,7 +7227,7 @@ PLATES = {
         "size_range": "Standard",
         "left_right": "L",
         "size": "4H",
-        "location": "D3, D4"
+        "location": "D4"
     },
     "52207336": {
         "uid": "DLHII",
@@ -7237,7 +7237,7 @@ PLATES = {
         "size_range": "Standard",
         "left_right": "L",
         "size": "6H",
-        "location": "D3, D4"
+        "location": "D4"
     },
     "52207338": {
         "uid": "DLHII",
@@ -7247,7 +7247,7 @@ PLATES = {
         "size_range": "Standard",
         "left_right": "L",
         "size": "8H",
-        "location": "D3, D4"
+        "location": "D4"
     },
     "52207364": {
         "uid": "DLHII",
@@ -7257,7 +7257,7 @@ PLATES = {
         "size_range": "Standard",
         "left_right": "R",
         "size": "4H",
-        "location": "D3, D4"
+        "location": "D4"
     },
     "52207366": {
         "uid": "DLHII",
@@ -7267,7 +7267,7 @@ PLATES = {
         "size_range": "Standard",
         "left_right": "R",
         "size": "6H",
-        "location": "D3, D4"
+        "location": "D4"
     },
     "52207368": {
         "uid": "DLHII",
@@ -7277,7 +7277,7 @@ PLATES = {
         "size_range": "Standard",
         "left_right": "R",
         "size": "8H",
-        "location": "D3, D4"
+        "location": "D4"
     },
 
     # DMT - VA 2.7/3.5mm Distal Medial Tibia Plates II
