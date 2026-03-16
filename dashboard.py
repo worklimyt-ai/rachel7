@@ -654,14 +654,24 @@ meta   = report["meta"]
 case_rows_all = report.get("cases_all", [])
 cases_all_df = pd.DataFrame(report.get("cases_all", []))
 case_sales_lookup: dict[str, str] = {}
+case_delivery_lookup: dict[str, str] = {}
+case_return_lookup: dict[str, str] = {}
+case_prefix_lookup: dict[str, str] = {}
+case_status_lookup: dict[str, str] = {}
+case_is_booking_lookup: dict[str, bool] = {}
 if not cases_all_df.empty and "case_id" in cases_all_df.columns:
     if "sales_code" not in cases_all_df.columns:
         cases_all_df["sales_code"] = ""
-    case_sales_lookup = {
-        str(r.get("case_id", "")).strip(): str(r.get("sales_code", "") or "").strip()
-        for _, r in cases_all_df.iterrows()
-        if str(r.get("case_id", "")).strip()
-    }
+    for _, r in cases_all_df.iterrows():
+        cid = str(r.get("case_id", "")).strip()
+        if not cid:
+            continue
+        case_sales_lookup[cid]      = str(r.get("sales_code", "") or "").strip()
+        case_delivery_lookup[cid]   = str(r.get("delivery_date", "") or "").strip()
+        case_return_lookup[cid]     = str(r.get("return_date", "") or "").strip()
+        case_prefix_lookup[cid]     = str(r.get("prefix", "") or "").strip().upper()
+        case_status_lookup[cid]     = str(r.get("status", "") or "").strip().upper()
+        case_is_booking_lookup[cid] = bool(r.get("is_booking_case", False))
 now_kl = datetime.now(KL_TZ)
 try:
     report_today = datetime.strptime(str(meta.get("today_kl", "")).strip(), "%Y-%m-%d").date()
@@ -728,14 +738,10 @@ def _render_meeple_steps(steps: list[tuple], accent: str) -> str:
         is_done    = done and not is_current
 
         if is_done:
-            pill_style = (
-                f"background:{accent};border-color:{accent};color:#fff"
-            )
+            pill_style = f"background:{accent};border-color:{accent};color:#fff"
             pill_cls = "meeple-pill mp-done"
         elif is_current:
-            pill_style = (
-                f"background:{accent}18;border-color:{accent};color:{accent}"
-            )
+            pill_style = f"background:{accent}18;border-color:{accent};color:{accent}"
             pill_cls = "meeple-pill mp-current"
         else:
             pill_style = ""
@@ -769,70 +775,67 @@ def _render_meeple_steps(steps: list[tuple], accent: str) -> str:
     return "".join(parts)
 
 
-def _meeple_track_html(case: dict) -> str:
+def _build_meeple_steps(
+    *,
+    prefix: str,
+    delivery: str,
+    surgery: str,
+    sales_code: str,
+    status: str,
+    is_booking: bool,
+    return_date: str = "",
+) -> tuple[list[tuple], str]:
     """
-    Build the meeple progress track HTML for a case card.
+    Returns (steps, accent_color) for _render_meeple_steps.
+    Centralised so sets, plates, and cases tabs all use identical logic.
 
-    Track shapes:
-      Parking (prefix starts P, not BC):
-        Surgery → Top Up → Deliver Top Up → Done
-      Booked (prefix starts BC):
-        Booked → Delivered → Surgery → Sales Posted → In Transit → Checking
-      Standard:
-        Delivered → Surgery → Sales Posted → In Transit → Checking
+    Parking (prefix P, not BC):
+      Surgery → Sales Posted → Top Up Prepared → Top Up Delivered
+      - Top Up Prepared  = return_date present  (use return_date as proxy until
+                           topup_prep_date column exists in sheet)
+      - Top Up Delivered = status ITO/COMPLETED or sales_code + return_date
 
-    Cancelled/Postponed: terminal pill, no track.
+    Booked (prefix BC):
+      Booked → Delivered → Surgery → Sales Posted → In Transit → Checking
+
+    Standard:
+      Delivered → Surgery → Sales Posted → In Transit → Checking
     """
-    status     = str(case.get("status", "") or "").strip().upper()
-    smart      = str(case.get("smart_status", "") or "").strip().upper()
-    prefix     = str(case.get("prefix", "") or "").strip().upper()
-    delivery   = str(case.get("delivery_date", "") or "").strip()
-    surgery    = str(case.get("surgery_date", "") or "").strip()
-    sales_code = str(case.get("sales_code", "") or "").strip()
-    is_booking = bool(case.get("is_booking_case"))
-    is_parking = prefix.startswith("P") and not is_booking
-
-    # Terminal states
-    if status == "CNX" or smart == "CNX" or case.get("is_cancelled_case"):
-        return "<div class='meeple-terminal mp-cnx'>✕ Cancelled</div>"
-    if status == "PP" or smart == "PP":
-        return "<div class='meeple-terminal mp-pp'>⏸ Postponed</div>"
-
+    is_parking  = prefix.startswith("P") and not is_booking
+    is_transit  = status in {"ITS", "ITD"}
+    is_checking = status in {"ITO", "COMPLETED"}
     transit_label = (
         "With Saiful" if status == "ITS"
         else "With Dylan" if status == "ITD"
         else "In Transit"
     )
-    is_transit  = status in {"ITS", "ITD"}
-    is_checking = status in {"ITO", "COMPLETED"}
 
     if is_parking:
-        # Surgery → Top Up → Deliver Top Up → Done
-        has_surgery   = bool(_parse_ui_date(surgery))
-        has_del_topup = bool(_parse_ui_date(delivery))
-        has_done      = bool(sales_code) or is_checking
+        has_surgery  = bool(_parse_ui_date(surgery))
+        has_sales    = bool(sales_code)
+        # return_date is the topup-delivered proxy; topup-prepared = return_date present
+        has_topup_prep = bool(_parse_ui_date(return_date))
+        has_topup_del  = is_checking or (bool(sales_code) and bool(_parse_ui_date(return_date)))
         steps = [
-            ("Surgery",        "SURG",  has_surgery,   surgery),
-            ("Top Up",         "TOPUP", has_del_topup, ""),
-            ("Deliver Top Up", "DEL",   has_del_topup, delivery),
-            ("Done",           "DONE",  has_done,      ""),
+            ("Surgery",          "SURG",  has_surgery,    surgery),
+            ("Sales Posted",     "SALES", has_sales,      ""),
+            ("Top Up Prepared",  "PREP",  has_topup_prep, return_date),
+            ("Top Up Delivered", "DEL",   has_topup_del,  ""),
         ]
         accent = "#f59e0b"
 
     elif is_booking:
-        # Booked → Delivered → Surgery → Sales Posted → In Transit → Checking
         steps = [
-            ("Booked",       "BKD",   True,                       ""),
+            ("Booked",       "BKD",   True,                          ""),
             ("Delivered",    "DEL",   bool(_parse_ui_date(delivery)), delivery),
             ("Surgery",      "SURG",  bool(_parse_ui_date(surgery)),  surgery),
-            ("Sales Posted", "SALES", bool(sales_code),            ""),
-            (transit_label,  "TRNST", is_transit,                  ""),
-            ("Checking",     "CHK",   is_checking,                 ""),
+            ("Sales Posted", "SALES", bool(sales_code),               ""),
+            (transit_label,  "TRNST", is_transit,                     ""),
+            ("Checking",     "CHK",   is_checking,                    ""),
         ]
         accent = "#2563eb"
 
     else:
-        # Delivered → Surgery → Sales Posted → In Transit → Checking
         steps = [
             ("Delivered",    "DEL",   bool(_parse_ui_date(delivery)), delivery),
             ("Surgery",      "SURG",  bool(_parse_ui_date(surgery)),  surgery),
@@ -842,6 +845,65 @@ def _meeple_track_html(case: dict) -> str:
         ]
         accent = "#0ea5a4"
 
+    return steps, accent
+
+
+def _meeple_track_html(case: dict) -> str:
+    """Meeple track for the Cases tab — reads directly from a case dict."""
+    status = str(case.get("status", "") or "").strip().upper()
+    smart  = str(case.get("smart_status", "") or "").strip().upper()
+    if status == "CNX" or smart == "CNX" or case.get("is_cancelled_case"):
+        return "<div class='meeple-terminal mp-cnx'>✕ Cancelled</div>"
+    if status == "PP" or smart == "PP":
+        return "<div class='meeple-terminal mp-pp'>⏸ Postponed</div>"
+
+    steps, accent = _build_meeple_steps(
+        prefix      = str(case.get("prefix", "") or "").strip().upper(),
+        delivery    = str(case.get("delivery_date", "") or "").strip(),
+        surgery     = str(case.get("surgery_date", "") or "").strip(),
+        sales_code  = str(case.get("sales_code", "") or "").strip(),
+        status      = status,
+        is_booking  = bool(case.get("is_booking_case")),
+        return_date = str(case.get("return_date", "") or "").strip(),
+    )
+    return _render_meeple_steps(steps, accent)
+
+
+def _meeple_track_for_case_id(
+    case_id: str,
+    *,
+    surgery: str = "",
+    delivery: str = "",
+    case_status: str = "",
+) -> str:
+    """
+    Meeple track for Sets / Plates tabs — looks up case details by case_id.
+    surgery / delivery can be overridden from the set-level row when needed.
+    """
+    cid = str(case_id or "").strip()
+    status     = case_status.strip().upper() or case_status_lookup.get(cid, "")
+    prefix     = case_prefix_lookup.get(cid, "")
+    sales_code = case_sales_lookup.get(cid, "")
+    ret_date   = case_return_lookup.get(cid, "")
+    is_booking = case_is_booking_lookup.get(cid, False)
+    del_date   = delivery or case_delivery_lookup.get(cid, "")
+    surg_date  = surgery or ""
+
+    # terminal states
+    if status in {"CNX"} or (not status and prefix.upper().startswith("CNX")):
+        return "<div class='meeple-terminal mp-cnx'>✕ Cancelled</div>"
+    if status == "PP":
+        return "<div class='meeple-terminal mp-pp'>⏸ Postponed</div>"
+
+    steps, accent = _build_meeple_steps(
+        prefix      = prefix,
+        delivery    = del_date,
+        surgery     = surg_date,
+        sales_code  = sales_code,
+        status      = status,
+        is_booking  = is_booking,
+        return_date = ret_date,
+    )
     return _render_meeple_steps(steps, accent)
 
 
@@ -1375,8 +1437,15 @@ with inv_tabs[0]:
             if out_items:
                 rendered_lines = []
                 for idx, o in enumerate(out_items, start=1):
-                    idx_label = f"<span class='out-order'>#{idx}</span>"
+                    idx_label  = f"<span class='out-order'>#{idx}</span>"
                     assignment = str(o.get("Assignment", "")).strip().upper()
+                    case_id    = str(o.get("Case", "")).strip()
+                    meeple     = _meeple_track_for_case_id(
+                        case_id,
+                        surgery  = o.get("Surgery Date", ""),
+                        delivery = o.get("Delivery Date", ""),
+                        case_status = o.get("Case Status", ""),
+                    )
                     if assignment == "BOOKED":
                         rendered_lines.append(
                             f"<div class='out-line'>"
@@ -1387,6 +1456,7 @@ with inv_tabs[0]:
                             f"{_hospital_with_led(o['Hospital'], o.get('Delivery Date', ''), is_booked=True, sales_code=o.get('Sales Code', ''), case_status=o.get('Case Status', ''))}"
                             f"<span class='out-sep'> · </span>"
                             f"<span class='out-surg'>deliver {o.get('Delivery Date', '') or '—'}</span>"
+                            f"{meeple}"
                             f"</div>"
                         )
                     else:
@@ -1399,6 +1469,7 @@ with inv_tabs[0]:
                             f"{_hospital_with_led(o['Hospital'], o['Surgery Date'], sales_code=o.get('Sales Code', ''), case_status=o.get('Case Status', ''))}"
                             f"<span class='out-sep'> · </span>"
                             f"<span class='out-surg'>surg {o['Surgery Date'] or '—'}</span>"
+                            f"{meeple}"
                             f"</div>"
                         )
                 out_lines = "".join(rendered_lines)
@@ -1792,6 +1863,7 @@ with inv_tabs[1]:
                     entry["size_ranges"].add(str(item.get("size_range", "")).strip())
 
                 out_tags = ""
+                out_meeples = ""
                 for cd in ordered_unique_out:
                     hosp = cd["hospital"] or "—"
                     surg = cd["surgery_date"] or "—"
@@ -1807,6 +1879,20 @@ with inv_tabs[1]:
                         f"{stk_s}"
                         f"</span>"
                     )
+                    case_id = str(cd.get("case_id", "")).strip()
+                    if case_id:
+                        meeple = _meeple_track_for_case_id(
+                            case_id,
+                            surgery     = str(cd.get("surgery_date", "")),
+                            case_status = str(cd.get("case_status", "")),
+                        )
+                        out_meeples += (
+                            f"<div style='padding:4px 10px 6px 10px;border-top:1px solid #f3f4f6'>"
+                            f"<span style='font-size:9px;font-weight:700;color:#9ca3af;letter-spacing:.08em;text-transform:uppercase'>"
+                            f"{escape(case_id)} · {escape(hosp)}</span>"
+                            f"{meeple}"
+                            f"</div>"
+                        )
 
                 # All chips merged into one row, colour = size_range (or override)
                 chips_html = ""
@@ -1885,11 +1971,12 @@ with inv_tabs[1]:
             drawer_blocks += (
                 f"<div class='dr-block'>"
                 f"<div class='dr-hdr {hdr_cls}'>"
-                    f"<span>{drawer}</span><span class='dh-out-list'>{out_tags}</span>"
-                    f"</div>"
-                    f"<div class='dr-chips {drc_cls}'>{chips_html}</div>"
-                    f"</div>"
-                )
+                f"<span>{drawer}</span><span class='dh-out-list'>{out_tags}</span>"
+                f"</div>"
+                f"{out_meeples}"
+                f"<div class='dr-chips {drc_cls}'>{chips_html}</div>"
+                f"</div>"
+            )
 
             return (
                 f"<div class='inv-row'>"
