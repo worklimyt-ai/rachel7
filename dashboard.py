@@ -114,14 +114,57 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
     letter-spacing: .01em;
 }
 .upcoming-cases {
-    margin-top: 6px;
-    font-size: 12px;
-    color: #059669;
-    letter-spacing: .01em;
-    font-family: 'JetBrains Mono', monospace;
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
-.upcoming-cases .more {
+.upcoming-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 7px;
+    padding: 4px 9px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: #15803d;
+    font-weight: 600;
+    white-space: nowrap;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.upcoming-chip.is-booked {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    color: #1d4ed8;
+}
+.upcoming-chip .uc-date {
+    font-size: 10px;
+    font-weight: 700;
+    opacity: .75;
+}
+.upcoming-chip .uc-hosp {
+    color: #374151;
+    font-size: 11px;
+}
+.upcoming-chip .uc-sets {
+    opacity: .6;
+    font-size: 10px;
+}
+.upcoming-chip .uc-kind {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    opacity: .6;
+}
+.upcoming-more {
+    font-size: 10px;
     color: #6b7280;
+    padding: 1px 4px;
+    font-style: italic;
 }
 .case-card {
     background: #ffffff;
@@ -825,8 +868,11 @@ with inv_tabs[0]:
                     continue
                 hospital = str(r.get("location_now", "")).strip() or "—"
                 surgery_date = str(r.get("surgery_date", "")).strip()
+                date_value = _parse_ui_date(surgery_date)
+                # Only include cases whose surgery date is today or in the future
+                if date_value is None or date_value < report_today:
+                    continue
                 key = ("OUT", case_id, hospital, surgery_date)
-                date_value = _parse_ui_date(surgery_date) or date.max
                 set_name = str(r.get("set_name", "")).strip()
                 entry = upcoming_case_map.get(key)
                 if entry is None:
@@ -848,8 +894,11 @@ with inv_tabs[0]:
                     continue
                 hospital = str(r.get("location_now", "")).strip() or "—"
                 delivery_date = str(r.get("delivery_date", "")).strip()
+                date_value = _parse_ui_date(delivery_date)
+                # Only include cases whose delivery date is today or in the future
+                if date_value is None or date_value < report_today:
+                    continue
                 key = ("BOOKED", case_id, hospital, delivery_date)
-                date_value = _parse_ui_date(delivery_date) or date.max
                 set_name = str(r.get("set_name", "")).strip()
                 entry = upcoming_case_map.get(key)
                 if entry is None:
@@ -1062,28 +1111,53 @@ with inv_tabs[0]:
 
             upcoming_cases = list(r.get("UpcomingCases", []) or [])
             upcoming_parts = []
-            for idx, item in enumerate(upcoming_cases[:4], start=1):
-                item_case = escape(str(item.get("case_id", "")))
+            for item in upcoming_cases[:5]:
+                item_case  = escape(str(item.get("case_id", "")))
+                item_hosp  = escape(str(item.get("hospital", "—")))
+                item_kind  = str(item.get("kind", "")).strip().upper()
+                is_booked  = item_kind == "BOOKED"
+                chip_cls   = "upcoming-chip is-booked" if is_booked else "upcoming-chip"
+                kind_label = "del" if is_booked else "surg"
+                raw_date   = str(item.get("date", "")).strip()
+                d_obj      = _parse_ui_date(raw_date)
+                date_label = d_obj.strftime("%-d %b") if d_obj else escape(raw_date or "—")
+                days_away  = (d_obj - report_today).days if d_obj else None
+                if days_away is not None:
+                    if days_away == 0:
+                        day_hint = " (today)"
+                    elif days_away == 1:
+                        day_hint = " (tmrw)"
+                    elif days_away <= 7:
+                        day_hint = f" ({days_away}d)"
+                    else:
+                        day_hint = ""
+                else:
+                    day_hint = ""
                 set_names = [
                     escape(str(name).strip())
                     for name in sorted(set(item.get("set_names", [])))
                     if str(name).strip()
                 ]
-                set_names_text = f" [{', '.join(set_names)}]" if set_names else ""
-                item_hospital = escape(str(item.get("hospital", "—")))
-                item_date = escape(str(item.get("date", "")).strip() or "—")
-                item_kind = str(item.get("kind", "")).strip().upper()
-                item_kind_label = "del" if item_kind == "BOOKED" else "surg"
+                sets_part = (
+                    f"<span class='uc-sets'>[{', '.join(set_names)}]</span>"
+                    if set_names else ""
+                )
                 upcoming_parts.append(
-                    f"<span>{idx}.) {item_case}{set_names_text} ({item_hospital} · {item_kind_label} {item_date})</span>"
+                    f"<span class='{chip_cls}'>"
+                    f"<span class='uc-date'>{date_label}{escape(day_hint)}</span>"
+                    f"<span class='uc-kind'>{kind_label}</span>"
+                    f"<span class='uc-hosp'>{item_hosp}</span>"
+                    f"<span style='color:#9ca3af;font-size:10px'>{item_case}</span>"
+                    f"{sets_part}"
+                    f"</span>"
                 )
             upcoming_html = ""
             if upcoming_parts:
-                more_count = max(len(upcoming_cases) - 4, 0)
-                more_label = f"<span class='more'> +{more_count} more</span>" if more_count > 0 else ""
+                more_count = max(len(upcoming_cases) - 5, 0)
+                more_label = f"<span class='upcoming-more'>+{more_count} more</span>" if more_count > 0 else ""
                 upcoming_html = (
-                    "<div class='upcoming-cases'>upcoming cases: "
-                    + " · ".join(upcoming_parts)
+                    "<div class='upcoming-cases'>"
+                    + "".join(upcoming_parts)
                     + more_label
                     + "</div>"
                 )
