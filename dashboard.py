@@ -132,7 +132,6 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
     color: #15803d;
     font-weight: 600;
     white-space: nowrap;
-    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
 }
@@ -142,23 +141,15 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
     color: #1d4ed8;
 }
 .upcoming-chip .uc-date {
-    font-size: 10px;
     font-weight: 700;
-    opacity: .75;
+    min-width: 44px;
 }
 .upcoming-chip .uc-hosp {
     color: #374151;
-    font-size: 11px;
 }
 .upcoming-chip .uc-sets {
-    opacity: .6;
+    opacity: .55;
     font-size: 10px;
-}
-.upcoming-chip .uc-kind {
-    font-size: 9px;
-    text-transform: uppercase;
-    letter-spacing: .08em;
-    opacity: .6;
 }
 .upcoming-more {
     font-size: 10px;
@@ -867,12 +858,12 @@ with inv_tabs[0]:
                 if not case_id:
                     continue
                 hospital = str(r.get("location_now", "")).strip() or "—"
-                surgery_date = str(r.get("surgery_date", "")).strip()
-                date_value = _parse_ui_date(surgery_date)
-                # Only include cases whose surgery date is today or in the future
+                delivery_date = str(r.get("delivery_date", "")).strip()
+                date_value = _parse_ui_date(delivery_date)
+                # Only show cases not yet delivered (delivery date today or future)
                 if date_value is None or date_value < report_today:
                     continue
-                key = ("OUT", case_id, hospital, surgery_date)
+                key = ("OUT", case_id, hospital, delivery_date)
                 set_name = str(r.get("set_name", "")).strip()
                 entry = upcoming_case_map.get(key)
                 if entry is None:
@@ -880,7 +871,7 @@ with inv_tabs[0]:
                         "kind": "OUT",
                         "case_id": case_id,
                         "hospital": hospital,
-                        "date": surgery_date,
+                        "date": delivery_date,
                         "date_value": date_value,
                         "set_names": [],
                     }
@@ -895,7 +886,7 @@ with inv_tabs[0]:
                 hospital = str(r.get("location_now", "")).strip() or "—"
                 delivery_date = str(r.get("delivery_date", "")).strip()
                 date_value = _parse_ui_date(delivery_date)
-                # Only include cases whose delivery date is today or in the future
+                # Only show cases not yet delivered (delivery date today or future)
                 if date_value is None or date_value < report_today:
                     continue
                 key = ("BOOKED", case_id, hospital, delivery_date)
@@ -1115,22 +1106,17 @@ with inv_tabs[0]:
                 item_case  = escape(str(item.get("case_id", "")))
                 item_hosp  = escape(str(item.get("hospital", "—")))
                 item_kind  = str(item.get("kind", "")).strip().upper()
-                is_booked  = item_kind == "BOOKED"
-                chip_cls   = "upcoming-chip is-booked" if is_booked else "upcoming-chip"
-                kind_label = "del" if is_booked else "surg"
+                chip_cls   = "upcoming-chip is-booked" if item_kind == "BOOKED" else "upcoming-chip"
                 raw_date   = str(item.get("date", "")).strip()
                 d_obj      = _parse_ui_date(raw_date)
                 date_label = d_obj.strftime("%-d %b") if d_obj else escape(raw_date or "—")
                 days_away  = (d_obj - report_today).days if d_obj else None
-                if days_away is not None:
-                    if days_away == 0:
-                        day_hint = " (today)"
-                    elif days_away == 1:
-                        day_hint = " (tmrw)"
-                    elif days_away <= 7:
-                        day_hint = f" ({days_away}d)"
-                    else:
-                        day_hint = ""
+                if days_away == 0:
+                    day_hint = " today"
+                elif days_away == 1:
+                    day_hint = " tmrw"
+                elif days_away is not None and days_away <= 7:
+                    day_hint = f" {days_away}d"
                 else:
                     day_hint = ""
                 set_names = [
@@ -1139,13 +1125,12 @@ with inv_tabs[0]:
                     if str(name).strip()
                 ]
                 sets_part = (
-                    f"<span class='uc-sets'>[{', '.join(set_names)}]</span>"
+                    f" <span class='uc-sets'>[{', '.join(set_names)}]</span>"
                     if set_names else ""
                 )
                 upcoming_parts.append(
                     f"<span class='{chip_cls}'>"
                     f"<span class='uc-date'>{date_label}{escape(day_hint)}</span>"
-                    f"<span class='uc-kind'>{kind_label}</span>"
                     f"<span class='uc-hosp'>{item_hosp}</span>"
                     f"<span style='color:#9ca3af;font-size:10px'>{item_case}</span>"
                     f"{sets_part}"
