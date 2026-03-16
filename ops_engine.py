@@ -1183,6 +1183,7 @@ def build_plate_outputs(
                     "delivery_date":  case["delivery_date"],
                     "surgery_date":   case["surgery_date"],
                     "raw_plate_token":parsed["raw_token"],
+                    "case_status":    case["status"],
                     "from_stock":     parsed["from_stock"],
                 })
 
@@ -1220,6 +1221,7 @@ def build_plate_outputs(
                 "case_id":      d["case_id"],
                 "hospital":     d["hospital"],
                 "surgery_date": d["surgery_date"],
+                "case_status":  d.get("case_status", ""),
                 "from_stock":   d["from_stock"],
             }
             out_case_details.append(case_detail)
@@ -1823,10 +1825,6 @@ def is_cancelled_case(case: dict[str, Any]) -> bool:
     if has_sales:
         return False
 
-    if status_token == "PP":
-        return True
-    if "POSTPON" in smart_status_token or "POSTPON" in status_token:
-        return True
     return False
 
 

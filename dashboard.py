@@ -113,6 +113,16 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
     color: #1d4ed8;
     letter-spacing: .01em;
 }
+.upcoming-cases {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #059669;
+    letter-spacing: .01em;
+    font-family: 'JetBrains Mono', monospace;
+}
+.upcoming-cases .more {
+    color: #6b7280;
+}
 .case-card {
     background: #ffffff;
     border: 1px solid #e5e7eb;
@@ -203,6 +213,13 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
     border-left: 3px solid #e5e7eb;
     padding-left: 14px;
     margin-left: 4px;
+}
+.out-order {
+    font-size: 10px;
+    font-weight: 700;
+    color: #6b7280;
+    margin-right: 6px;
+    letter-spacing: .02em;
 }
 .out-tag  {
     display: inline-block;
@@ -589,14 +606,14 @@ def _hospital_status_class(
     booked_delivery_value = str(delivery_value or "").strip()
     if not booked_delivery_value and is_booked:
         booked_delivery_value = str(surgery_value or "").strip()
-    if is_booked and booked_delivery_value:
-        return "is-delivered"
-    if _parse_ui_date(surgery_value) is not None:
-        return "is-surgery"
     if status == "CNX":
         return "is-cancelled"
     if status == "PP":
         return "is-postponed"
+    if is_booked and booked_delivery_value:
+        return "is-delivered"
+    if _parse_ui_date(surgery_value) is not None:
+        return "is-surgery"
     if str(sales_code or "").strip():
         return "is-sales-posted"
     if status == "":
@@ -620,14 +637,14 @@ def _hospital_status_label(
     booked_delivery_value = str(delivery_value or "").strip()
     if not booked_delivery_value and is_booked:
         booked_delivery_value = str(surgery_value or "").strip()
-    if is_booked and booked_delivery_value:
-        return "Delivered"
-    if _parse_ui_date(surgery_value) is not None:
-        return "Surgery"
     if status == "CNX":
         return "Cancelled"
     if status == "PP":
         return "Postponed"
+    if is_booked and booked_delivery_value:
+        return "Delivered"
+    if _parse_ui_date(surgery_value) is not None:
+        return "Surgery"
     if str(sales_code or "").strip():
         return "Sales posted"
     if status == "":
@@ -801,6 +818,81 @@ with inv_tabs[0]:
                 & (~cat_rows["assignment_kind_norm"].eq("BOOKED"))
             ]
 
+            upcoming_case_map: dict[tuple[str, str, str, str], dict] = {}
+            for _, r in out_case_rows.iterrows():
+                case_id = str(r.get("case_id", "")).strip()
+                if not case_id:
+                    continue
+                hospital = str(r.get("location_now", "")).strip() or "—"
+                surgery_date = str(r.get("surgery_date", "")).strip()
+                key = ("OUT", case_id, hospital, surgery_date)
+                date_value = _parse_ui_date(surgery_date) or date.max
+                set_name = str(r.get("set_name", "")).strip()
+                entry = upcoming_case_map.get(key)
+                if entry is None:
+                    entry = {
+                        "kind": "OUT",
+                        "case_id": case_id,
+                        "hospital": hospital,
+                        "date": surgery_date,
+                        "date_value": date_value,
+                        "set_names": [],
+                    }
+                    upcoming_case_map[key] = entry
+                if set_name and set_name not in entry["set_names"]:
+                    entry["set_names"].append(set_name)
+
+            for _, r in booked_rows.iterrows():
+                case_id = str(r.get("case_id", "")).strip()
+                if not case_id:
+                    continue
+                hospital = str(r.get("location_now", "")).strip() or "—"
+                delivery_date = str(r.get("delivery_date", "")).strip()
+                key = ("BOOKED", case_id, hospital, delivery_date)
+                date_value = _parse_ui_date(delivery_date) or date.max
+                set_name = str(r.get("set_name", "")).strip()
+                entry = upcoming_case_map.get(key)
+                if entry is None:
+                    entry = {
+                        "kind": "BOOKED",
+                        "case_id": case_id,
+                        "hospital": hospital,
+                        "date": delivery_date,
+                        "date_value": date_value,
+                        "set_names": [],
+                    }
+                    upcoming_case_map[key] = entry
+                if set_name and set_name not in entry["set_names"]:
+                    entry["set_names"].append(set_name)
+
+            upcoming_cases = sorted(
+                upcoming_case_map.values(),
+                key=lambda item: (
+                    item.get("date_value", date.max),
+                    str(item.get("kind", "")),
+                    str(item.get("case_id", "")),
+                    str(item.get("hospital", "")),
+                )
+            )
+
+            upcoming_case_parts: list[str] = []
+            for idx, item in enumerate(upcoming_cases, start=1):
+                set_names = [
+                    escape(str(name).strip())
+                    for name in sorted(set(item.get("set_names", [])))
+                    if str(name).strip()
+                ]
+                set_names_text = f" [{', '.join(set_names)}]" if set_names else ""
+                upcoming_case_parts.append(
+                    f"{idx}. "
+                    f"{escape(str(item.get('case_id', '')))}"
+                    f"{set_names_text} "
+                    f"{escape(str(item.get('hospital', '—')))} "
+                    f"{'del' if item.get('kind') == 'BOOKED' else 'surg'} "
+                    f"{escape(str(item.get('date', '—')).strip() or '—')}"
+                )
+            upcoming_cases_text = "; ".join(upcoming_case_parts) if upcoming_case_parts else ""
+
             in_count = int(len(office_rows))
             standby_count = int(len(standby_rows))
             booked_count = int(len(booked_rows))
@@ -829,15 +921,45 @@ with inv_tabs[0]:
                 for _, r in standby_rows.iterrows()
             ]
             in_list = "; ".join(sorted([item["name"] for item in office_items + standby_items]))
-            out_list = "; ".join(sorted(
-                [
-                    f"{str(r['set_name'])} @ {str(r['location_now']).strip() or 'OUT'} ({str(r['surgery_date']).strip() or '-'})"
-                    for _, r in out_case_rows.iterrows()
-                ] + [
-                    f"{str(r['set_name'])} booked @ {str(r['location_now']).strip() or 'BOOKED'} ({str(r['delivery_date']).strip() or '-'})"
-                    for _, r in booked_rows.iterrows()
-                ]
-            ))
+
+            out_case_items: list[dict] = []
+            for _, r in out_case_rows.iterrows():
+                out_case_items.append({
+                    "kind": "OUT",
+                    "set_name": str(r.get("set_name", "")).strip(),
+                    "hospital": str(r.get("location_now", "")).strip() or "OUT",
+                    "surgery_date": str(r.get("surgery_date", "")).strip(),
+                    "date_value": _parse_ui_date(str(r.get("surgery_date", ""))) or date.max,
+                    "case_id": str(r.get("case_id", "")).strip(),
+                    "case_status": str(r.get("case_status", "")).strip(),
+                    "sales_code": case_sales_lookup.get(str(r.get("case_id", "")).strip(), ""),
+                })
+            booked_case_items: list[dict] = []
+            for _, r in booked_rows.iterrows():
+                booked_case_items.append({
+                    "kind": "BOOKED",
+                    "set_name": str(r.get("set_name", "")).strip(),
+                    "hospital": str(r.get("location_now", "")).strip() or "BOOKED",
+                    "delivery_date": str(r.get("delivery_date", "")).strip(),
+                    "date_value": _parse_ui_date(str(r.get("delivery_date", ""))) or date.max,
+                    "case_id": str(r.get("case_id", "")).strip(),
+                    "case_status": str(r.get("case_status", "")).strip(),
+                    "sales_code": case_sales_lookup.get(str(r.get("case_id", "")).strip(), ""),
+                })
+
+            out_list = "; ".join(
+                f"{item['set_name']} @ {item['hospital']} ({(item.get('surgery_date') or item.get('delivery_date') or '-')})"
+                for item in sorted(
+                    out_case_items + booked_case_items,
+                    key=lambda item: (
+                        item.get("date_value", date.max),
+                        str(item.get("kind", "")),
+                        str(item.get("hospital", "")),
+                        str(item.get("case_id", "")),
+                        str(item.get("set_name", "")),
+                    )
+                )
+            )
 
             summary_rows.append({
                 "Category": label,
@@ -852,29 +974,34 @@ with inv_tabs[0]:
                 "NextBooking": next_booking_lookup.get(cat_norm, {}),
                 "In Office Sets": in_list,
                 "Out (Hospital • Surgery)": out_list,
+                "UpcomingCases": upcoming_cases,
+                "UpcomingCasesText": upcoming_cases_text,
             })
 
-            for _, r in out_case_rows.iterrows():
+            for item in out_case_items:
                 out_rows.append({
                     "Category": label,
-                    "Set": str(r.get("set_name", "")),
-                    "Hospital": str(r.get("location_now", "")),
-                    "Surgery Date": str(r.get("surgery_date", "")),
-                    "Case": str(r.get("case_id", "")),
-                    "Case Status": str(r.get("case_status", "")),
-                    "Sales Code": case_sales_lookup.get(str(r.get("case_id", "")).strip(), ""),
+                    "Set": item["set_name"],
+                    "Hospital": item["hospital"],
+                    "Surgery Date": item["surgery_date"],
+                    "Delivery Date": "",
+                    "Case": item["case_id"],
+                    "Case Status": item["case_status"],
+                    "Sales Code": item["sales_code"],
+                    "DateValue": item["date_value"],
                 })
-            for _, r in booked_rows.iterrows():
+            for item in booked_case_items:
                 out_rows.append({
                     "Category": label,
-                    "Set": str(r.get("set_name", "")),
-                    "Hospital": str(r.get("location_now", "")),
+                    "Set": item["set_name"],
+                    "Hospital": item["hospital"],
                     "Surgery Date": "",
-                    "Delivery Date": str(r.get("delivery_date", "")),
-                    "Case": str(r.get("case_id", "")),
-                    "Case Status": str(r.get("case_status", "")),
-                    "Sales Code": case_sales_lookup.get(str(r.get("case_id", "")).strip(), ""),
+                    "Delivery Date": item["delivery_date"],
+                    "Case": item["case_id"],
+                    "Case Status": item["case_status"],
+                    "Sales Code": item["sales_code"],
                     "Assignment": "BOOKED",
+                    "DateValue": item["date_value"],
                 })
 
         # Build out-details lookup: category_norm → list of dicts
@@ -892,6 +1019,7 @@ with inv_tabs[0]:
                 if sq in r["Category"].lower()
                 or sq in r["In Office Sets"].lower()
                 or sq in r["Out (Hospital • Surgery)"].lower()
+                or sq in r.get("UpcomingCasesText", "").lower()
             ]
 
         def _set_row_html(r: dict) -> str:
@@ -932,6 +1060,34 @@ with inv_tabs[0]:
                     next_booking_label += f" · {next_booking_case}"
                 next_booking_html = f"<div class='booking-next'>next booking {next_booking_label}</div>"
 
+            upcoming_cases = list(r.get("UpcomingCases", []) or [])
+            upcoming_parts = []
+            for idx, item in enumerate(upcoming_cases[:4], start=1):
+                item_case = escape(str(item.get("case_id", "")))
+                set_names = [
+                    escape(str(name).strip())
+                    for name in sorted(set(item.get("set_names", [])))
+                    if str(name).strip()
+                ]
+                set_names_text = f" [{', '.join(set_names)}]" if set_names else ""
+                item_hospital = escape(str(item.get("hospital", "—")))
+                item_date = escape(str(item.get("date", "")).strip() or "—")
+                item_kind = str(item.get("kind", "")).strip().upper()
+                item_kind_label = "del" if item_kind == "BOOKED" else "surg"
+                upcoming_parts.append(
+                    f"<span>{idx}.) {item_case}{set_names_text} ({item_hospital} · {item_kind_label} {item_date})</span>"
+                )
+            upcoming_html = ""
+            if upcoming_parts:
+                more_count = max(len(upcoming_cases) - 4, 0)
+                more_label = f"<span class='more'> +{more_count} more</span>" if more_count > 0 else ""
+                upcoming_html = (
+                    "<div class='upcoming-cases'>upcoming cases: "
+                    + " · ".join(upcoming_parts)
+                    + more_label
+                    + "</div>"
+                )
+
             left_col = (
                 f"<div style='flex:0 0 39%;padding-right:20px'>"
                 f"<div style='display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px'>"
@@ -940,18 +1096,29 @@ with inv_tabs[0]:
                 f"</div>"
                 f"{in_sets_html}"
                 f"{next_booking_html}"
+                f"{upcoming_html}"
                 f"</div>"
             )
 
             # Right: OUT lines
-            out_items = _set_out.get(cat_norm, [])
+            out_items = sorted(
+                _set_out.get(cat_norm, []),
+                key=lambda o: (
+                    o.get("DateValue", date.max),
+                    str(o.get("Case", "")),
+                    str(o.get("Set", "")),
+                    str(o.get("Hospital", "")),
+                ),
+            )
             if out_items:
                 rendered_lines = []
-                for o in out_items:
+                for idx, o in enumerate(out_items, start=1):
+                    idx_label = f"<span class='out-order'>#{idx}</span>"
                     assignment = str(o.get("Assignment", "")).strip().upper()
                     if assignment == "BOOKED":
                         rendered_lines.append(
                             f"<div class='out-line'>"
+                            f"{idx_label}"
                             f"<span class='out-tag out-tag-booked'>BOOKED</span> "
                             f"<span class='out-set'>{o['Set']}</span>"
                             f"<span class='out-sep'> → </span>"
@@ -960,17 +1127,18 @@ with inv_tabs[0]:
                             f"<span class='out-surg'>deliver {o.get('Delivery Date', '') or '—'}</span>"
                             f"</div>"
                         )
-                        continue
-                    rendered_lines.append(
-                        f"<div class='out-line'>"
-                        f"<span class='out-tag'>OUT</span> "
-                        f"<span class='out-set'>{o['Set']}</span>"
-                        f"<span class='out-sep'> → </span>"
-                        f"{_hospital_with_led(o['Hospital'], o['Surgery Date'], sales_code=o.get('Sales Code', ''), case_status=o.get('Case Status', ''))}"
-                        f"<span class='out-sep'> · </span>"
-                        f"<span class='out-surg'>surg {o['Surgery Date'] or '—'}</span>"
-                        f"</div>"
-                    )
+                    else:
+                        rendered_lines.append(
+                            f"<div class='out-line'>"
+                            f"{idx_label}"
+                            f"<span class='out-tag'>OUT</span> "
+                            f"<span class='out-set'>{o['Set']}</span>"
+                            f"<span class='out-sep'> → </span>"
+                            f"{_hospital_with_led(o['Hospital'], o['Surgery Date'], sales_code=o.get('Sales Code', ''), case_status=o.get('Case Status', ''))}"
+                            f"<span class='out-sep'> · </span>"
+                            f"<span class='out-surg'>surg {o['Surgery Date'] or '—'}</span>"
+                            f"</div>"
+                        )
                 out_lines = "".join(rendered_lines)
             else:
                 out_lines = "<span style='color:#9ca3af;font-size:12px;font-style:italic'>all in office</span>"
@@ -1279,6 +1447,7 @@ with inv_tabs[1]:
             badge = avail_badge(int(row["available_units"]), int(row["total_units"]))
 
             uid_drawers = _drawer_lookup.get(uid, {})
+            upcoming_case_map: dict[str, dict] = {}
 
             # ── Legend: which size ranges exist for this plate ────────────────
             all_srs_present: set[str] = set()
@@ -1314,6 +1483,7 @@ with inv_tabs[1]:
                             str(cd.get("hospital", "")),
                             str(cd.get("surgery_date", "")),
                             "1" if cd.get("from_stock") else "0",
+                            str(cd.get("case_status", "")),
                         ])
                         if key in seen:
                             continue
@@ -1323,12 +1493,44 @@ with inv_tabs[1]:
                             "case_id": cd.get("case_id", ""),
                             "hospital": cd.get("hospital", ""),
                             "surgery_date": cd.get("surgery_date", ""),
+                            "case_status": cd.get("case_status", ""),
                             "from_stock": bool(cd.get("from_stock", False)),
+                            "date_value": _parse_ui_date(str(cd.get("surgery_date", ""))) or date.max,
                         })
 
                 hdr_cls = "dh-out" if unique_out else ""
+                ordered_unique_out = sorted(
+                    unique_out,
+                    key=lambda item: (
+                        item.get("date_value", date.max),
+                        str(item.get("surgery_date", "")),
+                        str(item.get("case_id", "")),
+                        str(item.get("size_range", "")),
+                    ),
+                )
+
+                for item in ordered_unique_out:
+                    case_id = str(item.get("case_id", "")).strip()
+                    if not case_id:
+                        continue
+                    surgery_date = str(item.get("surgery_date", "")).strip()
+                    hospital = str(item.get("hospital", "")).strip() or "—"
+                    u_key = "|".join([case_id, hospital, surgery_date])
+                    entry = upcoming_case_map.get(u_key)
+                    if entry is None:
+                        entry = {
+                            "case_id": case_id,
+                            "hospital": hospital,
+                            "date": surgery_date,
+                            "case_status": str(item.get("case_status", "")).strip(),
+                            "date_value": item.get("date_value", date.max),
+                            "size_ranges": set(),
+                        }
+                        upcoming_case_map[u_key] = entry
+                    entry["size_ranges"].add(str(item.get("size_range", "")).strip())
+
                 out_tags = ""
-                for cd in unique_out:
+                for cd in ordered_unique_out:
                     hosp = cd["hospital"] or "—"
                     surg = cd["surgery_date"] or "—"
                     tc = "dht-stk" if cd["from_stock"] else ""
@@ -1337,7 +1539,7 @@ with inv_tabs[1]:
                         f"<span class='dh-out-tag {tc}'>"
                         f"<span class='dh-out-sr'>{escape(str(cd['size_range']))} out</span>"
                         f"<span class='out-sep'>→</span>"
-                        f"{_hospital_with_led(hosp, surg, variant='plate', sales_code=case_sales_lookup.get(str(cd.get('case_id', '')).strip(), ''))}"
+                        f"{_hospital_with_led(hosp, surg, variant='plate', sales_code=case_sales_lookup.get(str(cd.get('case_id', '')).strip(), ''), case_status=cd.get('case_status', ''))}"
                         f"<span class='out-sep'>·</span>"
                         f"<span class='dh-out-surg'>surg {escape(str(surg))}</span>"
                         f"{stk_s}"
@@ -1384,10 +1586,43 @@ with inv_tabs[1]:
                         chip_cls = _SR_CHIP.get(sz["size_range"], "sc-std")
                     chips_html += f"<span class='sc {chip_cls}'>{lbl}</span>"
 
-                drc_cls = "drc-out" if unique_out else ""
-                drawer_blocks += (
-                    f"<div class='dr-block'>"
-                    f"<div class='dr-hdr {hdr_cls}'>"
+            upcoming_cases = sorted(
+                [
+                    {
+                        "case_id": str(item.get("case_id", "")).strip(),
+                        "hospital": str(item.get("hospital", "—")).strip() or "—",
+                        "date": str(item.get("date", "")).strip(),
+                        "date_value": item.get("date_value", date.max),
+                        "size_ranges": sorted(item.get("size_ranges", [])),
+                    }
+                    for item in upcoming_case_map.values()
+                ],
+                key=lambda item: (
+                    item.get("date_value", date.max),
+                    str(item.get("case_id", "")),
+                    str(item.get("hospital", "")),
+                )
+            )
+            upcoming_parts = [
+                f"{idx}.) {item['case_id']} · {escape(str(item.get('hospital', '—')))} · {escape(str(item.get('date', '')).strip() or '—')}"
+                + (f" · sizes: {escape(', '.join(item.get('size_ranges', [])))}" if item.get("size_ranges") else "")
+                for idx, item in enumerate(upcoming_cases[:4], start=1)
+            ]
+            more_count = max(len(upcoming_cases) - 4, 0)
+            upcoming_html = ""
+            if upcoming_parts:
+                more_label = f"<span class='more'> +{more_count} more</span>" if more_count > 0 else ""
+                upcoming_html = (
+                    "<div class='upcoming-cases'>upcoming: "
+                    + " · ".join(upcoming_parts)
+                    + more_label
+                    + "</div>"
+                )
+
+            drc_cls = "drc-out" if unique_out else ""
+            drawer_blocks += (
+                f"<div class='dr-block'>"
+                f"<div class='dr-hdr {hdr_cls}'>"
                     f"<span>{drawer}</span><span class='dh-out-list'>{out_tags}</span>"
                     f"</div>"
                     f"<div class='dr-chips {drc_cls}'>{chips_html}</div>"
@@ -1402,6 +1637,7 @@ with inv_tabs[1]:
                 f"</div>"
                 f"<div class='inv-sub'>{uid} &nbsp;·&nbsp; {row['screw_sizes'] or ''}</div>"
                 f"<div class='inv-sub'>{row.get('size_ranges', '')} &nbsp;·&nbsp; {row.get('status_note', 'READY')}</div>"
+                f"{upcoming_html}"
                 f"{legend_html}"
                 f"{drawer_blocks}"
                 f"</div>"
