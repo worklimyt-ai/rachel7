@@ -114,48 +114,14 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
     letter-spacing: .01em;
 }
 .upcoming-cases {
-    margin-top: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-.upcoming-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: #f0fdf4;
-    border: 1px solid #bbf7d0;
-    border-radius: 7px;
-    padding: 4px 9px;
-    font-size: 11px;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #059669;
+    letter-spacing: .01em;
     font-family: 'JetBrains Mono', monospace;
-    color: #15803d;
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
-.upcoming-chip.is-booked {
-    background: #eff6ff;
-    border-color: #bfdbfe;
-    color: #1d4ed8;
-}
-.upcoming-chip .uc-date {
-    font-weight: 700;
-    min-width: 44px;
-}
-.upcoming-chip .uc-hosp {
-    color: #374151;
-}
-.upcoming-chip .uc-sets {
-    opacity: .55;
-    font-size: 10px;
-}
-.upcoming-more {
-    font-size: 10px;
+.upcoming-cases .more {
     color: #6b7280;
-    padding: 1px 4px;
-    font-style: italic;
 }
 .case-card {
     background: #ffffff;
@@ -389,6 +355,121 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
     padding-bottom: 6px;
     margin: 24px 0 14px 0;
 }
+
+/* ── Meeple progress track ──────────────────────────────────────── */
+.meeple-track {
+    display: flex;
+    align-items: flex-start;
+    width: 100%;
+    margin: 10px 0 6px 0;
+    overflow-x: auto;
+}
+.meeple-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 0 0 auto;
+    min-width: 58px;
+    gap: 2px;
+}
+.meeple-dot-row {
+    height: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1px;
+}
+.meeple-current-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+.meeple-pill {
+    min-width: 46px;
+    height: 28px;
+    padding: 0 8px;
+    border-radius: 999px;
+    border: 2px solid;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: .03em;
+    white-space: nowrap;
+}
+.meeple-pill.mp-done    { color: #fff; }
+.meeple-pill.mp-current { }
+.meeple-pill.mp-future  { background: #fffaf2; border-color: #d7c8af; color: #8a7a68; }
+.meeple-step-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.2;
+    max-width: 58px;
+}
+.meeple-step-date {
+    font-size: 9px;
+    color: #9ca3af;
+    text-align: center;
+    min-height: 11px;
+}
+.meeple-connector {
+    flex: 1 1 0;
+    min-width: 8px;
+    height: 3px;
+    border-radius: 999px;
+    margin-top: 19px;
+    align-self: flex-start;
+}
+.meeple-terminal {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    margin: 8px 0 2px 0;
+}
+.meeple-terminal.mp-cnx { background:#fee2e2; color:#b91c1c; border:2px solid #ef4444; }
+.meeple-terminal.mp-pp  { background:#fff7ed; color:#c2410c; border:2px solid #f97316; }
+
+/* ── Upcoming case chips ────────────────────────────────────────── */
+.upcoming-chip-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 8px;
+}
+.upcoming-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 7px;
+    padding: 4px 9px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: #15803d;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.upcoming-chip.is-booked {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    color: #1d4ed8;
+}
+.upcoming-chip .uc-date { font-weight: 700; min-width: 44px; }
+.upcoming-chip .uc-hosp { color: #374151; }
+.upcoming-chip .uc-sets { opacity:.55; font-size:10px; }
+.upcoming-more { font-size:10px; color:#6b7280; font-style:italic; padding: 1px 4px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -628,6 +709,142 @@ def _parse_ui_date(value: str) -> Optional[date]:
     return None
 
 
+def _render_meeple_steps(steps: list[tuple], accent: str) -> str:
+    """
+    steps: list of (label, short_label, is_done: bool, date_str: str)
+    Finds current step = first not-done after last done run.
+    Returns HTML string for the meeple track.
+    """
+    last_done = -1
+    for i, (_, _, done, _) in enumerate(steps):
+        if done:
+            last_done = i
+    # current = step after last completed, capped at last step
+    current_idx = min(last_done + 1, len(steps) - 1)
+
+    parts: list[str] = ['<div class="meeple-track">']
+    for i, (label, short, done, date_str) in enumerate(steps):
+        is_current = (i == current_idx)
+        is_done    = done and not is_current
+
+        if is_done:
+            pill_style = (
+                f"background:{accent};border-color:{accent};color:#fff"
+            )
+            pill_cls = "meeple-pill mp-done"
+        elif is_current:
+            pill_style = (
+                f"background:{accent}18;border-color:{accent};color:{accent}"
+            )
+            pill_cls = "meeple-pill mp-current"
+        else:
+            pill_style = ""
+            pill_cls = "meeple-pill mp-future"
+
+        label_color = accent if (is_done or is_current) else "#7b6345"
+
+        dot_html = (
+            f'<span class="meeple-current-dot" '
+            f'style="background:{accent};box-shadow:0 0 0 3px {accent}33"></span>'
+        ) if is_current else ""
+
+        d_obj = _parse_ui_date(date_str)
+        date_display = d_obj.strftime("%-d %b") if d_obj else ""
+
+        parts.append(
+            f'<div class="meeple-step">'
+            f'<div class="meeple-dot-row">{dot_html}</div>'
+            f'<div class="{pill_cls}" style="{pill_style}">{escape(short)}</div>'
+            f'<div class="meeple-step-label" style="color:{label_color}">{escape(label)}</div>'
+            f'<div class="meeple-step-date">{escape(date_display)}</div>'
+            f'</div>'
+        )
+        if i < len(steps) - 1:
+            conn_color = accent if is_done else "#d7c8af"
+            parts.append(
+                f'<div class="meeple-connector" style="background:{conn_color}"></div>'
+            )
+
+    parts.append('</div>')
+    return "".join(parts)
+
+
+def _meeple_track_html(case: dict) -> str:
+    """
+    Build the meeple progress track HTML for a case card.
+
+    Track shapes:
+      Parking (prefix starts P, not BC):
+        Surgery → Top Up → Deliver Top Up → Done
+      Booked (prefix starts BC):
+        Booked → Delivered → Surgery → Sales Posted → In Transit → Checking
+      Standard:
+        Delivered → Surgery → Sales Posted → In Transit → Checking
+
+    Cancelled/Postponed: terminal pill, no track.
+    """
+    status     = str(case.get("status", "") or "").strip().upper()
+    smart      = str(case.get("smart_status", "") or "").strip().upper()
+    prefix     = str(case.get("prefix", "") or "").strip().upper()
+    delivery   = str(case.get("delivery_date", "") or "").strip()
+    surgery    = str(case.get("surgery_date", "") or "").strip()
+    sales_code = str(case.get("sales_code", "") or "").strip()
+    is_booking = bool(case.get("is_booking_case"))
+    is_parking = prefix.startswith("P") and not is_booking
+
+    # Terminal states
+    if status == "CNX" or smart == "CNX" or case.get("is_cancelled_case"):
+        return "<div class='meeple-terminal mp-cnx'>✕ Cancelled</div>"
+    if status == "PP" or smart == "PP":
+        return "<div class='meeple-terminal mp-pp'>⏸ Postponed</div>"
+
+    transit_label = (
+        "With Saiful" if status == "ITS"
+        else "With Dylan" if status == "ITD"
+        else "In Transit"
+    )
+    is_transit  = status in {"ITS", "ITD"}
+    is_checking = status in {"ITO", "COMPLETED"}
+
+    if is_parking:
+        # Surgery → Top Up → Deliver Top Up → Done
+        has_surgery   = bool(_parse_ui_date(surgery))
+        has_del_topup = bool(_parse_ui_date(delivery))
+        has_done      = bool(sales_code) or is_checking
+        steps = [
+            ("Surgery",        "SURG",  has_surgery,   surgery),
+            ("Top Up",         "TOPUP", has_del_topup, ""),
+            ("Deliver Top Up", "DEL",   has_del_topup, delivery),
+            ("Done",           "DONE",  has_done,      ""),
+        ]
+        accent = "#f59e0b"
+
+    elif is_booking:
+        # Booked → Delivered → Surgery → Sales Posted → In Transit → Checking
+        steps = [
+            ("Booked",       "BKD",   True,                       ""),
+            ("Delivered",    "DEL",   bool(_parse_ui_date(delivery)), delivery),
+            ("Surgery",      "SURG",  bool(_parse_ui_date(surgery)),  surgery),
+            ("Sales Posted", "SALES", bool(sales_code),            ""),
+            (transit_label,  "TRNST", is_transit,                  ""),
+            ("Checking",     "CHK",   is_checking,                 ""),
+        ]
+        accent = "#2563eb"
+
+    else:
+        # Delivered → Surgery → Sales Posted → In Transit → Checking
+        steps = [
+            ("Delivered",    "DEL",   bool(_parse_ui_date(delivery)), delivery),
+            ("Surgery",      "SURG",  bool(_parse_ui_date(surgery)),  surgery),
+            ("Sales Posted", "SALES", bool(sales_code),               ""),
+            (transit_label,  "TRNST", is_transit,                     ""),
+            ("Checking",     "CHK",   is_checking,                    ""),
+        ]
+        accent = "#0ea5a4"
+
+    return _render_meeple_steps(steps, accent)
+
+
 def _hospital_status_class(
     surgery_value: str,
     *,
@@ -860,7 +1077,6 @@ with inv_tabs[0]:
                 hospital = str(r.get("location_now", "")).strip() or "—"
                 delivery_date = str(r.get("delivery_date", "")).strip()
                 date_value = _parse_ui_date(delivery_date)
-                # Only show cases not yet delivered (delivery date today or future)
                 if date_value is None or date_value < report_today:
                     continue
                 key = ("OUT", case_id, hospital, delivery_date)
@@ -886,7 +1102,6 @@ with inv_tabs[0]:
                 hospital = str(r.get("location_now", "")).strip() or "—"
                 delivery_date = str(r.get("delivery_date", "")).strip()
                 date_value = _parse_ui_date(delivery_date)
-                # Only show cases not yet delivered (delivery date today or future)
                 if date_value is None or date_value < report_today:
                     continue
                 key = ("BOOKED", case_id, hospital, delivery_date)
@@ -915,23 +1130,11 @@ with inv_tabs[0]:
                 )
             )
 
-            upcoming_case_parts: list[str] = []
-            for idx, item in enumerate(upcoming_cases, start=1):
-                set_names = [
-                    escape(str(name).strip())
-                    for name in sorted(set(item.get("set_names", [])))
-                    if str(name).strip()
-                ]
-                set_names_text = f" [{', '.join(set_names)}]" if set_names else ""
-                upcoming_case_parts.append(
-                    f"{idx}. "
-                    f"{escape(str(item.get('case_id', '')))}"
-                    f"{set_names_text} "
-                    f"{escape(str(item.get('hospital', '—')))} "
-                    f"{'del' if item.get('kind') == 'BOOKED' else 'surg'} "
-                    f"{escape(str(item.get('date', '—')).strip() or '—')}"
-                )
-            upcoming_cases_text = "; ".join(upcoming_case_parts) if upcoming_case_parts else ""
+            # plain-text version for search matching
+            upcoming_cases_text = " ".join(
+                f"{item.get('case_id','')} {item.get('hospital','')} {item.get('date','')}"
+                for item in upcoming_cases
+            )
 
             in_count = int(len(office_rows))
             standby_count = int(len(standby_rows))
@@ -1103,26 +1306,26 @@ with inv_tabs[0]:
             upcoming_cases = list(r.get("UpcomingCases", []) or [])
             upcoming_parts = []
             for item in upcoming_cases[:5]:
-                item_case  = escape(str(item.get("case_id", "")))
-                item_hosp  = escape(str(item.get("hospital", "—")))
-                item_kind  = str(item.get("kind", "")).strip().upper()
-                chip_cls   = "upcoming-chip is-booked" if item_kind == "BOOKED" else "upcoming-chip"
-                raw_date   = str(item.get("date", "")).strip()
-                d_obj      = _parse_ui_date(raw_date)
-                date_label = d_obj.strftime("%-d %b") if d_obj else escape(raw_date or "—")
-                days_away  = (d_obj - report_today).days if d_obj else None
+                item_case = escape(str(item.get("case_id", "")))
+                item_hosp = escape(str(item.get("hospital", "—")))
+                is_booked = str(item.get("kind", "")).strip().upper() == "BOOKED"
+                chip_cls  = "upcoming-chip is-booked" if is_booked else "upcoming-chip"
+                raw_date  = str(item.get("date", "")).strip()
+                d_obj     = _parse_ui_date(raw_date)
+                date_lbl  = d_obj.strftime("%-d %b") if d_obj else escape(raw_date or "—")
+                days_away = (d_obj - report_today).days if d_obj else None
                 if days_away == 0:
-                    day_hint = " today"
+                    hint = " today"
                 elif days_away == 1:
-                    day_hint = " tmrw"
+                    hint = " tmrw"
                 elif days_away is not None and days_away <= 7:
-                    day_hint = f" {days_away}d"
+                    hint = f" {days_away}d"
                 else:
-                    day_hint = ""
+                    hint = ""
                 set_names = [
-                    escape(str(name).strip())
-                    for name in sorted(set(item.get("set_names", [])))
-                    if str(name).strip()
+                    escape(str(n).strip())
+                    for n in sorted(set(item.get("set_names", [])))
+                    if str(n).strip()
                 ]
                 sets_part = (
                     f" <span class='uc-sets'>[{', '.join(set_names)}]</span>"
@@ -1130,7 +1333,7 @@ with inv_tabs[0]:
                 )
                 upcoming_parts.append(
                     f"<span class='{chip_cls}'>"
-                    f"<span class='uc-date'>{date_label}{escape(day_hint)}</span>"
+                    f"<span class='uc-date'>{date_lbl}{escape(hint)}</span>"
                     f"<span class='uc-hosp'>{item_hosp}</span>"
                     f"<span style='color:#9ca3af;font-size:10px'>{item_case}</span>"
                     f"{sets_part}"
@@ -1141,7 +1344,7 @@ with inv_tabs[0]:
                 more_count = max(len(upcoming_cases) - 5, 0)
                 more_label = f"<span class='upcoming-more'>+{more_count} more</span>" if more_count > 0 else ""
                 upcoming_html = (
-                    "<div class='upcoming-cases'>"
+                    "<div class='upcoming-chip-wrap'>"
                     + "".join(upcoming_parts)
                     + more_label
                     + "</div>"
@@ -2109,6 +2312,7 @@ with inv_tabs[3]:
                 "</div>"
                 f"<div class='case-tags'>{''.join(tags)}</div>"
                 "</div>"
+                f"{_meeple_track_html(case)}"
                 f"<div class='case-lines'>{''.join(lines)}</div>"
                 "</div>"
             )
