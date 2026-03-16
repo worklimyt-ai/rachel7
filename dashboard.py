@@ -261,6 +261,18 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
     background: #fffbeb;
     color: #92400e;
 }
+/* cancelled — red */
+.out-hosp-wrap.is-cancelled .out-hosp-name {
+    border-left-color: #ef4444;
+    background: #fef2f2;
+    color: #b91c1c;
+}
+/* postponed — orange */
+.out-hosp-wrap.is-postponed .out-hosp-name {
+    border-left-color: #f97316;
+    background: #fff7ed;
+    color: #c2410c;
+}
 /* sales posted — blue */
 .out-hosp-wrap.is-sales-posted .out-hosp-name,
 .out-hosp-wrap.is-sales .out-hosp-name {
@@ -286,8 +298,14 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
     background: #f5f3ff;
     color: #6d28d9;
 }
-/* shelf — green */
+/* collect — green */
 .out-hosp-wrap.is-shelf .out-hosp-name {
+    border-left-color: #22c55e;
+    background: #f0fdf4;
+    color: #166534;
+}
+/* collect — green */
+.out-hosp-wrap.is-collect .out-hosp-name {
     border-left-color: #22c55e;
     background: #f0fdf4;
     color: #166534;
@@ -575,15 +593,19 @@ def _hospital_status_class(
         return "is-delivered"
     if _parse_ui_date(surgery_value) is not None:
         return "is-surgery"
+    if status == "CNX":
+        return "is-cancelled"
+    if status == "PP":
+        return "is-postponed"
     if str(sales_code or "").strip():
         return "is-sales-posted"
+    if status == "":
+        return "is-collect"
     if status in {"ITS", "ITD"}:
         return f"is-in-transit is-{status.lower()}"
-    if status == "ITO":
+    if status in {"ITO", "COMPLETED"}:
         return "is-checking"
-    if status in {"CNX", "PP", "COMPLETED"}:
-        return "is-checking"
-    return "is-shelf"
+    return "is-collect"
 
 
 def _hospital_status_label(
@@ -602,15 +624,19 @@ def _hospital_status_label(
         return "Delivered"
     if _parse_ui_date(surgery_value) is not None:
         return "Surgery"
+    if status == "CNX":
+        return "Cancelled"
+    if status == "PP":
+        return "Postponed"
     if str(sales_code or "").strip():
         return "Sales posted"
+    if status == "":
+        return "Collect"
     if status in {"ITS", "ITD"}:
         return "In transit with Saiful" if status == "ITS" else "In transit with Dylan"
-    if status == "ITO":
+    if status in {"ITO", "COMPLETED"}:
         return "Checking"
-    if status in {"CNX", "PP", "COMPLETED"}:
-        return "Checking"
-    return "Shelf"
+    return "Collect"
 
 
 def _hospital_with_led(
