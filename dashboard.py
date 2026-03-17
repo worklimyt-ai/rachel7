@@ -887,6 +887,7 @@ with inv_tabs[1]:
 
                 out_tags = ""
                 out_meeples = ""
+                meeple_seen_cases: set[str] = set()  # one meeple per case_id
                 for cd in ordered_uo:
                     hosp = cd["hospital"] or "—"
                     surg = cd["surgery_date"] or "—"
@@ -900,7 +901,8 @@ with inv_tabs[1]:
                         f"{stks}</span>"
                     )
                     cid = str(cd.get("case_id","")).strip()
-                    if cid:
+                    if cid and cid not in meeple_seen_cases:
+                        meeple_seen_cases.add(cid)
                         mp = _meeple_track_for_case_id(cid, surgery=str(cd.get("surgery_date","")), case_status=str(cd.get("case_status","")))
                         out_meeples += (
                             f"<div style='padding:4px 10px 6px 10px;border-top:1px solid #f3f4f6'>"
