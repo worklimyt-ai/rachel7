@@ -58,6 +58,12 @@ Examples:
 - `PHILOS*` = standard PHILOS from stock
 - `PHILOS-ELONLY*` = extra long PHILOS from stock
 
+Drawer hint (optional, for drawer-accurate planning):
+
+- Add a drawer code after the plate, e.g. `PHILOS-D2` to prefer Drawer 2.
+- Other accepted forms: `PHILOS(D2)`, `PHILOS (D2)`.
+- If the hinted drawer is unavailable, the case will fall back to normal drawer balancing.
+
 Important:
 
 - If only extra long PHILOS is sent, enter `PHILOS-ELONLY` or `PHILOS-XLONLY`.

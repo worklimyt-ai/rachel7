@@ -8403,7 +8403,7 @@ PLATES = {
         "size_range": "Small",
         "left_right": "",
         "size": "3H",
-        "location": "D4"
+        "location": "D4[no_stock]"
     },
 
     # FIBHOOK - Distal Lateral Fibular Hook Plates
@@ -8577,19 +8577,20 @@ PLATES = {
 
 
 # ── BONEGRAFT ────────────────────────────────────────────────────────────────
+
 BONEGRAFT = [
-    {"name": "Reprobone novo", "presentation": "1 cc", "shorthand": "n1", "description": "Synthetic bone graft, paste", "ref": "PAS1"},
-    {"name": "Reprobone novo", "presentation": "2.5 cc", "shorthand": "n2.5",  "description": "Synthetic bone graft, paste", "ref": "PAS2.5"},
-    {"name": "Reprobone fusion", "presentation": "1 cc", "shorthand": "f1",  "description": "Synthetic bone graft, granulated paste", "ref": "GNP1"},
-    {"name": "Reprobone fusion", "presentation": "2.5 cc", "shorthand": "f2.5",  "description": "Synthetic bone graft, granulated paste", "ref": "GNP2.5"},
-    {"name": "Reprobone", "presentation": "5 cc", "shorthand": "G5",  "description": "Synthetic bone substitute, granules", "ref": "RBG5"},
-    {"name": "Reprobone", "presentation": "10 cc", "shorthand": "R10",  "description": "Synthetic bone substitute, granules", "ref": "RBG10"},
-    {"name": "Reprobone", "presentation": "30 cc", "shorthand": "r30",  "description": "Synthetic bone substitute, granules", "ref": "RBG30"},
-    {"name": "Reprobone", "presentation": "20 cc", "shorthand": "r20",  "description": "Synthetic bone substitute, granules", "ref": "RBG20"},
-    {"name": "Reprobone", "presentation": "10x10x10 mm", "shorthand": "b10",  "description": "Synthetic bone substitute, block", "ref": "RB111"},
-    {"name": "Reprobone", "presentation": "20x20x20 mm", "shorthand": "b20",  "description": "Synthetic bone substitute, block", "ref": "RB222"},
-    {"name": "Collatamp G", "presentation": "5 cm x 5 cm", "shorthand": "c5",  "description": ""},
-    {"name": "Collatamp G", "presentation": "10 cm x 10 cm", "shorthand": "c10",  "description": ""}
+    {"name": "Reprobone novo", "presentation": "1 cc", "description": "Synthetic bone graft, paste", "ref": "PAS1"},
+    {"name": "Reprobone novo", "presentation": "2.5 cc", "description": "Synthetic bone graft, paste", "ref": "PAS2.5"},
+    {"name": "Reprobone fusion", "presentation": "1 cc", "description": "Synthetic bone graft, granulated paste", "ref": "GNP1"},
+    {"name": "Reprobone fusion", "presentation": "2.5 cc", "description": "Synthetic bone graft, granulated paste", "ref": "GNP2.5"},
+    {"name": "Reprobone", "presentation": "5 cc", "description": "Synthetic bone substitute, granules", "ref": "RBG5"},
+    {"name": "Reprobone", "presentation": "10 cc", "description": "Synthetic bone substitute, granules", "ref": "RBG10"},
+    {"name": "Reprobone", "presentation": "30 cc", "description": "Synthetic bone substitute, granules", "ref": "RBG30"},
+    {"name": "Reprobone", "presentation": "20 cc", "description": "Synthetic bone substitute, granules", "ref": "RBG20"},
+    {"name": "Reprobone", "presentation": "10x10x10 mm", "description": "Synthetic bone substitute, block", "ref": "RB111"},
+    {"name": "Reprobone", "presentation": "20x20x20 mm", "description": "Synthetic bone substitute, block", "ref": "RB222"},
+    {"name": "Collatamp G", "presentation": "5 cm x 5 cm", "description": "Collatamp 5","ref": "CT5"},
+    {"name": "Collatamp G", "presentation": "10 cm x 10 cm", "description": "Collatamp 10","ref": "CT10"}
 ]
 
 # ── HOSPITALS ─────────────────────────────────────────────────────────────────

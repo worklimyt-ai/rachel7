@@ -3,6 +3,7 @@ dashboard.py  –  CHECKSETGO
 Run: streamlit run dashboard.py
 """
 
+import ast
 import streamlit as st
 import pandas as pd
 import re
@@ -1242,8 +1243,50 @@ with inv_tabs[3]:
                 if search_query: df = df[df["Region"].astype(str).str.contains(search_query,case=False,na=False)]
                 (st.dataframe(df[["Region","Cancelled"]],use_container_width=True,hide_index=True) if not df.empty else st.info("No matching regions."))
 
+        def _case_item_label(item) -> str:
+            if isinstance(item, str):
+                raw = item.strip()
+                if raw and raw[0] in "{[" and raw[-1] in "}]":
+                    try:
+                        parsed = ast.literal_eval(raw)
+                    except Exception:
+                        parsed = None
+                    else:
+                        if isinstance(parsed, (list, tuple)):
+                            if not parsed:
+                                return ""
+                            return _case_item_label(parsed[0])
+                        return _case_item_label(parsed)
+                return item.strip()
+            if not isinstance(item, dict):
+                return str(item).strip()
+
+            if "label" in item and str(item.get("label","")).strip():
+                return str(item.get("label","")).strip()
+
+            for key in ("summary","name","proper_name","category","presentation","plate_uid","uid","id","set_uid","raw_token"):
+                value = item.get(key)
+                text = str(value).strip() if value is not None else ""
+                if text:
+                    return text
+            return ""
+
+        def _clean_case_item_label(label: str) -> str:
+            text = str(label or "").strip()
+            if not text:
+                return ""
+            text = re.sub(r"\s*(?:\[[Dd]\d+\]|\([Dd]\d+\)|\s+[Dd]\d+|\-[Dd]\d+)\s*$", "", text)
+            return text.strip()
+
         def _cil(items) -> list[str]:
-            return [str(i.get("label","")).strip() for i in (items or []) if isinstance(i,dict) and str(i.get("label","")).strip()]
+            labels: list[str] = []
+            for item in (items or []):
+                if not isinstance(item, (dict, str)):
+                    continue
+                label = _clean_case_item_label(_case_item_label(item))
+                if label:
+                    labels.append(label)
+            return labels
 
         to_deliver_cases = report.get("case_buckets", {}).get("to_deliver", [])
         if not isinstance(to_deliver_cases, list):

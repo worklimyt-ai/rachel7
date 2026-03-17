@@ -387,11 +387,35 @@ def is_powertool_category(category: str) -> bool:
 # ---------------------------------------------------------------------------
 
 def parse_plate_request(token: str) -> dict[str, Any] | None:
-    raw = normalize_plate_code(token)
+    raw = str(token or "").strip()
     if not raw:
         return None
+
     from_stock = "*" in raw
     cleaned = raw.replace("*", "")
+
+    drawer = None
+    drawer_match = None
+    for pattern in (
+        r"^(.*)\[([Dd]\d+)\]\s*$",
+        r"^(.*)\(\s*([Dd]\d+)\s*\)\s*$",
+        r"^(.*)\s+([Dd]\d+)\s*$",
+        r"^(.*)-([Dd]\d+)\s*$",
+    ):
+        drawer_match = re.match(pattern, cleaned, flags=re.IGNORECASE)
+        if drawer_match:
+            break
+
+    if drawer_match:
+        cleaned = drawer_match.group(1).strip()
+        if cleaned:
+            drawer = drawer_match.group(2).upper()
+        else:
+            cleaned = raw.replace("*", "")
+
+    cleaned = normalize_plate_code(cleaned)
+    if not cleaned:
+        return None
     suffix_rules = [
         ("-XLONLY", ["EXTRA LONG"]),
         ("XLONLY", ["EXTRA LONG"]),
@@ -420,6 +444,7 @@ def parse_plate_request(token: str) -> dict[str, Any] | None:
         "base_uid":     uid_norm,
         "needed_ranges": needed_ranges,
         "from_stock":   from_stock,
+        "drawer":       drawer,
     }
 
 # ---------------------------------------------------------------------------
@@ -1158,6 +1183,8 @@ def build_plate_outputs(
     uid_ranges    = plate_inventory["uid_ranges"]
     uid_alias_map = plate_inventory["uid_alias_map"]
     unknown_plate_tokens: Counter[str] = Counter()
+    drawer_available_by_bucket: dict[tuple[str, str], dict[str, int]] = {}
+    drawer_used_by_bucket: dict[tuple[str, str], defaultdict[str, int]] = {}
 
     for case in parsed_cases:
         if not case["has_uid_set"]:
@@ -1188,6 +1215,7 @@ def build_plate_outputs(
                     "raw_plate_token":parsed["raw_token"],
                     "case_status":    case.get("status", ""),
                     "from_stock":     parsed["from_stock"],
+                    "requested_drawer": parsed.get("drawer"),
                 })
 
     plate_size_range_availability: list[dict[str, Any]] = []
@@ -1219,6 +1247,19 @@ def build_plate_outputs(
         stock_case_map: dict[str, list[dict[str, Any]]] = {stock: [] for stock in stock_keys}
         next_drawer_idx = 0
         next_stock_idx = 0
+        bucket_key = (uid, size_range)
+        bucket_drawer_capacity = drawer_available_by_bucket.setdefault(
+            bucket_key,
+            {
+                drawer: sum(1 for row in rows if not row.get("no_stock"))
+                for drawer, rows in bucket["drawer_size_detail"].items()
+            },
+        )
+        bucket_drawer_used = drawer_used_by_bucket.setdefault(
+            bucket_key,
+            defaultdict(int),
+        )
+
         for d in bucket["out_details"]:
             case_detail = {
                 "case_id":      d["case_id"],
@@ -1226,6 +1267,7 @@ def build_plate_outputs(
                 "surgery_date": d["surgery_date"],
                 "case_status":  d.get("case_status", ""),
                 "from_stock":   d["from_stock"],
+                "requested_drawer": d.get("requested_drawer"),
             }
             out_case_details.append(case_detail)
             if d["from_stock"] or not drawer_keys:
@@ -1235,10 +1277,34 @@ def build_plate_outputs(
                     if next_stock_idx < len(stock_keys) - 1:
                         next_stock_idx += 1
                 continue
-            target_drawer = drawer_keys[min(next_drawer_idx, len(drawer_keys) - 1)]
-            drawer_case_map[target_drawer].append(case_detail)
-            if next_drawer_idx < len(drawer_keys) - 1:
-                next_drawer_idx += 1
+            requested_drawer = d.get("requested_drawer")
+            target_drawer = None
+            if requested_drawer and requested_drawer in drawer_case_map:
+                if bucket_drawer_used[requested_drawer] < bucket_drawer_capacity.get(requested_drawer, 0):
+                    target_drawer = requested_drawer
+
+            auto_assigned = False
+            if target_drawer is None:
+                auto_assigned = True
+                found_drawer = None
+                for offset in range(len(drawer_keys)):
+                    candidate_idx = (next_drawer_idx + offset) % len(drawer_keys)
+                    candidate = drawer_keys[candidate_idx]
+                    if bucket_drawer_used[candidate] < bucket_drawer_capacity.get(candidate, 0):
+                        found_drawer = candidate
+                        next_drawer_idx = candidate_idx
+                        break
+
+                if found_drawer is not None:
+                    target_drawer = found_drawer
+                else:
+                    target_drawer = drawer_keys[min(next_drawer_idx, len(drawer_keys) - 1)]
+
+            if target_drawer:
+                drawer_case_map[target_drawer].append(case_detail)
+                bucket_drawer_used[target_drawer] += 1
+                if auto_assigned and next_drawer_idx < len(drawer_keys) - 1:
+                    next_drawer_idx += 1
 
         row = {
             "plate_uid":             uid,
