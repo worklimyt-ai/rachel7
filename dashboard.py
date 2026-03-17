@@ -3,7 +3,6 @@ dashboard.py  –  CHECKSETGO
 Run: streamlit run dashboard.py
 """
 
-import ast
 import streamlit as st
 import pandas as pd
 import re
@@ -48,28 +47,6 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
 .office-set-empty { color: #9ca3af; font-size: 12px; font-style: italic; }
 .booking-next { margin-top: 8px; font-size: 12px; font-weight: 600; color: #1d4ed8; letter-spacing: .01em; }
 
-.case-card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
-.case-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
-.case-title { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; color: #111827; }
-.case-sub   { color: #6b7280; font-size: 12px; margin-top: 4px; }
-.case-tags  { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-.case-tag   { display: inline-block; border-radius: 999px; padding: 3px 9px; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-.case-tag.is-booking { background: #dbeafe; color: #1d4ed8; }
-.case-tag.is-out     { background: #fef3c7; color: #92400e; }
-.case-tag.is-status  { background: #f3f4f6; color: #4b5563; }
-.case-lines { display: grid; gap: 8px; }
-.case-line  { display: grid; grid-template-columns: 96px 1fr; gap: 10px; align-items: start; }
-.case-line-label { color: #6b7280; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding-top: 2px; }
-.case-line-value { color: #111827; font-size: 14px; line-height: 1.45; }
-.case-empty { color: #9ca3af; font-size: 12px; font-style: italic; }
-.case-suggestion { margin-top: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid #e5e7eb; background: #f8fafc; }
-.case-suggestion.is-tentative { background: #fff7ed; border-color: #fed7aa; }
-.case-suggestion-title { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #6b7280; margin-bottom: 5px; }
-.case-suggestion-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; line-height: 1.45; }
-.case-suggestion-set { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #0f172a; }
-.case-suggestion-note { color: #475569; }
-.case-suggestion-flag { display: inline-block; border-radius: 999px; padding: 2px 8px; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; background: #dbeafe; color: #1d4ed8; }
-.case-suggestion-flag.is-tentative { background: #fef3c7; color: #92400e; }
 
 .out-line { padding: 5px 0; margin-top: 6px; line-height: 1.6; border-left: 3px solid #e5e7eb; padding-left: 14px; margin-left: 4px; }
 .out-order { font-size: 10px; font-weight: 700; color: #6b7280; margin-right: 6px; letter-spacing: .02em; }
@@ -113,7 +90,6 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
 .meeple-step-date  { font-size: 16px; font-weight: 800; color: #111827; text-align: center; min-height: 20px; }
 .meeple-connector  { flex: 1 1 0; min-width: 8px; height: 3px; border-radius: 999px; margin-top: 19px; align-self: flex-start; }
 .meeple-terminal { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .05em; margin: 8px 0 2px 0; }
-.meeple-terminal.mp-cnx { background:#fee2e2; color:#b91c1c; border:2px solid #ef4444; }
 .meeple-terminal.mp-pp  { background:#fff7ed; color:#c2410c; border:2px solid #f97316; }
 
 /* ── Upcoming chips ── */
@@ -503,24 +479,6 @@ def _build_meeple_steps(*, prefix, delivery, surgery, sales_code, status, is_boo
         ("Checking",    "CHK",   is_checking,                    ""),
     ], "#0ea5a4"
 
-
-def _meeple_track_html(case: dict) -> str:
-    status = str(case.get("status","") or "").strip().upper()
-    smart  = str(case.get("smart_status","") or "").strip().upper()
-    if status == "PP" or smart == "PP":
-        return "<div class='meeple-terminal mp-pp'>⏸ Postponed</div>"
-    steps, accent = _build_meeple_steps(
-        prefix      = str(case.get("prefix","") or "").strip().upper(),
-        delivery    = str(case.get("delivery_date","") or "").strip(),
-        surgery     = str(case.get("surgery_date","") or "").strip(),
-        sales_code  = str(case.get("sales_code","") or "").strip(),
-        status      = status or smart,
-        is_booking  = bool(case.get("is_booking_case")),
-        return_date = str(case.get("return_date","") or "").strip(),
-    )
-    return _render_meeple_steps(steps, accent)
-
-
 def _meeple_track_for_case_id(case_id: str, *, surgery="", delivery="", case_status="") -> str:
     cid    = str(case_id or "").strip()
     status = case_status.strip().upper() or case_status_lookup.get(cid, "")
@@ -577,7 +535,7 @@ def _hospital_with_led(hospital, sv, *, variant="", sales_code="", case_status="
 # TABS
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 st.markdown("<div class='sec-header'>Operational Detail — Inventory Snapshot</div>", unsafe_allow_html=True)
-inv_tabs = st.tabs(["🧰 Sets", "🦾 Plates", "🔌 Powertools", "📋 Cases"])
+inv_tabs = st.tabs(["🧰 Sets", "🦾 Plates", "🔌 Powertools"])
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SETS TAB
@@ -1203,198 +1161,7 @@ with inv_tabs[2]:
         if pt_sum_rows: st.markdown("".join(_pt_html(r) for r in pt_sum_rows), unsafe_allow_html=True)
         else: st.info("No matching powertools.")
 
-
 # ══════════════════════════════════════════════════════════════════════════════
-# CASES TAB
-# ══════════════════════════════════════════════════════════════════════════════
-with inv_tabs[3]:
-    if not case_rows_all:
-        st.info("No case data.")
-    else:
-        a30 = report.get("archive_30d_summary",{}) or {}
-        acbr = pd.DataFrame(a30.get("cases_by_region_30d",[]))
-        axbr = pd.DataFrame(a30.get("cancelled_by_region_30d",[]))
-
-        st.markdown("<div class='sec-header'>Archive 30d Summary</div>", unsafe_allow_html=True)
-        if int(meta.get("counts",{}).get("archive_rows",0) or 0) == 0:
-            st.warning("Archive source returned 0 rows.")
-
-        for col,(lbl,val) in zip(st.columns(3),[
-            ("Cases",a30.get("total_cases_30d",0)),
-            ("Cancelled",a30.get("total_cancelled_cases_30d",0)),
-            ("Sets Delivered",a30.get("sets_delivered_30d",0)),
-        ]):
-            with col:
-                st.markdown(f"<div class='kpi-card'><div class='kpi-label'>{escape(str(lbl))}</div><div class='kpi-value'>{escape(str(val))}</div></div>", unsafe_allow_html=True)
-
-        rc = st.columns(2)
-        with rc[0]:
-            st.markdown("<div class='sec-header'>Cases By Region (30d)</div>", unsafe_allow_html=True)
-            if acbr.empty: st.info("No archive cases in the past 30 days.")
-            else:
-                df = acbr.rename(columns={"region":"Region","cases":"Cases"})
-                if search_query: df = df[df["Region"].astype(str).str.contains(search_query,case=False,na=False)]
-                (st.dataframe(df[["Region","Cases"]].head(5),use_container_width=True,hide_index=True) if not df.empty else st.info("No matching regions."))
-        with rc[1]:
-            st.markdown("<div class='sec-header'>Cancelled By Region (30d)</div>", unsafe_allow_html=True)
-            if axbr.empty: st.info("No cancelled archive cases in the past 30 days.")
-            else:
-                df = axbr.rename(columns={"region":"Region","cancelled_cases":"Cancelled"})
-                if search_query: df = df[df["Region"].astype(str).str.contains(search_query,case=False,na=False)]
-                (st.dataframe(df[["Region","Cancelled"]],use_container_width=True,hide_index=True) if not df.empty else st.info("No matching regions."))
-
-        def _case_item_label(item) -> str:
-            if isinstance(item, str):
-                raw = item.strip()
-                if raw and raw[0] in "{[" and raw[-1] in "}]":
-                    try:
-                        parsed = ast.literal_eval(raw)
-                    except Exception:
-                        parsed = None
-                    else:
-                        if isinstance(parsed, (list, tuple)):
-                            if not parsed:
-                                return ""
-                            return _case_item_label(parsed[0])
-                        return _case_item_label(parsed)
-                return item.strip()
-            if not isinstance(item, dict):
-                return str(item).strip()
-
-            if "label" in item and str(item.get("label","")).strip():
-                return str(item.get("label","")).strip()
-
-            for key in ("summary","name","proper_name","category","presentation","plate_uid","uid","id","set_uid","raw_token"):
-                value = item.get(key)
-                text = str(value).strip() if value is not None else ""
-                if text:
-                    return text
-            return ""
-
-        def _clean_case_item_label(label: str) -> str:
-            text = str(label or "").strip()
-            if not text:
-                return ""
-            text = re.sub(r"\s*(?:\[[Dd]\d+\]|\([Dd]\d+\)|\s+[Dd]\d+|\-[Dd]\d+)\s*$", "", text)
-            return text.strip()
-
-        def _cil(items) -> list[str]:
-            labels: list[str] = []
-            for item in (items or []):
-                if not isinstance(item, (dict, str)):
-                    continue
-                label = _clean_case_item_label(_case_item_label(item))
-                if label:
-                    labels.append(label)
-            return labels
-
-        to_deliver_cases = report.get("case_buckets", {}).get("to_deliver", [])
-        if not isinstance(to_deliver_cases, list):
-            to_deliver_cases = []
-        base_cases = to_deliver_cases if (not search_query and to_deliver_cases) else case_rows_all
-        cases_sorted = sorted(
-            base_cases,
-            key=lambda c: (
-                _parse_ui_date(str(c.get("delivery_date",""))) or date.max,
-                _parse_ui_date(str(c.get("surgery_date",""))) or date.max,
-                str(c.get("case_id","")),
-            ),
-        )
-        if not search_query:
-            if not to_deliver_cases:
-                cases_sorted = [
-                    case for case in cases_sorted
-                    if bool(case.get("has_shorthand_only", False))
-                    and not bool(case.get("is_cancelled_case", False))
-                    and (_parse_ui_date(str(case.get("delivery_date",""))) or date.min) >= report_today
-                ]
-
-        filtered_cases: list[str] = []
-        for case in cases_sorted:
-            sl  = _cil(case.get("sent_sets"))
-            pl  = _cil(case.get("sent_plates"))
-            ptl = _cil(case.get("sent_powertools"))
-            bgl = _cil(case.get("sent_bonegraft"))
-            exl = _cil(case.get("sent_extra_items"))
-            suggested_sets = case.get("suggested_sets", [])
-            if not isinstance(suggested_sets, list):
-                suggested_sets = []
-            ssl = [str(item.get("summary","")).strip() for item in suggested_sets if isinstance(item, dict) and str(item.get("summary","")).strip()]
-
-            blob = " ".join([str(case.get("case_id","")),str(case.get("prefix","")),str(case.get("hospital","")),
-                str(case.get("region","")),str(case.get("delivery_date","")),str(case.get("surgery_date","")),
-                str(case.get("smart_status","")),str(case.get("status","")),
-                " ".join(sl)," ".join(pl)," ".join(ptl)," ".join(bgl)," ".join(exl)," ".join(ssl)]).lower()
-            if search_query and search_query.lower() not in blob: continue
-
-            tags = [f"<span class='case-tag is-status'>{escape(str(case.get('prefix','')).strip() or 'CASE')}</span>"]
-            if case.get("is_booking_case") and case.get("booking_hold_active"): tags.append("<span class='case-tag is-booking'>BOOKED</span>")
-            elif any([sl,pl,ptl,bgl,exl]): tags.append("<span class='case-tag is-out'>SENT OUT</span>")
-            sm = escape(str(case.get("smart_status","")).strip() or str(case.get("status","")).strip())
-            if sm: tags.append(f"<span class='case-tag is-status'>{sm}</span>")
-            if case.get("is_cancelled_case"): tags.append("<span class='case-tag is-status'>CANCELLED</span>")
-
-            lines = [f"<div class='case-line'><div class='case-line-label'>Region</div><div class='case-line-value'>{escape(str(case.get('region','')).strip() or 'Unknown')}</div></div>"]
-            if sl:  lines.append(f"<div class='case-line'><div class='case-line-label'>Sets</div><div class='case-line-value'>{escape('; '.join(sl))}</div></div>")
-            if pl:  lines.append(f"<div class='case-line'><div class='case-line-label'>Plates</div><div class='case-line-value'>{escape('; '.join(pl))}</div></div>")
-            if ptl: lines.append(f"<div class='case-line'><div class='case-line-label'>Powertool</div><div class='case-line-value'>{escape('; '.join(ptl))}</div></div>")
-            if bgl: lines.append(f"<div class='case-line'><div class='case-line-label'>Bonegraft</div><div class='case-line-value'>{escape('; '.join(bgl))}</div></div>")
-            if exl: lines.append(f"<div class='case-line'><div class='case-line-label'>Extra Items</div><div class='case-line-value'>{escape('; '.join(exl))}</div></div>")
-            if not lines: lines.append("<div class='case-empty'>No sent items recorded for this case.</div>")
-
-            suggestion_blocks = []
-            for suggestion in suggested_sets:
-                if not isinstance(suggestion, dict):
-                    continue
-                is_tentative = not bool(suggestion.get("confirmed", False))
-                sg_cls = "case-suggestion is-tentative" if is_tentative else "case-suggestion"
-                flag_cls = "case-suggestion-flag is-tentative" if is_tentative else "case-suggestion-flag"
-                flag_label = "Tentative" if is_tentative else "Ready"
-                suggestion_html = (
-                    f"<div class='{sg_cls}'>"
-                    f"<div class='case-suggestion-title'>{escape(str(suggestion.get('category','')).strip() or 'Suggested Set')}</div>"
-                    f"<div class='case-suggestion-row'>"
-                    f"<span class='case-suggestion-set'>{escape(str(suggestion.get('set_display','')).strip() or '—')}</span>"
-                    f"<span class='case-suggestion-note'>{escape(str(suggestion.get('suggestion_reason','')).strip())}</span>"
-                    f"<span class='{flag_cls}'>{flag_label}</span>"
-                    f"</div>"
-                )
-                source_case_id = str(suggestion.get("source_case_id","")).strip()
-                source_state = str(suggestion.get("current_state","")).strip().upper()
-                if source_case_id and source_state in {"OUT","BOOKED"}:
-                    source_meeple = _meeple_track_for_case_id(
-                        source_case_id,
-                        surgery=str(suggestion.get("source_surgery_date","")).strip(),
-                        delivery=str(suggestion.get("source_delivery_date","")).strip(),
-                        case_status=str(suggestion.get("source_case_status","")).strip(),
-                    )
-                    suggestion_html += (
-                        f"<div style='margin-top:8px'>"
-                        f"<div class='case-suggestion-title'>Current Path</div>"
-                        f"<div class='case-suggestion-note'>"
-                        f"{escape(source_case_id)} · {escape(str(suggestion.get('source_hospital','')).strip() or str(suggestion.get('current_location','')).strip() or '—')}"
-                        f"</div>{source_meeple}</div>"
-                    )
-                suggestion_html += "</div>"
-                suggestion_blocks.append(suggestion_html)
-
-            filtered_cases.append(
-                "<div class='case-card'><div class='case-head'><div>"
-                f"<div class='case-title'>{escape(str(case.get('case_id','')).strip() or 'Case')} · {escape(str(case.get('hospital','')).strip() or 'Unknown hospital')}</div>"
-                f"<div class='case-sub'>deliver {escape(str(case.get('delivery_date','')).strip() or '—')} · surg {escape(str(case.get('surgery_date','')).strip() or '—')}</div>"
-                f"</div><div class='case-tags'>{''.join(tags)}</div></div>"
-                f"{_meeple_track_html(case)}"
-                f"<div class='case-lines'>{''.join(lines)}</div>{''.join(suggestion_blocks)}</div>"
-            )
-
-        if filtered_cases:
-            st.markdown("".join(filtered_cases), unsafe_allow_html=True)
-        elif search_query:
-            st.info("No matching cases.")
-        else:
-            st.info("No shorthand-only upcoming cases need suggestions right now.")
-
-
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # DATA QUALITY
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
