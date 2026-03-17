@@ -397,6 +397,15 @@ def _compact_set_id(value: str, fallback: str = "") -> str:
     if not t: return ""
     return str(int(t)) if re.fullmatch(r"\d+", t) else t
 
+
+def _is_past_or_today(value) -> bool:
+    if isinstance(value, date):
+        return value <= report_today
+    d = _parse_ui_date(str(value or "").strip())
+    if d is None:
+        return False
+    return d <= report_today
+
 # ── Meeple track ──────────────────────────────────────────────────────────────
 def _render_meeple_steps(steps: list, accent: str) -> str:
     last_done = -1
@@ -457,16 +466,16 @@ def _build_meeple_steps(*, prefix, delivery, surgery, sales_code, status, is_boo
 
     if is_cnx:
         return [
-            ("Delivered", "DEL",  bool(_parse_ui_date(delivery)), delivery),
+            ("Delivered", "DEL",  _is_past_or_today(delivery),  delivery),
             ("Cancelled", "CNX",  True,                           ""),
             (tl,          "TRNST",is_transit,                     ""),
             ("Checking",  "CHK",  is_checking,                    ""),
         ], "#ef4444"
 
     if is_parking:
-        has_surg      = bool(_parse_ui_date(surgery))
+        has_surg      = _is_past_or_today(surgery)
         has_sales     = bool(sales_code)
-        has_prep      = bool(_parse_ui_date(return_date))
+        has_prep      = _is_past_or_today(return_date)
         has_del_topup = is_checking or (has_sales and has_prep)
         return [
             ("Surgery",         "SURG",  has_surg,      surgery),
@@ -478,16 +487,16 @@ def _build_meeple_steps(*, prefix, delivery, surgery, sales_code, status, is_boo
     if is_booking:
         return [
             ("Booked",      "BKD",   True,                          ""),
-            ("Delivered",   "DEL",   bool(_parse_ui_date(delivery)), delivery),
-            ("Surgery",     "SURG",  bool(_parse_ui_date(surgery)),  surgery),
+            ("Delivered",   "DEL",   _is_past_or_today(delivery),   delivery),
+            ("Surgery",     "SURG",  _is_past_or_today(surgery),    surgery),
             ("Sales Posted","SALES", bool(sales_code),               ""),
             (tl,            "TRNST", is_transit,                     ""),
             ("Checking",    "CHK",   is_checking,                    ""),
         ], "#2563eb"
 
     return [
-        ("Delivered",   "DEL",   bool(_parse_ui_date(delivery)), delivery),
-        ("Surgery",     "SURG",  bool(_parse_ui_date(surgery)),  surgery),
+        ("Delivered",   "DEL",   _is_past_or_today(delivery),   delivery),
+        ("Surgery",     "SURG",  _is_past_or_today(surgery),    surgery),
         ("Sales Posted","SALES", bool(sales_code),               ""),
         (tl,            "TRNST", is_transit,                     ""),
         ("Checking",    "CHK",   is_checking,                    ""),
