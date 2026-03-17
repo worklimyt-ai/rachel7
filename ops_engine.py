@@ -367,6 +367,8 @@ def serialize_case_common(case: dict[str, Any]) -> dict[str, Any]:
         "powertools_raw":       case.get("powertools_raw", ""),
         "bonegraft_raw":        case.get("bonegraft_raw", ""),
         "extra_items_raw":      case.get("extra_items_raw", ""),
+        "suggested_sets":       case.get("suggested_sets", []),
+        "suggested_sets_summary": case.get("suggested_sets_summary", ""),
     }
 
 def is_na_status(value: Any) -> bool:
@@ -1101,6 +1103,7 @@ def build_set_outputs(
         key         = s["_set_key"]
         assignments = by_set_key.get(key, [])
         base_row    = {
+            "set_key":           key,
             "category":          s["category"],
             "id":                s["id"],
             "set_display":       format_set_display(
@@ -1183,7 +1186,7 @@ def build_plate_outputs(
                     "delivery_date":  case["delivery_date"],
                     "surgery_date":   case["surgery_date"],
                     "raw_plate_token":parsed["raw_token"],
-                    "case_status":    case["status"],
+                    "case_status":    case.get("status", ""),
                     "from_stock":     parsed["from_stock"],
                 })
 
@@ -1828,6 +1831,236 @@ def is_cancelled_case(case: dict[str, Any]) -> bool:
     return False
 
 
+def infer_set_reusable_date(case: dict[str, Any]) -> date | None:
+    return (
+        parse_date(case.get("return_date"))
+        or parse_date(case.get("surgery_date"))
+        or parse_date(case.get("delivery_date"))
+    )
+
+
+def build_set_suggestion_summary(suggestion: dict[str, Any]) -> str:
+    parts = [f"{suggestion['category']}: {suggestion['set_display']}"]
+    reason = str(suggestion.get("suggestion_reason", "")).strip()
+    if reason:
+        parts.append(reason)
+    if not suggestion.get("confirmed", False):
+        parts.append("not confirmed")
+    return " | ".join(parts)
+
+
+def attach_upcoming_set_suggestions(
+    parsed_cases: list[dict[str, Any]],
+    set_indexes: dict[str, Any],
+    set_out_assignments: list[dict[str, Any]],
+    set_booking_assignments: list[dict[str, Any]] | None,
+    today_kl: date,
+) -> None:
+    case_by_id = {
+        str(case.get("case_id", "")).strip(): case
+        for case in parsed_cases
+        if str(case.get("case_id", "")).strip()
+    }
+    assignments_by_key: dict[str, dict[str, Any]] = {}
+    for row in set_booking_assignments or []:
+        key = str(row.get("set_key", "")).strip()
+        if key:
+            assignments_by_key[key] = dict(row, assignment_kind=row.get("assignment_kind") or "BOOKED")
+    for row in set_out_assignments:
+        key = str(row.get("set_key", "")).strip()
+        if key:
+            assignments_by_key[key] = dict(row, assignment_kind=row.get("assignment_kind") or "OUT")
+
+    candidate_sets_by_category: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for item in set_indexes["office_sets"] + set_indexes.get("standby_sets", []):
+        if is_na_status(item.get("status", "")):
+            continue
+        category = str(item.get("category", "")).strip()
+        if not category:
+            continue
+        candidate_sets_by_category[category].append(item)
+
+    suggested_counts: Counter[str] = Counter()
+    ordered_cases = sorted(
+        (
+            case for case in parsed_cases
+            if case.get("has_shorthand_only")
+            and not is_cancelled_case(case)
+            and case.get("delivery_date_obj")
+            and case["delivery_date_obj"] >= today_kl
+        ),
+        key=lambda case: (
+            case.get("delivery_date_obj") or date.max,
+            case.get("surgery_date_obj") or date.max,
+            str(case.get("case_id", "")),
+        ),
+    )
+
+    for case in parsed_cases:
+        case["suggested_sets"] = []
+        case["suggested_sets_summary"] = ""
+
+    for case in ordered_cases:
+        target_delivery = case.get("delivery_date_obj") or date.max
+        suggestions: list[dict[str, Any]] = []
+
+        for category in case.get("set_categories", []):
+            candidates = candidate_sets_by_category.get(str(category).strip(), [])
+            if not candidates:
+                continue
+
+            ranked_candidates: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+            for set_row in candidates:
+                set_key = str(set_row.get("_set_key", "")).strip()
+                assignment = assignments_by_key.get(set_key)
+                source_case = case_by_id.get(str(assignment.get("case_id", "")).strip(), {}) if assignment else {}
+                current_state = "OFFICE"
+                current_location = "OFFICE"
+                if assignment:
+                    current_state = str(assignment.get("assignment_kind", "")).strip().upper() or "OUT"
+                    current_location = str(assignment.get("location_now", "")).strip() or current_state
+                elif (
+                    str(set_row.get("home", "")).strip().upper() == "STANDBY"
+                    or is_standby_status(set_row.get("status", ""))
+                ):
+                    current_state = "STANDBY"
+                    current_location = "STANDBY"
+
+                source_delivery = parse_date(assignment.get("delivery_date")) if assignment else None
+                source_surgery = parse_date(assignment.get("surgery_date")) if assignment else None
+                source_return = parse_date(source_case.get("return_date", "")) if source_case else None
+                source_sales_code = str(source_case.get("sales_code", "")).strip()
+                source_cancelled = bool(source_case) and is_cancelled_case(source_case)
+                reusable_date = infer_set_reusable_date(source_case) if source_case else (
+                    source_surgery or source_delivery
+                )
+                is_reused_candidate = suggested_counts.get(set_key, 0) > 0
+
+                if current_state == "OFFICE":
+                    suggestion_kind = "IN_OFFICE"
+                    suggestion_rank = 0
+                    suggestion_reason = (
+                        "only set in office"
+                        if len(candidates) == 1 else
+                        "next available in office"
+                    )
+                    confirmed = not is_reused_candidate
+                elif current_state == "STANDBY":
+                    suggestion_kind = "IN_STANDBY"
+                    suggestion_rank = 1
+                    suggestion_reason = "available in standby"
+                    confirmed = False
+                elif current_state == "BOOKED":
+                    ready_by_target = reusable_date is not None and reusable_date <= target_delivery
+                    suggestion_kind = "BOOKED_READY" if ready_by_target else "BOOKED_LATER"
+                    suggestion_rank = 3 if ready_by_target else 5
+                    if source_delivery and source_delivery <= target_delivery:
+                        suggestion_reason = (
+                            f"booked for {source_case.get('case_id', assignment.get('case_id', ''))}"
+                            f" on {format_date(source_delivery)}"
+                        )
+                    else:
+                        suggestion_reason = (
+                            f"booked for {source_case.get('case_id', assignment.get('case_id', ''))}"
+                            if source_case or assignment else
+                            "booked for another case"
+                        )
+                    confirmed = False
+                else:
+                    ready_by_target = reusable_date is not None and reusable_date <= target_delivery
+                    if source_cancelled:
+                        suggestion_kind = "OUT_CANCELLED"
+                        suggestion_rank = 2
+                        suggestion_reason = (
+                            f"currently at {current_location}; case cancelled"
+                        )
+                    elif source_return:
+                        suggestion_kind = "OUT_RETURNED"
+                        suggestion_rank = 2
+                        suggestion_reason = (
+                            f"currently at {current_location}; return dated {format_date(source_return)}"
+                        )
+                    elif source_sales_code:
+                        suggestion_kind = "OUT_SALES_POSTED"
+                        suggestion_rank = 2
+                        suggestion_reason = (
+                            f"currently at {current_location}; sales posted on {source_case.get('case_id', assignment.get('case_id', ''))}"
+                        )
+                    elif ready_by_target and source_surgery:
+                        suggestion_kind = "OUT_SURGERY_DONE"
+                        suggestion_rank = 2
+                        suggestion_reason = (
+                            f"currently at {current_location}; surgery done {format_date(source_surgery)}"
+                        )
+                    elif ready_by_target and source_delivery:
+                        suggestion_kind = "OUT_DELIVERED"
+                        suggestion_rank = 3
+                        suggestion_reason = (
+                            f"currently at {current_location}; delivered {format_date(source_delivery)}"
+                        )
+                    else:
+                        suggestion_kind = "OUT_WAITING"
+                        suggestion_rank = 4
+                        if source_surgery:
+                            suggestion_reason = (
+                                f"currently at {current_location}; surgery {format_date(source_surgery)}"
+                            )
+                        elif source_delivery:
+                            suggestion_reason = (
+                                f"currently at {current_location}; delivered {format_date(source_delivery)}"
+                            )
+                        else:
+                            suggestion_reason = f"currently at {current_location}"
+                    confirmed = False
+
+                if is_reused_candidate:
+                    suggestion_reason += "; already suggested earlier"
+
+                rank_key = (
+                    suggestion_rank,
+                    1 if is_reused_candidate else 0,
+                    reusable_date or date.max,
+                    compact_set_id(set_row.get("id", "")),
+                    str(set_row.get("uid", "")),
+                )
+                ranked_candidates.append((rank_key, {
+                    "category":             str(category).strip(),
+                    "set_key":              set_key,
+                    "set_uid":              str(set_row.get("uid", "")).strip(),
+                    "set_id":               str(set_row.get("id", "")).strip(),
+                    "set_display":          format_set_display(
+                        set_row.get("shorthand") or set_row.get("category"),
+                        set_row.get("id"),
+                    ),
+                    "current_state":        current_state,
+                    "current_location":     current_location,
+                    "suggestion_kind":      suggestion_kind,
+                    "suggestion_reason":    suggestion_reason,
+                    "confirmed":            confirmed,
+                    "source_case_id":       str(source_case.get("case_id", assignment.get("case_id", "")) if source_case or assignment else "").strip(),
+                    "source_hospital":      str(source_case.get("hospital", assignment.get("location_now", "")) if source_case or assignment else "").strip(),
+                    "source_delivery_date": format_date(source_delivery),
+                    "source_surgery_date":  format_date(source_surgery),
+                    "source_sales_code":    source_sales_code,
+                    "source_return_date":   format_date(source_return),
+                    "source_case_status":   str(source_case.get("status", assignment.get("case_status", "")) if source_case or assignment else "").strip(),
+                    "source_case_cancelled": source_cancelled,
+                }))
+
+            if not ranked_candidates:
+                continue
+
+            _, suggestion = min(ranked_candidates, key=lambda item: item[0])
+            suggestion["summary"] = build_set_suggestion_summary(suggestion)
+            suggestions.append(suggestion)
+            suggested_counts[suggestion["set_key"]] += 1
+
+        case["suggested_sets"] = suggestions
+        case["suggested_sets_summary"] = "; ".join(
+            item["summary"] for item in suggestions if item.get("summary")
+        )
+
+
 def build_case_region_summary(
     parsed_cases: list[dict[str, Any]],
     hospitals: dict[str, dict[str, Any]],
@@ -2089,6 +2322,13 @@ def build_operations_report(
         set_indexes,
         case_summary["set_out_assignments"],
         case_summary.get("set_booking_assignments", []),
+    )
+    attach_upcoming_set_suggestions(
+        case_summary["parsed_cases"],
+        set_indexes,
+        case_summary["set_out_assignments"],
+        case_summary.get("set_booking_assignments", []),
+        today,
     )
 
     plate_inventory = build_plate_inventory(master["PLATES"])

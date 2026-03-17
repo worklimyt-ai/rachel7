@@ -61,6 +61,14 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
 .case-line-label { color: #6b7280; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding-top: 2px; }
 .case-line-value { color: #111827; font-size: 14px; line-height: 1.45; }
 .case-empty { color: #9ca3af; font-size: 12px; font-style: italic; }
+.case-suggestion { margin-top: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid #e5e7eb; background: #f8fafc; }
+.case-suggestion.is-tentative { background: #fff7ed; border-color: #fed7aa; }
+.case-suggestion-title { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #6b7280; margin-bottom: 5px; }
+.case-suggestion-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; line-height: 1.45; }
+.case-suggestion-set { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #0f172a; }
+.case-suggestion-note { color: #475569; }
+.case-suggestion-flag { display: inline-block; border-radius: 999px; padding: 2px 8px; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; background: #dbeafe; color: #1d4ed8; }
+.case-suggestion-flag.is-tentative { background: #fef3c7; color: #92400e; }
 
 .out-line { padding: 5px 0; margin-top: 6px; line-height: 1.6; border-left: 3px solid #e5e7eb; padding-left: 14px; margin-left: 4px; }
 .out-order { font-size: 10px; font-weight: 700; color: #6b7280; margin-right: 6px; letter-spacing: .02em; }
@@ -113,7 +121,12 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
 .upcoming-chip.is-booked { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
 .upcoming-chip .uc-date { font-weight: 700; min-width: 44px; }
 .upcoming-chip .uc-hosp { color: #374151; }
+.upcoming-chip .uc-set { color: #0f172a; font-weight: 700; }
+.upcoming-chip .uc-set.is-tentative { color: #9a3412; }
 .upcoming-more { font-size: 10px; color: #6b7280; font-style: italic; padding: 1px 4px; }
+.out-next-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0 26px; }
+.out-next-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; background: #eff6ff; color: #1d4ed8; font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.out-next-chip.is-tentative { background: #fff7ed; color: #c2410c; }
 
 /* ── Plate drawers ── */
 .dr-block { margin-top: 8px; border-radius: 8px; overflow: hidden; border: 1.5px solid #e5e7eb; }
@@ -237,6 +250,7 @@ case_status_lookup:     dict[str,str]  = {}
 case_is_booking_lookup: dict[str,bool] = {}
 # category_norm → list of upcoming case entries (delivery_date >= today, not cancelled)
 category_upcoming:      dict[str,list] = {}
+suggested_case_queue_by_set_key: dict[str, list[dict]] = {}
 
 if not cases_all_df.empty and "case_id" in cases_all_df.columns:
     for _, r in cases_all_df.iterrows():
@@ -249,12 +263,41 @@ if not cases_all_df.empty and "case_id" in cases_all_df.columns:
         case_prefix_lookup[cid]     = str(r.get("prefix","") or "").strip().upper()
         case_status_lookup[cid]     = str(r.get("status","") or "").strip().upper()
         case_is_booking_lookup[cid] = bool(r.get("is_booking_case", False))
+        suggested_sets = r.get("suggested_sets", [])
+        if not isinstance(suggested_sets, list):
+            suggested_sets = []
+        suggested_by_category: dict[str, dict] = {}
+        for item in suggested_sets:
+            if not isinstance(item, dict):
+                continue
+            cat_norm = str(item.get("category", "")).upper().strip()
+            set_key = str(item.get("set_key", "")).strip()
+            if cat_norm:
+                suggested_by_category[cat_norm] = item
+            if set_key:
+                suggestion_date = None
+                for fmt in ("%d/%m/%Y","%Y-%m-%d","%d-%m-%Y"):
+                    try:
+                        suggestion_date = datetime.strptime(str(r.get("delivery_date", "") or "").strip(), fmt).date()
+                        break
+                    except:
+                        pass
+                suggested_case_queue_by_set_key.setdefault(set_key, []).append({
+                    "case_id": cid,
+                    "hospital": str(r.get("hospital", "") or "").strip(),
+                    "date": str(r.get("delivery_date", "") or "").strip(),
+                    "date_value": suggestion_date,
+                    "confirmed": bool(item.get("confirmed", False)),
+                    "category": str(item.get("category", "")).strip(),
+                })
 
         # Build category_upcoming index
         is_cancelled = bool(r.get("is_cancelled_case", False))
         status_raw   = str(r.get("status","") or "").strip().upper()
         smart_raw    = str(r.get("smart_status","") or "").strip().upper()
         if is_cancelled or status_raw == "CNX" or smart_raw == "CNX":
+            continue
+        if not bool(r.get("has_shorthand_only", False)):
             continue
         del_str  = str(r.get("delivery_date","") or "").strip()
         del_date = None
@@ -265,16 +308,20 @@ if not cases_all_df.empty and "case_id" in cases_all_df.columns:
             continue
         set_cats = r.get("set_categories", [])
         if not isinstance(set_cats, list): set_cats = []
-        entry = {
-            "case_id":    cid,
-            "hospital":   str(r.get("hospital","") or "").strip(),
-            "date":       del_str,
-            "date_value": del_date,
-            "kind":       "BOOKED" if bool(r.get("is_booking_case",False)) else "OUT",
-        }
         for cat in set_cats:
             cn = str(cat).upper().strip()
-            if cn: category_upcoming.setdefault(cn, []).append(entry)
+            if not cn:
+                continue
+            suggestion = suggested_by_category.get(cn, {})
+            category_upcoming.setdefault(cn, []).append({
+                "case_id":    cid,
+                "hospital":   str(r.get("hospital","") or "").strip(),
+                "date":       del_str,
+                "date_value": del_date,
+                "kind":       "BOOKED" if bool(r.get("is_booking_case",False)) else "OUT",
+                "suggested_set": str(suggestion.get("set_display", "")).strip(),
+                "suggested_confirmed": bool(suggestion.get("confirmed", False)),
+            })
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Header
@@ -494,7 +541,7 @@ with inv_tabs[0]:
         st.info("No set data.")
     else:
         for col in ("category","set_display","id","location_now","surgery_date","patient_doctor",
-                    "case_id","set_status","home","assignment_kind","delivery_date","case_status"):
+                    "case_id","set_status","home","assignment_kind","delivery_date","case_status","set_key"):
             if col not in set_status_all.columns: set_status_all[col] = ""
         set_status_all = set_status_all.copy()
         set_status_all["category_norm"]       = set_status_all["category"].astype(str).str.upper().str.strip()
@@ -579,6 +626,7 @@ with inv_tabs[0]:
                     "case_id":str(r.get("case_id","")).strip(),
                     "case_status":str(r.get("case_status","")).strip(),
                     "sales_code":case_sales_lookup.get(str(r.get("case_id","")).strip(),""),
+                    "set_key":str(r.get("set_key","")).strip(),
                 })
             booked_case_items: list[dict] = []
             for _, r in booked_rows.iterrows():
@@ -590,6 +638,7 @@ with inv_tabs[0]:
                     "case_id":str(r.get("case_id","")).strip(),
                     "case_status":str(r.get("case_status","")).strip(),
                     "sales_code":case_sales_lookup.get(str(r.get("case_id","")).strip(),""),
+                    "set_key":str(r.get("set_key","")).strip(),
                 })
 
             # Upcoming cases — from cases_all index, delivery_date >= today
@@ -620,12 +669,12 @@ with inv_tabs[0]:
                 out_rows.append({"Category":cat_norm,"Set":item["set_name"],"Hospital":item["hospital"],
                     "Surgery Date":item["surgery_date"],"Delivery Date":item["delivery_date"],
                     "Case":item["case_id"],"Case Status":item["case_status"],"Sales Code":item["sales_code"],
-                    "DateValue":item["date_value"]})
+                    "DateValue":item["date_value"],"set_key":item.get("set_key","")})
             for item in booked_case_items:
                 out_rows.append({"Category":cat_norm,"Set":item["set_name"],"Hospital":item["hospital"],
                     "Surgery Date":"","Delivery Date":item["delivery_date"],
                     "Case":item["case_id"],"Case Status":item["case_status"],"Sales Code":item["sales_code"],
-                    "Assignment":"BOOKED","DateValue":item["date_value"]})
+                    "Assignment":"BOOKED","DateValue":item["date_value"],"set_key":item.get("set_key","")})
 
         _set_out: dict[str,list] = {}
         for r in out_rows: _set_out.setdefault(r["Category"].upper().strip(), []).append(r)
@@ -677,10 +726,18 @@ with inv_tabs[0]:
                 date_lbl  = d_obj.strftime("%-d %b") if d_obj else escape(str(item.get("date","")) or "—")
                 da        = (d_obj - report_today).days if d_obj else None
                 hint      = " today" if da==0 else " tmrw" if da==1 else (f" {da}d" if da is not None and da<=7 else "")
+                suggested_set = str(item.get("suggested_set","")).strip()
+                suggested_cls = "uc-set" if bool(item.get("suggested_confirmed", False)) else "uc-set is-tentative"
+                suggested_html = (
+                    f"<span class='{suggested_cls}'>→ {escape(suggested_set)}</span>"
+                    if suggested_set else
+                    ""
+                )
                 up_parts.append(
                     f"<span class='{chip_cls}'>"
                     f"<span class='uc-date'>{date_lbl}{escape(hint)}</span>"
                     f"<span class='uc-hosp'>{escape(str(item.get('hospital','—')))}</span>"
+                    f"{suggested_html}"
                     f"<span style='color:#9ca3af;font-size:10px'>{escape(str(item.get('case_id','')))}</span>"
                     f"</span>"
                 )
@@ -702,7 +759,24 @@ with inv_tabs[0]:
                 for idx, o in enumerate(out_items, 1):
                     assignment = str(o.get("Assignment","")).upper()
                     cid        = str(o.get("Case","")).strip()
+                    set_key    = str(o.get("set_key","")).strip()
                     meeple     = _meeple_track_for_case_id(cid, surgery=o.get("Surgery Date",""), delivery=o.get("Delivery Date",""), case_status=o.get("Case Status",""))
+                    next_cases = sorted(
+                        suggested_case_queue_by_set_key.get(set_key, []),
+                        key=lambda item: (item.get("date_value") or date.max, str(item.get("case_id",""))),
+                    )
+                    next_parts = []
+                    for next_item in next_cases[:3]:
+                        nx_cls = "out-next-chip" if bool(next_item.get("confirmed", False)) else "out-next-chip is-tentative"
+                        next_parts.append(
+                            f"<span class='{nx_cls}'>"
+                            f"next {escape(str(next_item.get('date','')) or '—')} · "
+                            f"{escape(str(next_item.get('hospital','')) or '—')} · "
+                            f"{escape(str(next_item.get('case_id','')))}</span>"
+                        )
+                    if len(next_cases) > 3:
+                        next_parts.append(f"<span class='out-next-chip is-tentative'>+{len(next_cases)-3} more</span>")
+                    next_html = f"<div class='out-next-wrap'>{''.join(next_parts)}</div>" if next_parts else ""
                     if assignment == "BOOKED":
                         lines.append(
                             f"<div class='out-line'>"
@@ -710,7 +784,7 @@ with inv_tabs[0]:
                             f"<span class='out-tag out-tag-booked'>BOOKED</span> "
                             f"<span class='out-set'>{o['Set']}</span><span class='out-sep'> → </span>"
                             f"{_hospital_with_led(o['Hospital'], o.get('Delivery Date',''), is_booked=True, sales_code=o.get('Sales Code',''), case_status=o.get('Case Status',''))}"
-                            f"{meeple}</div>"
+                            f"{meeple}{next_html}</div>"
                         )
                     else:
                         lines.append(
@@ -719,7 +793,7 @@ with inv_tabs[0]:
                             f"<span class='out-tag'>OUT</span> "
                             f"<span class='out-set'>{o['Set']}</span><span class='out-sep'> → </span>"
                             f"{_hospital_with_led(o['Hospital'], o['Surgery Date'], sales_code=o.get('Sales Code',''), case_status=o.get('Case Status',''))}"
-                            f"{meeple}</div>"
+                            f"{meeple}{next_html}</div>"
                         )
                 out_lines = "".join(lines)
             else:
@@ -1129,11 +1203,15 @@ with inv_tabs[3]:
             ptl = _cil(case.get("sent_powertools"))
             bgl = _cil(case.get("sent_bonegraft"))
             exl = _cil(case.get("sent_extra_items"))
+            suggested_sets = case.get("suggested_sets", [])
+            if not isinstance(suggested_sets, list):
+                suggested_sets = []
+            ssl = [str(item.get("summary","")).strip() for item in suggested_sets if isinstance(item, dict) and str(item.get("summary","")).strip()]
 
             blob = " ".join([str(case.get("case_id","")),str(case.get("prefix","")),str(case.get("hospital","")),
                 str(case.get("region","")),str(case.get("delivery_date","")),str(case.get("surgery_date","")),
                 str(case.get("smart_status","")),str(case.get("status","")),
-                " ".join(sl)," ".join(pl)," ".join(ptl)," ".join(bgl)," ".join(exl)]).lower()
+                " ".join(sl)," ".join(pl)," ".join(ptl)," ".join(bgl)," ".join(exl)," ".join(ssl)]).lower()
             if search_query and search_query.lower() not in blob: continue
 
             tags = [f"<span class='case-tag is-status'>{escape(str(case.get('prefix','')).strip() or 'CASE')}</span>"]
@@ -1151,13 +1229,49 @@ with inv_tabs[3]:
             if exl: lines.append(f"<div class='case-line'><div class='case-line-label'>Extra Items</div><div class='case-line-value'>{escape('; '.join(exl))}</div></div>")
             if not lines: lines.append("<div class='case-empty'>No sent items recorded for this case.</div>")
 
+            suggestion_blocks = []
+            for suggestion in suggested_sets:
+                if not isinstance(suggestion, dict):
+                    continue
+                is_tentative = not bool(suggestion.get("confirmed", False))
+                sg_cls = "case-suggestion is-tentative" if is_tentative else "case-suggestion"
+                flag_cls = "case-suggestion-flag is-tentative" if is_tentative else "case-suggestion-flag"
+                flag_label = "Tentative" if is_tentative else "Ready"
+                suggestion_html = (
+                    f"<div class='{sg_cls}'>"
+                    f"<div class='case-suggestion-title'>{escape(str(suggestion.get('category','')).strip() or 'Suggested Set')}</div>"
+                    f"<div class='case-suggestion-row'>"
+                    f"<span class='case-suggestion-set'>{escape(str(suggestion.get('set_display','')).strip() or '—')}</span>"
+                    f"<span class='case-suggestion-note'>{escape(str(suggestion.get('suggestion_reason','')).strip())}</span>"
+                    f"<span class='{flag_cls}'>{flag_label}</span>"
+                    f"</div>"
+                )
+                source_case_id = str(suggestion.get("source_case_id","")).strip()
+                source_state = str(suggestion.get("current_state","")).strip().upper()
+                if source_case_id and source_state in {"OUT","BOOKED"}:
+                    source_meeple = _meeple_track_for_case_id(
+                        source_case_id,
+                        surgery=str(suggestion.get("source_surgery_date","")).strip(),
+                        delivery=str(suggestion.get("source_delivery_date","")).strip(),
+                        case_status=str(suggestion.get("source_case_status","")).strip(),
+                    )
+                    suggestion_html += (
+                        f"<div style='margin-top:8px'>"
+                        f"<div class='case-suggestion-title'>Current Path</div>"
+                        f"<div class='case-suggestion-note'>"
+                        f"{escape(source_case_id)} · {escape(str(suggestion.get('source_hospital','')).strip() or str(suggestion.get('current_location','')).strip() or '—')}"
+                        f"</div>{source_meeple}</div>"
+                    )
+                suggestion_html += "</div>"
+                suggestion_blocks.append(suggestion_html)
+
             filtered_cases.append(
                 "<div class='case-card'><div class='case-head'><div>"
                 f"<div class='case-title'>{escape(str(case.get('case_id','')).strip() or 'Case')} · {escape(str(case.get('hospital','')).strip() or 'Unknown hospital')}</div>"
                 f"<div class='case-sub'>deliver {escape(str(case.get('delivery_date','')).strip() or '—')} · surg {escape(str(case.get('surgery_date','')).strip() or '—')}</div>"
                 f"</div><div class='case-tags'>{''.join(tags)}</div></div>"
                 f"{_meeple_track_html(case)}"
-                f"<div class='case-lines'>{''.join(lines)}</div></div>"
+                f"<div class='case-lines'>{''.join(lines)}</div>{''.join(suggestion_blocks)}</div>"
             )
 
         if filtered_cases: st.markdown("".join(filtered_cases), unsafe_allow_html=True)
