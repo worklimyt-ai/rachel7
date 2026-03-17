@@ -318,7 +318,7 @@ if not cases_all_df.empty and "case_id" in cases_all_df.columns:
                 "hospital":   str(r.get("hospital","") or "").strip(),
                 "date":       del_str,
                 "date_value": del_date,
-                "kind":       "BOOKED" if bool(r.get("is_booking_case",False)) else "OUT",
+                "kind":       "PENDING",
                 "suggested_set": str(suggestion.get("set_display", "")).strip(),
                 "suggested_confirmed": bool(suggestion.get("confirmed", False)),
             })
@@ -1196,8 +1196,24 @@ with inv_tabs[3]:
         def _cil(items) -> list[str]:
             return [str(i.get("label","")).strip() for i in (items or []) if isinstance(i,dict) and str(i.get("label","")).strip()]
 
+        cases_sorted = sorted(
+            case_rows_all,
+            key=lambda c: (
+                _parse_ui_date(str(c.get("delivery_date",""))) or date.max,
+                _parse_ui_date(str(c.get("surgery_date",""))) or date.max,
+                str(c.get("case_id","")),
+            ),
+        )
+        if not search_query:
+            cases_sorted = [
+                case for case in cases_sorted
+                if bool(case.get("has_shorthand_only", False))
+                and not bool(case.get("is_cancelled_case", False))
+                and (_parse_ui_date(str(case.get("delivery_date",""))) or date.min) >= report_today
+            ]
+
         filtered_cases: list[str] = []
-        for case in sorted(case_rows_all, key=lambda c: (_parse_ui_date(str(c.get("delivery_date",""))) or date.max, _parse_ui_date(str(c.get("surgery_date",""))) or date.max, str(c.get("case_id","")))):
+        for case in cases_sorted:
             sl  = _cil(case.get("sent_sets"))
             pl  = _cil(case.get("sent_plates"))
             ptl = _cil(case.get("sent_powertools"))
@@ -1274,8 +1290,12 @@ with inv_tabs[3]:
                 f"<div class='case-lines'>{''.join(lines)}</div>{''.join(suggestion_blocks)}</div>"
             )
 
-        if filtered_cases: st.markdown("".join(filtered_cases), unsafe_allow_html=True)
-        else: st.info("No matching cases.")
+        if filtered_cases:
+            st.markdown("".join(filtered_cases), unsafe_allow_html=True)
+        elif search_query:
+            st.info("No matching cases.")
+        else:
+            st.info("No shorthand-only upcoming cases need suggestions right now.")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
