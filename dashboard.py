@@ -248,6 +248,33 @@ case_return_lookup:     dict[str,str]  = {}
 case_prefix_lookup:     dict[str,str]  = {}
 case_status_lookup:     dict[str,str]  = {}
 case_is_booking_lookup: dict[str,bool] = {}
+upcoming_case_rows: list[dict] = report.get("case_buckets", {}).get("to_deliver", [])
+if not isinstance(upcoming_case_rows, list):
+    upcoming_case_rows = []
+# Fallback path for older reports that do not include case_buckets.
+if not upcoming_case_rows and not cases_all_df.empty:
+    for _, r in cases_all_df.iterrows():
+        if not bool(r.get("has_shorthand_only", False)):
+            continue
+        if bool(r.get("is_cancelled_case", False)):
+            continue
+        del_str  = str(r.get("delivery_date","") or "").strip()
+        del_date = None
+        for fmt in ("%d/%m/%Y","%Y-%m-%d","%d-%m-%Y"):
+            try:
+                del_date = datetime.strptime(del_str, fmt).date()
+                break
+            except:
+                pass
+        if del_date is None or del_date < report_today:
+            continue
+        upcoming_case_rows.append(r.to_dict())
+upcoming_case_ids = {
+    str(r.get("case_id","")).strip()
+    for r in upcoming_case_rows
+    if str(r.get("case_id","")).strip()
+}
+
 # category_norm → list of upcoming case entries (delivery_date >= today, not cancelled)
 category_upcoming:      dict[str,list] = {}
 suggested_case_queue_by_set_key: dict[str, list[dict]] = {}
@@ -266,15 +293,13 @@ if not cases_all_df.empty and "case_id" in cases_all_df.columns:
         suggested_sets = r.get("suggested_sets", [])
         if not isinstance(suggested_sets, list):
             suggested_sets = []
-        suggested_by_category: dict[str, dict] = {}
-        for item in suggested_sets:
-            if not isinstance(item, dict):
-                continue
-            cat_norm = str(item.get("category", "")).upper().strip()
-            set_key = str(item.get("set_key", "")).strip()
-            if cat_norm:
-                suggested_by_category[cat_norm] = item
-            if set_key:
+        if cid in upcoming_case_ids:
+            for item in suggested_sets:
+                if not isinstance(item, dict):
+                    continue
+                set_key = str(item.get("set_key", "")).strip()
+                if not set_key:
+                    continue
                 suggestion_date = None
                 for fmt in ("%d/%m/%Y","%Y-%m-%d","%d-%m-%Y"):
                     try:
@@ -291,31 +316,46 @@ if not cases_all_df.empty and "case_id" in cases_all_df.columns:
                     "category": str(item.get("category", "")).strip(),
                 })
 
-        # Build category_upcoming index
-        is_cancelled = bool(r.get("is_cancelled_case", False))
-        status_raw   = str(r.get("status","") or "").strip().upper()
-        smart_raw    = str(r.get("smart_status","") or "").strip().upper()
-        if is_cancelled or status_raw == "CNX" or smart_raw == "CNX":
+    for case in upcoming_case_rows:
+        case_id = str(case.get("case_id","")).strip()
+        if not case_id:
             continue
-        if not bool(r.get("has_shorthand_only", False)):
+        if case.get("has_uid_set") or case.get("has_active_uid_set"):
             continue
-        del_str  = str(r.get("delivery_date","") or "").strip()
+
+        del_str = str(case.get("delivery_date","") or "").strip()
         del_date = None
         for fmt in ("%d/%m/%Y","%Y-%m-%d","%d-%m-%Y"):
-            try: del_date = datetime.strptime(del_str, fmt).date(); break
-            except: pass
-        if del_date is None or del_date < report_today:
+            try:
+                del_date = datetime.strptime(del_str, fmt).date()
+                break
+            except:
+                pass
+        if del_date is None:
             continue
-        set_cats = r.get("set_categories", [])
-        if not isinstance(set_cats, list): set_cats = []
+
+        suggested_sets = case.get("suggested_sets", [])
+        if not isinstance(suggested_sets, list):
+            suggested_sets = []
+        suggested_by_category: dict[str, dict] = {}
+        for item in suggested_sets:
+            if not isinstance(item, dict):
+                continue
+            cat_norm = str(item.get("category", "")).upper().strip()
+            if cat_norm:
+                suggested_by_category[cat_norm] = item
+
+        set_cats = case.get("set_categories", [])
+        if not isinstance(set_cats, list):
+            set_cats = []
         for cat in set_cats:
             cn = str(cat).upper().strip()
             if not cn:
                 continue
             suggestion = suggested_by_category.get(cn, {})
             category_upcoming.setdefault(cn, []).append({
-                "case_id":    cid,
-                "hospital":   str(r.get("hospital","") or "").strip(),
+                "case_id":    case_id,
+                "hospital":   str(case.get("hospital","") or "").strip(),
                 "date":       del_str,
                 "date_value": del_date,
                 "kind":       "PENDING",
@@ -1196,8 +1236,12 @@ with inv_tabs[3]:
         def _cil(items) -> list[str]:
             return [str(i.get("label","")).strip() for i in (items or []) if isinstance(i,dict) and str(i.get("label","")).strip()]
 
+        to_deliver_cases = report.get("case_buckets", {}).get("to_deliver", [])
+        if not isinstance(to_deliver_cases, list):
+            to_deliver_cases = []
+        base_cases = to_deliver_cases if (not search_query and to_deliver_cases) else case_rows_all
         cases_sorted = sorted(
-            case_rows_all,
+            base_cases,
             key=lambda c: (
                 _parse_ui_date(str(c.get("delivery_date",""))) or date.max,
                 _parse_ui_date(str(c.get("surgery_date",""))) or date.max,
@@ -1205,12 +1249,13 @@ with inv_tabs[3]:
             ),
         )
         if not search_query:
-            cases_sorted = [
-                case for case in cases_sorted
-                if bool(case.get("has_shorthand_only", False))
-                and not bool(case.get("is_cancelled_case", False))
-                and (_parse_ui_date(str(case.get("delivery_date",""))) or date.min) >= report_today
-            ]
+            if not to_deliver_cases:
+                cases_sorted = [
+                    case for case in cases_sorted
+                    if bool(case.get("has_shorthand_only", False))
+                    and not bool(case.get("is_cancelled_case", False))
+                    and (_parse_ui_date(str(case.get("delivery_date",""))) or date.min) >= report_today
+                ]
 
         filtered_cases: list[str] = []
         for case in cases_sorted:
@@ -1329,3 +1374,50 @@ st.markdown(
     f"Hospitals: {meta['counts']['master_hospitals']}</div>",
     unsafe_allow_html=True,
 )
+        # Build category_upcoming index from backend to-deliver bucket (authoritative upcoming view).
+        if upcoming_case_rows:
+            pass
+
+    for case in upcoming_case_rows:
+        case_id = str(case.get("case_id","")).strip()
+        if not case_id:
+            continue
+        if case.get("has_uid_set") or case.get("has_active_uid_set"):
+            continue
+        del_str  = str(case.get("delivery_date","") or "").strip()
+        del_date = None
+        for fmt in ("%d/%m/%Y","%Y-%m-%d","%d-%m-%Y"):
+            try:
+                del_date = datetime.strptime(del_str, fmt).date()
+                break
+            except:
+                pass
+        if del_date is None:
+            continue
+        suggested_sets = case.get("suggested_sets", [])
+        if not isinstance(suggested_sets, list):
+            suggested_sets = []
+        suggested_by_category: dict[str, dict] = {}
+        for item in suggested_sets:
+            if not isinstance(item, dict):
+                continue
+            cat_norm = str(item.get("category", "")).upper().strip()
+            if cat_norm:
+                suggested_by_category[cat_norm] = item
+        set_cats = case.get("set_categories", [])
+        if not isinstance(set_cats, list):
+            set_cats = []
+        for cat in set_cats:
+            cn = str(cat).upper().strip()
+            if not cn:
+                continue
+            suggestion = suggested_by_category.get(cn, {})
+            category_upcoming.setdefault(cn, []).append({
+                "case_id":    case_id,
+                "hospital":   str(case.get("hospital","") or "").strip(),
+                "date":       del_str,
+                "date_value": del_date,
+                "kind":       "PENDING",
+                "suggested_set": str(suggestion.get("set_display", "")).strip(),
+                "suggested_confirmed": bool(suggestion.get("confirmed", False)),
+            })
