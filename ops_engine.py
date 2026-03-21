@@ -522,12 +522,31 @@ def load_master_data(module_path: str | Path) -> dict[str, Any]:
                 sys.modules["pandas"] = prev
 
     sets       = getattr(module, "SETS", None)
-    plates     = getattr(module, "PLATES", None)
+    raw_plates = getattr(module, "PLATES_BY_CODE", getattr(module, "PLATES", None))
     hospitals  = getattr(module, "HOSPITALS", None)
     bonegraft  = getattr(module, "BONEGRAFT", [])
-    if not (isinstance(sets, list) and isinstance(plates, dict) and isinstance(hospitals, dict)):
+    if not (isinstance(sets, list) and isinstance(hospitals, dict)):
         raise RuntimeError(
-            "master_data.py must expose SETS (list), PLATES (dict), HOSPITALS (dict)"
+            "master_data.py must expose SETS (list), HOSPITALS (dict), and PLATES"
+        )
+
+    if isinstance(raw_plates, dict):
+        plates: dict[str, dict[str, Any]] = {}
+        for code, row in raw_plates.items():
+            if isinstance(row, dict) and code:
+                plates[str(code)] = row
+    elif isinstance(raw_plates, list):
+        plates = {}
+        for row in raw_plates:
+            if not isinstance(row, dict):
+                continue
+            code = row.get("product_code")
+            if not code:
+                continue
+            plates[str(code)] = row
+    else:
+        raise RuntimeError(
+            "master_data.py must expose PLATES as a dict (PLATES_BY_CODE) or a list with product_code"
         )
     if not isinstance(bonegraft, list):
         bonegraft = []
