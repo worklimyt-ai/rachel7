@@ -26,7 +26,7 @@ SETS = [
     {"category": "2.4-2.7", "id": "07", "home": "PENANG", "uid": "2.407", "shorthand": "2.4"},
     {"category": "2.4-2.7", "id": "08", "home": "IPOH", "uid": "2.408", "shorthand": "2.4"},
     {"category": "2.4-2.7", "id": "09", "home": "PENANG", "uid": "2.409", "shorthand": "2.4"},
-    {"category": "2.4-2.7", "id": "10", "home": "OFFICE", "uid": "2.410", "status": "NA", "shorthand": "2.4"},
+    {"category": "2.4-2.7", "id": "10", "home": "ABMC", "uid": "2.410", "shorthand": "2.4"},
     {"category": "2.4-2.7", "id": "11", "home": "PENANG", "uid": "2.411", "shorthand": "2.4"},
     {"category": "2.4-2.7", "id": "12", "home": "OFFICE", "uid": "2.412", "shorthand": "2.4"},
     {"category": "2.4-2.7", "id": "13", "home": "IPOH", "uid": "2.413", "shorthand": "2.4"},
@@ -3731,6 +3731,7 @@ HOSPITALS = {
     'HQE2': {'name': 'Queen Elizabeth Hospital 2', 'lat': 5.9558, 'lng': 116.0894, 'region': 'Sabah'},
     'SGH': {'name': 'SARAWAK GENERAL HOSPITAL', 'lat': 1.5439, 'lng': 110.3369, 'region': 'Sarawak'},
     'BMC': {'name': 'Bintulu Medical Centre', 'lat': 3.1763, 'lng': 113.0441, 'region': 'Sarawak'},
+    'KPH': {'name': 'Kemena Pacific Hospital ', 'lat': 3.2333, 'lng': 113.0860, 'region': 'Sarawak'},
 
     # --- PRIVATE HOSPITALS ---
     # CENTRAL 
