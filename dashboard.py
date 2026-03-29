@@ -46,17 +46,19 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
 .office-set-ids.is-standby { color: #b45309; }
 .office-set-empty { color: #9ca3af; font-size: 12px; font-style: italic; }
 .booking-next { margin-top: 8px; font-size: 12px; font-weight: 600; color: #1d4ed8; letter-spacing: .01em; }
-.home-set-wrap { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
-.home-set-title { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #6b7280; }
-.home-set-list { display: flex; flex-wrap: wrap; gap: 6px; }
-.home-set-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; background: #fff7ed; border: 1px solid #fed7aa; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: #9a3412; }
-.home-set-home { color: #7c2d12; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; }
-.home-set-date { color: #9a3412; font-size: 10px; font-weight: 600; }
-.service-set-wrap { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
-.service-set-title { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #6b7280; }
-.service-set-list { display: flex; flex-wrap: wrap; gap: 6px; }
-.service-set-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; background: #fef2f2; border: 1px solid #fecaca; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: #b91c1c; }
-.service-set-date { color: #991b1b; font-size: 10px; font-weight: 600; }
+.home-set-wrap { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.home-set-title { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #6b7280; }
+.home-set-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.home-set-chip { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 7px 12px; border-radius: 14px; background: #fff7ed; border: 1px solid #fdba74; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 800; line-height: 1.2; color: #9a3412; }
+.home-set-main { display: inline-flex; align-items: center; gap: 8px; }
+.home-set-home { color: #7c2d12; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.home-set-date { color: #9a3412; font-size: 11px; font-weight: 700; }
+.service-set-wrap { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.service-set-title { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #6b7280; }
+.service-set-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.service-set-chip { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 7px 12px; border-radius: 14px; background: #fef2f2; border: 1px solid #fca5a5; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 800; line-height: 1.2; color: #b91c1c; }
+.service-set-main { display: inline-flex; align-items: center; gap: 8px; }
+.service-set-date { color: #991b1b; font-size: 11px; font-weight: 700; }
 
 
 .out-line { padding: 5px 0; margin-top: 6px; line-height: 1.6; border-left: 3px solid #e5e7eb; padding-left: 14px; margin-left: 4px; }
@@ -839,11 +841,12 @@ with inv_tabs[0]:
                 maintained = escape(_format_last_maintained(str(item.get("last_maintained", "")).strip()))
                 if not label and not home:
                     continue
+                home_label_html = f"<span>{label or '—'}</span>"
+                home_home_html = f"<span class='home-set-home'>{home}</span>" if home else ""
                 maintained_html = f"<span class='home-set-date'>{maintained}</span>" if maintained else ""
                 home_parts.append(
                     f"<span class='home-set-chip'>"
-                    f"<span>{label or '—'}</span>"
-                    f"<span class='home-set-home'>{home}</span>"
+                    f"<span class='home-set-main'>{home_label_html}{home_home_html}</span>"
                     f"{maintained_html}"
                     f"</span>"
                 )
@@ -868,10 +871,11 @@ with inv_tabs[0]:
             if service_items:
                 service_parts = []
                 for item in service_items:
+                    service_main_html = f"<span class='service-set-main'><span>{item['label']}</span></span>"
                     maintained_html = f"<span class='service-set-date'>{item['maintained']}</span>" if item["maintained"] else ""
                     service_parts.append(
                         f"<span class='service-set-chip'>"
-                        f"<span>{item['label']}</span>"
+                        f"{service_main_html}"
                         f"{maintained_html}"
                         f"</span>"
                     )
@@ -883,7 +887,7 @@ with inv_tabs[0]:
                 )
 
             left_col = (
-                f"<div style='flex:0 0 39%;padding-right:20px'>"
+                f"<div style='flex:0 0 40%;max-width:40%;padding-right:20px'>"
                 f"<div style='display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px'>"
                 f"<span class='inv-name' style='font-size:20px'>{r['DisplayLabel']}</span>{badge}</div>"
                 f"{in_html}{nb_html}{up_html}{home_html}{service_html}</div>"
@@ -937,7 +941,7 @@ with inv_tabs[0]:
 
             return (
                 f"<div class='inv-row' style='display:flex;align-items:flex-start'>"
-                f"{left_col}<div style='flex:1'>{out_lines}</div></div>"
+                f"{left_col}<div style='flex:0 0 60%;max-width:60%'>{out_lines}</div></div>"
             )
 
         if filtered_summary:
