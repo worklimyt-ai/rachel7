@@ -51,6 +51,12 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
 .home-set-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .home-set-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; background: #fff7ed; border: 1px solid #fed7aa; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: #9a3412; }
 .home-set-home { color: #7c2d12; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; }
+.home-set-date { color: #9a3412; font-size: 10px; font-weight: 600; }
+.service-set-wrap { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.service-set-title { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #6b7280; }
+.service-set-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.service-set-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; background: #fef2f2; border: 1px solid #fecaca; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: #b91c1c; }
+.service-set-date { color: #991b1b; font-size: 10px; font-weight: 600; }
 
 
 .out-line { padding: 5px 0; margin-top: 6px; line-height: 1.6; border-left: 3px solid #e5e7eb; padding-left: 14px; margin-left: 4px; }
@@ -386,6 +392,15 @@ def _compact_set_id(value: str, fallback: str = "") -> str:
     if not t: return ""
     return str(int(t)) if re.fullmatch(r"\d+", t) else t
 
+def _format_last_maintained(value: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    d = _parse_ui_date(text)
+    if d is None:
+        return text
+    return f"{d.day} {d.strftime('%b %Y')}"
+
 
 def _is_past_or_today(value) -> bool:
     if isinstance(value, date):
@@ -610,19 +625,30 @@ with inv_tabs[0]:
         ordered_norm.extend(sorted(n for n in display_by_norm if n not in ordered_norm))
         ordered_core = {c.upper() for c in OFFICE_VIEW_ORDER}
         home_items_by_category: dict[str, list[dict[str, str]]] = {}
+        service_items_by_category: dict[str, list[dict[str, str]]] = {}
         for item in master_sets:
             cat_norm = str(item.get("category", "")).upper().strip()
             home_norm = str(item.get("home", "")).upper().strip()
             status_norm = str(item.get("status", "")).upper().strip()
+            last_maintained = str(item.get("last_maintained", "")).strip()
             if not cat_norm or cat_norm in _POWERTOOL_CATS:
+                continue
+            label = _compact_set_id(item.get("id", ""), item.get("uid", ""))
+            if "NA" in status_norm:
+                if label:
+                    service_items_by_category.setdefault(cat_norm, []).append({
+                        "label": label,
+                        "last_maintained": last_maintained,
+                    })
                 continue
             if home_norm in {"", "OFFICE", "STANDBY"}:
                 continue
-            if "NA" in status_norm or "STANDBY" in status_norm:
+            if "STANDBY" in status_norm:
                 continue
             home_items_by_category.setdefault(cat_norm, []).append({
-                "label": _compact_set_id(item.get("id", ""), item.get("uid", "")),
+                "label": label,
                 "home": home_norm,
+                "last_maintained": last_maintained,
             })
         for items in home_items_by_category.values():
             items.sort(key=lambda item: (
@@ -630,6 +656,12 @@ with inv_tabs[0]:
                 int(item["label"]) if str(item.get("label", "")).isdigit() else 0,
                 str(item.get("label", "")),
                 str(item.get("home", "")),
+            ))
+        for items in service_items_by_category.values():
+            items.sort(key=lambda item: (
+                0 if str(item.get("label", "")).isdigit() else 1,
+                int(item["label"]) if str(item.get("label", "")).isdigit() else 0,
+                str(item.get("label", "")),
             ))
 
         summary_rows: list[dict] = []
@@ -703,9 +735,17 @@ with inv_tabs[0]:
                 "In Office":in_count,"Booked":bk_count,"Out":out_count,"Available":available,
                 "OfficeItems":office_items,"StandbyItems":standby_items,
                 "HomeItems":list(home_items_by_category.get(cat_norm, [])),
+                "ServiceItems":list(service_items_by_category.get(cat_norm, [])),
                 "NextBooking":next_booking_lookup.get(cat_norm,{}),
                 "In Office Sets":", ".join(sorted(i["name"] for i in office_items+standby_items)),
-                "Home Sets":", ".join(f"{i['label']} {i['home']}" for i in home_items_by_category.get(cat_norm, [])),
+                "Home Sets":", ".join(
+                    " ".join(filter(None, [i["label"], i["home"], i.get("last_maintained", "")]))
+                    for i in home_items_by_category.get(cat_norm, [])
+                ),
+                "Service Sets":", ".join(
+                    " ".join(filter(None, [i["label"], i.get("last_maintained", "")]))
+                    for i in service_items_by_category.get(cat_norm, [])
+                ),
                 "Out (Hospital•Surgery)":out_list,
                 "UpcomingCases":upcoming_cases,"UpcomingCasesText":upcoming_text,
             })
@@ -731,6 +771,7 @@ with inv_tabs[0]:
                 if sq in r["DisplayLabel"].lower()
                 or sq in r["In Office Sets"].lower()
                 or sq in r.get("Home Sets","").lower()
+                or sq in r.get("Service Sets","").lower()
                 or sq in r["Out (Hospital•Surgery)"].lower()
                 or sq in r.get("UpcomingCasesText","").lower()
             ]
@@ -795,12 +836,15 @@ with inv_tabs[0]:
             for item in list(r.get("HomeItems", []) or []):
                 label = escape(str(item.get("label", "")).strip())
                 home = escape(str(item.get("home", "")).strip())
+                maintained = escape(_format_last_maintained(str(item.get("last_maintained", "")).strip()))
                 if not label and not home:
                     continue
+                maintained_html = f"<span class='home-set-date'>{maintained}</span>" if maintained else ""
                 home_parts.append(
                     f"<span class='home-set-chip'>"
                     f"<span>{label or '—'}</span>"
                     f"<span class='home-set-home'>{home}</span>"
+                    f"{maintained_html}"
                     f"</span>"
                 )
             home_html = ""
@@ -812,11 +856,37 @@ with inv_tabs[0]:
                     "</div>"
                 )
 
+            service_items = [
+                {
+                    "label": escape(str(item.get("label", "")).strip()),
+                    "maintained": escape(_format_last_maintained(str(item.get("last_maintained", "")).strip())),
+                }
+                for item in list(r.get("ServiceItems", []) or [])
+                if str(item.get("label", "")).strip()
+            ]
+            service_html = ""
+            if service_items:
+                service_parts = []
+                for item in service_items:
+                    maintained_html = f"<span class='service-set-date'>{item['maintained']}</span>" if item["maintained"] else ""
+                    service_parts.append(
+                        f"<span class='service-set-chip'>"
+                        f"<span>{item['label']}</span>"
+                        f"{maintained_html}"
+                        f"</span>"
+                    )
+                service_html = (
+                    "<div class='service-set-wrap'>"
+                    "<div class='service-set-title'>🛠️ maintenance/service</div>"
+                    f"<div class='service-set-list'>{''.join(service_parts)}</div>"
+                    "</div>"
+                )
+
             left_col = (
                 f"<div style='flex:0 0 39%;padding-right:20px'>"
                 f"<div style='display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px'>"
                 f"<span class='inv-name' style='font-size:20px'>{r['DisplayLabel']}</span>{badge}</div>"
-                f"{in_html}{nb_html}{up_html}{home_html}</div>"
+                f"{in_html}{nb_html}{up_html}{home_html}{service_html}</div>"
             )
 
             out_items = sorted(_set_out.get(cn,[]), key=lambda o: (o.get("DateValue",date.max), str(o.get("Case",""))))
