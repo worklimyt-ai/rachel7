@@ -46,6 +46,11 @@ section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px 
 .office-set-ids.is-standby { color: #b45309; }
 .office-set-empty { color: #9ca3af; font-size: 12px; font-style: italic; }
 .booking-next { margin-top: 8px; font-size: 12px; font-weight: 600; color: #1d4ed8; letter-spacing: .01em; }
+.home-set-wrap { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.home-set-title { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #6b7280; }
+.home-set-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.home-set-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; background: #fff7ed; border: 1px solid #fed7aa; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: #9a3412; }
+.home-set-home { color: #7c2d12; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; }
 
 
 .out-line { padding: 5px 0; margin-top: 6px; line-height: 1.6; border-left: 3px solid #e5e7eb; padding-left: 14px; margin-left: 4px; }
@@ -180,6 +185,12 @@ def load_report(master: str, cases: str, archive: str, sig: str) -> dict:
     from ops_engine import build_operations_report
     return build_operations_report(master_data_path=master, cases_source=cases or None, archive_source=archive or None)
 
+@st.cache_data(show_spinner=False, ttl=60)
+def load_master_sets(master: str, sig: str) -> list[dict]:
+    from ops_engine import load_master_data
+    raw_sets = load_master_data(master).get("SETS", [])
+    return list(raw_sets) if isinstance(raw_sets, list) else []
+
 def _source_sig(value: str) -> str:
     text = str(value or "").strip()
     if not text: return ""
@@ -206,6 +217,7 @@ if st.session_state.get("load_error"):
     st.error(f"❌ Failed to load data: {st.session_state['load_error']}")
     st.stop()
 
+master_sets = load_master_sets(master_path, _source_sig(master_path))
 report       = st.session_state["report"]
 meta         = report["meta"]
 case_rows_all = report.get("cases_all", [])
@@ -597,6 +609,28 @@ with inv_tabs[0]:
         ordered_norm = [c.upper() for c in OFFICE_VIEW_ORDER]
         ordered_norm.extend(sorted(n for n in display_by_norm if n not in ordered_norm))
         ordered_core = {c.upper() for c in OFFICE_VIEW_ORDER}
+        home_items_by_category: dict[str, list[dict[str, str]]] = {}
+        for item in master_sets:
+            cat_norm = str(item.get("category", "")).upper().strip()
+            home_norm = str(item.get("home", "")).upper().strip()
+            status_norm = str(item.get("status", "")).upper().strip()
+            if not cat_norm or cat_norm in _POWERTOOL_CATS:
+                continue
+            if home_norm in {"", "OFFICE", "STANDBY"}:
+                continue
+            if "NA" in status_norm or "STANDBY" in status_norm:
+                continue
+            home_items_by_category.setdefault(cat_norm, []).append({
+                "label": _compact_set_id(item.get("id", ""), item.get("uid", "")),
+                "home": home_norm,
+            })
+        for items in home_items_by_category.values():
+            items.sort(key=lambda item: (
+                0 if str(item.get("label", "")).isdigit() else 1,
+                int(item["label"]) if str(item.get("label", "")).isdigit() else 0,
+                str(item.get("label", "")),
+                str(item.get("home", "")),
+            ))
 
         summary_rows: list[dict] = []
         out_rows:     list[dict] = []
@@ -668,8 +702,10 @@ with inv_tabs[0]:
                 "Category":cat_norm,"DisplayLabel":label,"CategoryNorm":cat_norm,
                 "In Office":in_count,"Booked":bk_count,"Out":out_count,"Available":available,
                 "OfficeItems":office_items,"StandbyItems":standby_items,
+                "HomeItems":list(home_items_by_category.get(cat_norm, [])),
                 "NextBooking":next_booking_lookup.get(cat_norm,{}),
                 "In Office Sets":", ".join(sorted(i["name"] for i in office_items+standby_items)),
+                "Home Sets":", ".join(f"{i['label']} {i['home']}" for i in home_items_by_category.get(cat_norm, [])),
                 "Out (Hospital•Surgery)":out_list,
                 "UpcomingCases":upcoming_cases,"UpcomingCasesText":upcoming_text,
             })
@@ -694,6 +730,7 @@ with inv_tabs[0]:
                 r for r in summary_rows
                 if sq in r["DisplayLabel"].lower()
                 or sq in r["In Office Sets"].lower()
+                or sq in r.get("Home Sets","").lower()
                 or sq in r["Out (Hospital•Surgery)"].lower()
                 or sq in r.get("UpcomingCasesText","").lower()
             ]
@@ -754,11 +791,32 @@ with inv_tabs[0]:
                 more = max(len(upcoming_cases)-5, 0)
                 up_html = "<div class='upcoming-chip-wrap'>" + "".join(up_parts) + (f"<span class='upcoming-more'>+{more} more</span>" if more else "") + "</div>"
 
+            home_parts = []
+            for item in list(r.get("HomeItems", []) or []):
+                label = escape(str(item.get("label", "")).strip())
+                home = escape(str(item.get("home", "")).strip())
+                if not label and not home:
+                    continue
+                home_parts.append(
+                    f"<span class='home-set-chip'>"
+                    f"<span>{label or '—'}</span>"
+                    f"<span class='home-set-home'>{home}</span>"
+                    f"</span>"
+                )
+            home_html = ""
+            if home_parts:
+                home_html = (
+                    "<div class='home-set-wrap'>"
+                    "<div class='home-set-title'>🏠 home</div>"
+                    f"<div class='home-set-list'>{''.join(home_parts)}</div>"
+                    "</div>"
+                )
+
             left_col = (
                 f"<div style='flex:0 0 39%;padding-right:20px'>"
                 f"<div style='display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px'>"
                 f"<span class='inv-name' style='font-size:20px'>{r['DisplayLabel']}</span>{badge}</div>"
-                f"{in_html}{nb_html}{up_html}</div>"
+                f"{in_html}{nb_html}{up_html}{home_html}</div>"
             )
 
             out_items = sorted(_set_out.get(cn,[]), key=lambda o: (o.get("DateValue",date.max), str(o.get("Case",""))))
