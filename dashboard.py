@@ -29,6 +29,7 @@ st.markdown("""
   --ivory-highlight: #fffaf1;
   --glaucous-light: #bfd1d2;
   --glaucous-soft: #e4efef;
+  --glaucous-mid: #6e8f95;
   --green-blue: #2f6f73;
   --green-blue-deep: #244f56;
   --green-blue-soft: #dbeaea;
@@ -266,12 +267,12 @@ details[data-testid="stExpander"] summary * {
 .meeple-pill { min-width: 46px; height: 28px; padding: 0 8px; border-radius: 999px; border: 2px solid; display: inline-flex; align-items: center; justify-content: center; font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 700; line-height: 1; letter-spacing: .03em; white-space: nowrap; }
 .meeple-pill.mp-done    { color: #fff; }
 .meeple-pill.mp-current { }
-.meeple-pill.mp-future  { background: #fffaf2; border-color: #d7c8af; color: #8a7a68; }
+.meeple-pill.mp-future  { background: var(--ivory-highlight); border-color: var(--line-soft); color: var(--buff-deep); }
 .meeple-step-label { font-size: 9px; font-weight: 700; text-align: center; line-height: 1.2; max-width: 58px; }
 .meeple-step-date  { font-size: 16px; font-weight: 800; color: var(--ink-main); text-align: center; min-height: 20px; }
-.meeple-connector  { flex: 1 1 0; min-width: 8px; height: 3px; border-radius: 999px; margin-top: 19px; align-self: flex-start; }
-.meeple-terminal { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .05em; margin: 8px 0 2px 0; }
-.meeple-terminal.mp-pp  { background:#fff7ed; color:#c2410c; border:2px solid #f97316; }
+.meeple-connector  { flex: 1 1 0; min-width: 8px; height: 3px; border-radius: 999px; margin-top: 19px; align-self: flex-start; background: var(--line-soft); }
+.meeple-terminal { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .05em; margin: 8px 0 2px 0; background: var(--glaucous-soft); color: var(--green-blue-deep); border: 1px solid var(--glaucous-light); }
+.meeple-terminal.mp-pp  { background:#f5ead2; color:var(--buff-deep); border:2px solid #c8aa79; }
 
 /* ── Upcoming chips ── */
 .upcoming-chip-wrap { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
@@ -315,6 +316,11 @@ details[data-testid="stExpander"] summary * {
 KL_TZ = ZoneInfo("Asia/Kuala_Lumpur")
 DEFAULT_MASTER_DATA_PATH = str(Path(__file__).resolve().with_name("master_data.py"))
 _POWERTOOL_CATS = {"P5503", "P5400", "P8400"}
+THEME_GREEN_BLUE = "#2f6f73"
+THEME_GLAUCOUS = "#6e8f95"
+THEME_BUFF = "#8c6b3f"
+THEME_CANCELLED = "#8a5f56"
+THEME_LINE_SOFT = "#d8ccb4"
 
 OFFICE_VIEW_ORDER = [
     "STD CANNA 6.5/7.3","STD CANNA 4.0","STD CANNA 2.4","STD CANNA 3.0",
@@ -600,7 +606,7 @@ def _render_meeple_steps(steps: list, accent: str) -> str:
         else:
             pill_style = ""
             pill_cls   = "meeple-pill mp-future"
-        label_color = accent if (is_done or is_current) else "#7b6345"
+        label_color = accent if (is_done or is_current) else THEME_BUFF
         dot_html = f'<span class="meeple-current-dot" style="background:{accent};box-shadow:0 0 0 3px {accent}33"></span>' if is_current else ""
         d_obj = _parse_ui_date(date_str)
         date_display = d_obj.strftime("%-d %b") if d_obj else ""
@@ -613,7 +619,7 @@ def _render_meeple_steps(steps: list, accent: str) -> str:
             f'</div>'
         )
         if i < len(steps) - 1:
-            parts.append(f'<div class="meeple-connector" style="background:{accent if is_done else "#d7c8af"}"></div>')
+            parts.append(f'<div class="meeple-connector" style="background:{accent if is_done else THEME_LINE_SOFT}"></div>')
     parts.append('</div>')
     return "".join(parts)
 
@@ -644,7 +650,7 @@ def _build_meeple_steps(*, prefix, delivery, surgery, sales_code, status, is_boo
             ("Cancelled", "CNX",  True,                           ""),
             (tl,          "TRNST",is_transit,                     ""),
             ("Checking",  "CHK",  is_checking,                    ""),
-        ], "#ef4444"
+        ], THEME_CANCELLED
 
     if is_parking:
         has_surg      = _is_past_or_today(surgery)
@@ -656,7 +662,7 @@ def _build_meeple_steps(*, prefix, delivery, surgery, sales_code, status, is_boo
             ("Sales Posted",    "SALES", has_sales,     ""),
             ("Top Up Prepared", "PREP",  has_prep,      return_date),
             ("Top Up Delivered","DEL",   has_del_topup, ""),
-        ], "#f59e0b"
+        ], THEME_BUFF
 
     if is_booking:
         return [
@@ -666,7 +672,7 @@ def _build_meeple_steps(*, prefix, delivery, surgery, sales_code, status, is_boo
             ("Sales Posted","SALES", bool(sales_code),               ""),
             (tl,            "TRNST", is_transit,                     ""),
             ("Checking",    "CHK",   is_checking,                    ""),
-        ], "#2563eb"
+        ], THEME_GLAUCOUS
 
     return [
         ("Delivered",   "DEL",   _is_past_or_today(delivery),   delivery),
@@ -674,7 +680,7 @@ def _build_meeple_steps(*, prefix, delivery, surgery, sales_code, status, is_boo
         ("Sales Posted","SALES", bool(sales_code),               ""),
         (tl,            "TRNST", is_transit,                     ""),
         ("Checking",    "CHK",   is_checking,                    ""),
-    ], "#0ea5a4"
+    ], THEME_GREEN_BLUE
 
 def _meeple_track_for_case_id(case_id: str, *, surgery="", delivery="", case_status="") -> str:
     cid    = str(case_id or "").strip()
