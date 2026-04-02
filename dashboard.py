@@ -586,6 +586,21 @@ def _is_past_or_today(value) -> bool:
         return False
     return d <= report_today
 
+def _kpi_card(label: str, value: str | int, tone: str = "ok") -> str:
+    return (
+        f"<div class='kpi-card'>"
+        f"<div class='kpi-label'>{escape(str(label))}</div>"
+        f"<div class='kpi-value {tone}'>{escape(str(value))}</div>"
+        f"</div>"
+    )
+
+def _filter_df_by_search(df: pd.DataFrame, query: str) -> pd.DataFrame:
+    text = str(query or "").strip().lower()
+    if not text or df.empty:
+        return df
+    haystack = df.fillna("").astype(str).agg(" ".join, axis=1).str.lower()
+    return df[haystack.str.contains(text, regex=False)]
+
 # ── Meeple track ──────────────────────────────────────────────────────────────
 def _render_meeple_steps(steps: list, accent: str) -> str:
     last_done = -1
@@ -738,12 +753,221 @@ def _hospital_with_led(hospital, sv, *, variant="", sales_code="", case_status="
 # TABS
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 st.markdown("<div class='sec-header'>Operational Detail — Inventory Snapshot</div>", unsafe_allow_html=True)
-inv_tabs = st.tabs(["🧰 Sets", "🦾 Plates", "🔌 Powertools"])
+inv_tabs = st.tabs(["🚨 Triage", "🧰 Sets", "🦾 Plates", "🔌 Powertools"])
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TRIAGE TAB
+# ══════════════════════════════════════════════════════════════════════════════
+with inv_tabs[0]:
+    triage_set_avail   = pd.DataFrame(report.get("set_category_availability", []))
+    triage_set_status  = pd.DataFrame(report.get("set_office_status", []))
+    triage_collect     = pd.DataFrame(report.get("case_buckets", {}).get("to_collect", []))
+    triage_plate_sum   = pd.DataFrame(report.get("plate_uid_summary", []))
+    triage_plate_range = pd.DataFrame(report.get("plate_size_range_availability", []))
+
+    set_critical_view = pd.DataFrame()
+    set_watch_view    = pd.DataFrame()
+    collect_view      = pd.DataFrame()
+    plate_critical_view = pd.DataFrame()
+    plate_watch_view    = pd.DataFrame()
+
+    if not triage_set_avail.empty:
+        triage_set_avail = triage_set_avail.copy()
+        triage_set_avail["category_norm"] = triage_set_avail["category"].astype(str).str.upper().str.strip()
+        triage_set_avail = triage_set_avail[~triage_set_avail["category_norm"].isin(_POWERTOOL_CATS)]
+        for col in ("available", "total_office", "out_for_case", "reserved_total"):
+            if col not in triage_set_avail.columns:
+                triage_set_avail[col] = 0
+        triage_set_avail["available"] = triage_set_avail["available"].apply(_safe_int)
+        triage_set_avail["total_office"] = triage_set_avail["total_office"].apply(_safe_int)
+        triage_set_avail["out_for_case"] = triage_set_avail["out_for_case"].apply(_safe_int)
+        triage_set_avail["reserved_total"] = triage_set_avail["reserved_total"].apply(_safe_int)
+        set_ratio = triage_set_avail["available"].div(triage_set_avail["total_office"].replace(0, pd.NA))
+        triage_set_avail["is_critical"] = triage_set_avail["total_office"].gt(0) & triage_set_avail["available"].eq(0)
+        triage_set_avail["is_watch"] = (
+            triage_set_avail["total_office"].gt(1)
+            & triage_set_avail["available"].gt(0)
+            & ((triage_set_avail["available"].eq(1)) | set_ratio.le(0.25).fillna(False))
+        )
+        triage_set_avail["availability_display"] = (
+            triage_set_avail["available"].astype(str)
+            + "/"
+            + triage_set_avail["total_office"].astype(str)
+        )
+
+        holders_by_category: dict[str, str] = {}
+        if not triage_set_status.empty:
+            triage_set_status = triage_set_status.copy()
+            for col in ("category", "location_now", "set_status", "assignment_kind", "case_id", "surgery_date"):
+                if col not in triage_set_status.columns:
+                    triage_set_status[col] = ""
+            triage_set_status["category_norm"] = triage_set_status["category"].astype(str).str.upper().str.strip()
+            triage_set_status["location_norm"] = triage_set_status["location_now"].astype(str).str.upper().str.strip()
+            triage_set_status["set_status_norm"] = triage_set_status["set_status"].astype(str).str.upper().str.strip()
+            triage_set_status["assignment_kind_norm"] = triage_set_status["assignment_kind"].astype(str).str.upper().str.strip()
+            triage_set_status = triage_set_status[~triage_set_status["category_norm"].isin(_POWERTOOL_CATS)]
+            out_rows = triage_set_status[
+                triage_set_status["location_norm"].ne("")
+                & ~triage_set_status["location_norm"].isin(["OFFICE", "STANDBY"])
+                & ~triage_set_status["set_status_norm"].str.contains("NA", na=False)
+                & ~triage_set_status["assignment_kind_norm"].eq("BOOKED")
+            ].sort_values(["surgery_date", "case_id", "location_now"])
+            for category_norm, grp in out_rows.groupby("category_norm"):
+                labels: list[str] = []
+                for _, item in grp.iterrows():
+                    case_id = str(item.get("case_id", "") or "").strip()
+                    hospital = str(item.get("location_now", "") or "").strip()
+                    token = f"{case_id} @ {hospital}" if case_id and hospital else case_id or hospital
+                    if token and token not in labels:
+                        labels.append(token)
+                holders_by_category[category_norm] = "; ".join(labels)
+
+        triage_set_avail["out_with"] = triage_set_avail["category_norm"].map(holders_by_category).fillna("")
+        set_display = triage_set_avail[[
+            "category", "availability_display", "out_for_case", "reserved_total", "out_with", "is_critical", "is_watch"
+        ]].rename(columns={
+            "category": "Category",
+            "availability_display": "Avail",
+            "out_for_case": "Out",
+            "reserved_total": "Reserved",
+            "out_with": "Out With",
+        })
+        set_critical_view = set_display[set_display["is_critical"]].drop(columns=["is_critical", "is_watch"])
+        set_watch_view = set_display[set_display["is_watch"]].drop(columns=["is_critical", "is_watch"])
+        set_critical_view = _filter_df_by_search(set_critical_view, search_query)
+        set_watch_view = _filter_df_by_search(set_watch_view, search_query)
+
+    if not triage_collect.empty:
+        triage_collect = triage_collect.copy()
+        for col in ("case_id", "hospital", "patient_doctor", "surgery_date", "sales_code", "sets_outstanding", "plates", "powertools"):
+            if col not in triage_collect.columns:
+                triage_collect[col] = ""
+        triage_collect["sort_surgery"] = triage_collect["surgery_date"].apply(_parse_ui_date)
+        triage_collect["Outstanding"] = triage_collect.apply(
+            lambda row: " | ".join(
+                part for part in [
+                    f"sets: {str(row.get('sets_outstanding', '')).strip()}" if str(row.get("sets_outstanding", "")).strip() else "",
+                    f"plates: {str(row.get('plates', '')).strip()}" if str(row.get("plates", "")).strip() else "",
+                    f"powertools: {str(row.get('powertools', '')).strip()}" if str(row.get("powertools", "")).strip() else "",
+                ]
+                if part
+            ),
+            axis=1,
+        )
+        collect_view = triage_collect.sort_values(
+            ["sort_surgery", "case_id"],
+            na_position="last",
+        )[["case_id", "hospital", "patient_doctor", "surgery_date", "sales_code", "Outstanding"]].rename(columns={
+            "case_id": "Case",
+            "hospital": "Hospital",
+            "patient_doctor": "Doctor",
+            "surgery_date": "Surgery",
+            "sales_code": "Sales",
+        })
+        collect_view = _filter_df_by_search(collect_view, search_query)
+
+    if not triage_plate_sum.empty:
+        triage_plate_sum = triage_plate_sum.copy()
+        for col in ("plate_uid", "proper_name", "plate_name", "availability", "status_note", "size_ranges"):
+            if col not in triage_plate_sum.columns:
+                triage_plate_sum[col] = ""
+        triage_plate_sum["uid_norm"] = triage_plate_sum["plate_uid"].astype(str).str.upper().str.strip()
+        triage_plate_sum["status_note"] = triage_plate_sum["status_note"].astype(str).str.strip()
+        triage_plate_sum["is_critical"] = triage_plate_sum["status_note"].str.upper().str.startswith("OUT OF STOCK")
+        triage_plate_sum["is_watch"] = triage_plate_sum["status_note"].str.upper().str.startswith("PARTIAL")
+
+        plate_holders: dict[str, str] = {}
+        if not triage_plate_range.empty:
+            triage_plate_range = triage_plate_range.copy()
+            for col in ("plate_uid", "out_case_details", "range_status"):
+                if col not in triage_plate_range.columns:
+                    triage_plate_range[col] = [] if col == "out_case_details" else ""
+            triage_plate_range["uid_norm"] = triage_plate_range["plate_uid"].astype(str).str.upper().str.strip()
+            for uid_norm, grp in triage_plate_range.groupby("uid_norm"):
+                labels: list[str] = []
+                for details in grp["out_case_details"].tolist():
+                    if not isinstance(details, list):
+                        continue
+                    for item in details:
+                        if not isinstance(item, dict):
+                            continue
+                        case_id = str(item.get("case_id", "") or "").strip()
+                        hospital = str(item.get("hospital", "") or "").strip()
+                        token = f"{case_id} @ {hospital}" if case_id and hospital else case_id or hospital
+                        if token and token not in labels:
+                            labels.append(token)
+                plate_holders[uid_norm] = "; ".join(labels)
+
+        triage_plate_sum["Plate"] = triage_plate_sum["proper_name"].astype(str).where(
+            triage_plate_sum["proper_name"].astype(str).str.strip().ne(""),
+            triage_plate_sum["plate_name"].astype(str),
+        )
+        triage_plate_sum["Out With"] = triage_plate_sum["uid_norm"].map(plate_holders).fillna("")
+        plate_display = triage_plate_sum[[
+            "plate_uid", "Plate", "availability", "status_note", "size_ranges", "Out With", "is_critical", "is_watch"
+        ]].rename(columns={
+            "plate_uid": "UID",
+            "availability": "Avail",
+            "status_note": "Status",
+            "size_ranges": "Ranges",
+        })
+        plate_critical_view = plate_display[plate_display["is_critical"]].drop(columns=["is_critical", "is_watch"])
+        plate_watch_view = plate_display[plate_display["is_watch"]].drop(columns=["is_critical", "is_watch"])
+        plate_critical_view = _filter_df_by_search(plate_critical_view, search_query)
+        plate_watch_view = _filter_df_by_search(plate_watch_view, search_query)
+
+    kpi1, kpi2, kpi3 = st.columns(3)
+    with kpi1:
+        st.markdown(_kpi_card("Critical Sets", len(set_critical_view), "alert"), unsafe_allow_html=True)
+    with kpi2:
+        st.markdown(_kpi_card("Sales Posted / Collect", len(collect_view), "warn"), unsafe_allow_html=True)
+    with kpi3:
+        st.markdown(_kpi_card("Low Plates", len(plate_critical_view) + len(plate_watch_view), "alert"), unsafe_allow_html=True)
+
+    if search_query:
+        st.caption(f"Filtered by search: {search_query}")
+
+    st.markdown("##### Sets Running Low")
+    set_col_critical, set_col_watch = st.columns(2)
+    with set_col_critical:
+        st.caption("Critical: nothing left in office")
+        if set_critical_view.empty:
+            st.info("No critical set shortages.")
+        else:
+            st.dataframe(set_critical_view, use_container_width=True, hide_index=True)
+    with set_col_watch:
+        st.caption("Watch: only one left or <=25% remaining")
+        if set_watch_view.empty:
+            st.info("No set categories on watch.")
+        else:
+            st.dataframe(set_watch_view, use_container_width=True, hide_index=True)
+
+    st.markdown("##### Sales Posted, Still Outstanding")
+    if collect_view.empty:
+        st.info("No cases with sales posted and equipment still out.")
+    else:
+        st.caption("These are the current collect cases: sales code is posted, but no return date is recorded yet.")
+        st.dataframe(collect_view, use_container_width=True, hide_index=True)
+
+    st.markdown("##### Plates Running Low")
+    plate_col_critical, plate_col_watch = st.columns(2)
+    with plate_col_critical:
+        st.caption("Critical: out of stock")
+        if plate_critical_view.empty:
+            st.info("No plates are fully out.")
+        else:
+            st.dataframe(plate_critical_view, use_container_width=True, hide_index=True)
+    with plate_col_watch:
+        st.caption("Watch: partial availability")
+        if plate_watch_view.empty:
+            st.info("No plates are partially depleted.")
+        else:
+            st.dataframe(plate_watch_view, use_container_width=True, hide_index=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SETS TAB
 # ══════════════════════════════════════════════════════════════════════════════
-with inv_tabs[0]:
+with inv_tabs[1]:
     set_avail      = pd.DataFrame(report.get("set_category_availability", []))
     set_status_all = pd.DataFrame(report.get("set_office_status", []))
     pt_avail_df    = pd.DataFrame(report.get("powertool_category_availability", []))
@@ -1163,7 +1387,7 @@ with inv_tabs[0]:
 # ══════════════════════════════════════════════════════════════════════════════
 # PLATES TAB
 # ══════════════════════════════════════════════════════════════════════════════
-with inv_tabs[1]:
+with inv_tabs[2]:
     plate_sum = pd.DataFrame(report.get("plate_uid_summary", []))
     if plate_sum.empty:
         st.info("No plate data.")
@@ -1345,7 +1569,7 @@ with inv_tabs[1]:
 # ══════════════════════════════════════════════════════════════════════════════
 # POWERTOOLS TAB
 # ══════════════════════════════════════════════════════════════════════════════
-with inv_tabs[2]:
+with inv_tabs[3]:
     pt_avail = pd.DataFrame(report.get("powertool_category_availability",[]))
     pt_del   = pd.DataFrame(report.get("powertool_delivered",[]))
     pt_uid   = pd.DataFrame(report.get("powertool_uid_availability",[]))

@@ -64,8 +64,8 @@ HSAH,Hospital Sultan Abdul Halim,Kedah,5.6669,100.5186,302.37,316.78
 HSAJB,"Hospital Sultanah Aminah, Johor Bahru",Johor,1.4586,103.7461,303.15,289.01
 HSB,Hospital Sultanah Bahiyah,Kedah,6.1492,100.4058,356.56,370.88
 HSBP,Hospital Seri Botani,Perak,4.5428,101.1058,161.91,176.18
-HSBU,Hospital Sungai Buloh,Selangor,3.2197,101.5831,6.88,21.24
 HSD,Hospital Serdang,Selangor,2.9764,101.7142,24.89,11.32
+HSGB,Hospital Sungai Buloh,Selangor,3.2197,101.5831,6.88,21.24
 HSGT,Hospital Segamat,Johor,2.5025,102.8222,152.18,138.97
 HSJ,Hospital Seberang Jaya,Penang,5.3944,100.4081,280.74,295.34
 HSM,Hospital Sri Manjung,Perak,4.1953,100.6658,155.45,169.99
@@ -85,11 +85,11 @@ HTPG,Hospital Taiping,Perak,4.8519,100.7414,210.11,224.68
 HUITMPA,Hospital UiTM Puncak Alam,Selangor,3.2038,101.4468,20.98,32.55
 HUKM,Hospital Canselor Tuanku Muhriz UKM/HCTM,KL,3.1026,101.7241,13.55,3.05
 HUTAR,Hospital Universiti Tunku Abdul Rahman,Perak,4.3414,101.1442,139.56,153.93
-IH,Island Hospital Penang,Penang,5.4142,100.3287,287.01,301.64
 IHP,Island Hospital,Penang,5.4217,100.3139,288.56,303.19
 KLS,Kek Lok Si Charitable Hospital,Penang,5.3975,100.2733,288.57,303.22
 KMC,Kedah Medical Centre,Kedah,6.1361,100.3739,356.58,370.94
 KMCJ,Kempas Medical JB,Johor,1.5436,103.7153,294.55,280.49
+KPH,Kemena Pacific Hospital ,Sarawak,3.2333,113.086,1271.31,1262.97
 KPJD,KPJ Damansara Specialist Hospital,Selangor,3.1344,101.6231,5.86,11.64
 KPJD2,Damansara Specialist Hospital 2 (KPJ Damansara 2),Selangor,3.1625,101.6319,2.61,12.89
 KPJIPH,KPJ Ipoh,Perak,4.6058,101.1136,168.16,182.36
