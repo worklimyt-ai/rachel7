@@ -620,6 +620,25 @@ def _triage_note(text: str, tone: str = "") -> str:
 def _triage_empty(text: str) -> str:
     return f"<div class='triage-empty'>{escape(text)}</div>"
 
+def _case_item_labels(items, fallback: str = "") -> str:
+    labels: list[str] = []
+    if isinstance(items, list):
+        for item in items:
+            if isinstance(item, dict):
+                for key in ("label", "set_display", "proper_name", "name"):
+                    value = str(item.get(key, "") or "").strip()
+                    if value:
+                        labels.append(value)
+                        break
+            else:
+                value = str(item or "").strip()
+                if value:
+                    labels.append(value)
+    if labels:
+        return "; ".join(labels)
+    text = str(fallback or "").strip()
+    return text or "—"
+
 # ── Meeple track ──────────────────────────────────────────────────────────────
 def _render_meeple_steps(steps: list, accent: str) -> str:
     last_done = -1
@@ -780,15 +799,77 @@ inv_tabs = st.tabs(["🚨 Triage", "🧰 Sets", "🦾 Plates", "🔌 Powertools"
 with inv_tabs[0]:
     triage_set_avail   = pd.DataFrame(report.get("set_category_availability", []))
     triage_set_status  = pd.DataFrame(report.get("set_office_status", []))
+    triage_cases_all   = pd.DataFrame(report.get("cases_all", []))
     triage_collect     = pd.DataFrame(report.get("case_buckets", {}).get("to_collect", []))
     triage_plate_sum   = pd.DataFrame(report.get("plate_uid_summary", []))
     triage_plate_range = pd.DataFrame(report.get("plate_size_range_availability", []))
 
+    deliver_today_view = pd.DataFrame()
     set_critical_view = pd.DataFrame()
     set_watch_view    = pd.DataFrame()
     collect_view      = pd.DataFrame()
     plate_critical_view = pd.DataFrame()
     plate_watch_view    = pd.DataFrame()
+
+    if not triage_cases_all.empty:
+        triage_cases_all = triage_cases_all.copy()
+        for col in (
+            "case_id", "delivery_date", "hospital", "patient_doctor", "smart_status", "status",
+            "sets_outstanding", "sets", "plates_raw", "bonegraft_raw", "powertools_raw", "extra_items_raw",
+            "sent_sets", "sent_plates", "sent_powertools", "sent_bonegraft", "sent_extra_items",
+            "has_shorthand_only", "has_uid_set", "has_active_uid_set", "is_cancelled_case",
+        ):
+            if col not in triage_cases_all.columns:
+                triage_cases_all[col] = "" if col not in {
+                    "sent_sets", "sent_plates", "sent_powertools", "sent_bonegraft", "sent_extra_items"
+                } else []
+        triage_cases_all["delivery_date_value"] = triage_cases_all["delivery_date"].apply(_parse_ui_date)
+        triage_cases_all["delivery_state"] = triage_cases_all.apply(
+            lambda row: (
+                "Needs allocation" if bool(row.get("has_shorthand_only", False))
+                else "Allocated" if bool(row.get("has_active_uid_set", False) or row.get("has_uid_set", False))
+                else str(row.get("smart_status", "") or row.get("status", "")).strip() or "Scheduled"
+            ),
+            axis=1,
+        )
+        triage_deliver_today = triage_cases_all[
+            triage_cases_all["delivery_date_value"].eq(report_today)
+            & ~triage_cases_all["is_cancelled_case"].fillna(False).astype(bool)
+        ].copy()
+        if not triage_deliver_today.empty:
+            triage_deliver_today["Sets"] = triage_deliver_today.apply(
+                lambda row: _case_item_labels(row.get("sent_sets", []), row.get("sets_outstanding", "") or row.get("sets", "")),
+                axis=1,
+            )
+            triage_deliver_today["Plates"] = triage_deliver_today.apply(
+                lambda row: _case_item_labels(row.get("sent_plates", []), row.get("plates_raw", "")),
+                axis=1,
+            )
+            triage_deliver_today["Bonegraft"] = triage_deliver_today.apply(
+                lambda row: _case_item_labels(row.get("sent_bonegraft", []), row.get("bonegraft_raw", "")),
+                axis=1,
+            )
+            triage_deliver_today["Powertool"] = triage_deliver_today.apply(
+                lambda row: _case_item_labels(row.get("sent_powertools", []), row.get("powertools_raw", "")),
+                axis=1,
+            )
+            triage_deliver_today["Extra Items"] = triage_deliver_today.apply(
+                lambda row: _case_item_labels(row.get("sent_extra_items", []), row.get("extra_items_raw", "")),
+                axis=1,
+            )
+            deliver_today_view = triage_deliver_today.sort_values(
+                ["hospital", "patient_doctor", "case_id"],
+                na_position="last",
+            )[[
+                "case_id", "hospital", "patient_doctor", "delivery_state", "Sets",
+                "Plates", "Bonegraft", "Powertool", "Extra Items"
+            ]].rename(columns={
+                "case_id": "Case",
+                "hospital": "Hospital",
+                "patient_doctor": "Doctor",
+                "delivery_state": "State",
+            })
+            deliver_today_view = _filter_df_by_search(deliver_today_view, search_query)
 
     if not triage_set_avail.empty:
         triage_set_avail = triage_set_avail.copy()
@@ -937,12 +1018,14 @@ with inv_tabs[0]:
         plate_critical_view = _filter_df_by_search(plate_critical_view, search_query)
         plate_watch_view = _filter_df_by_search(plate_watch_view, search_query)
 
-    kpi1, kpi2, kpi3 = st.columns(3)
+    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
     with kpi1:
-        st.markdown(_kpi_card("Critical Sets", len(set_critical_view), "alert"), unsafe_allow_html=True)
+        st.markdown(_kpi_card("Deliver Today", len(deliver_today_view), "ok"), unsafe_allow_html=True)
     with kpi2:
-        st.markdown(_kpi_card("Sales Posted / Collect", len(collect_view), "warn"), unsafe_allow_html=True)
+        st.markdown(_kpi_card("Critical Sets", len(set_critical_view), "alert"), unsafe_allow_html=True)
     with kpi3:
+        st.markdown(_kpi_card("Sales Posted / Collect", len(collect_view), "warn"), unsafe_allow_html=True)
+    with kpi4:
         st.markdown(_kpi_card("Low Plates", len(plate_critical_view) + len(plate_watch_view), "alert"), unsafe_allow_html=True)
 
     st.markdown(
@@ -959,6 +1042,18 @@ with inv_tabs[0]:
             _triage_note(f"<strong>Search filter</strong>: {escape(search_query)}", "warn"),
             unsafe_allow_html=True,
         )
+
+    st.markdown("<div class='triage-section-title'>What Needs To Be Delivered Today</div>", unsafe_allow_html=True)
+    if deliver_today_view.empty:
+        st.markdown(_triage_empty("No non-cancelled cases have delivery_date set to today."), unsafe_allow_html=True)
+    else:
+        st.markdown(
+            _triage_note(
+                "<strong>Today delivery list</strong>: driven by <strong>delivery_date = today</strong> on active cases."
+            ),
+            unsafe_allow_html=True,
+        )
+        st.dataframe(deliver_today_view, use_container_width=True, hide_index=True)
 
     st.markdown("<div class='triage-section-title'>Sets Running Low</div>", unsafe_allow_html=True)
     set_col_critical, set_col_watch = st.columns(2)
