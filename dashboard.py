@@ -310,6 +310,16 @@ details[data-testid="stExpander"] summary * {
 .sr-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; margin-bottom: 2px; }
 .sr-legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--ink-muted); }
 .sr-legend-dot  { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── Triage ── */
+.triage-note { margin: 8px 0 14px 0; padding: 11px 14px; border-radius: 12px; border: 1px solid var(--line-soft); background: var(--ivory-surface); color: var(--ink-main); font-size: 13px; line-height: 1.45; }
+.triage-note strong { color: var(--green-blue-deep); }
+.triage-note.is-warn { background: #f5ead2; border-color: #e2c99b; }
+.triage-note.is-warn strong { color: var(--buff-deep); }
+.triage-note.is-alert { background: var(--danger-soft); border-color: #e8b7b2; }
+.triage-note.is-alert strong { color: var(--danger-ink); }
+.triage-empty { margin: 8px 0; padding: 12px 14px; border-radius: 12px; border: 1px dashed var(--glaucous-light); background: var(--ivory-highlight); color: var(--ink-muted); font-size: 13px; font-style: italic; }
+.triage-section-title { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 800; color: var(--green-blue-deep); margin: 18px 0 4px 0; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -601,6 +611,15 @@ def _filter_df_by_search(df: pd.DataFrame, query: str) -> pd.DataFrame:
     haystack = df.fillna("").astype(str).agg(" ".join, axis=1).str.lower()
     return df[haystack.str.contains(text, regex=False)]
 
+def _triage_note(text: str, tone: str = "") -> str:
+    cls = "triage-note"
+    if tone:
+        cls += f" is-{tone}"
+    return f"<div class='{cls}'>{text}</div>"
+
+def _triage_empty(text: str) -> str:
+    return f"<div class='triage-empty'>{escape(text)}</div>"
+
 # ── Meeple track ──────────────────────────────────────────────────────────────
 def _render_meeple_steps(steps: list, accent: str) -> str:
     last_done = -1
@@ -775,12 +794,13 @@ with inv_tabs[0]:
         triage_set_avail = triage_set_avail.copy()
         triage_set_avail["category_norm"] = triage_set_avail["category"].astype(str).str.upper().str.strip()
         triage_set_avail = triage_set_avail[~triage_set_avail["category_norm"].isin(_POWERTOOL_CATS)]
-        for col in ("available", "total_office", "out_for_case", "reserved_total"):
+        for col in ("available", "total_office", "out_for_case", "booked_for_case", "reserved_total"):
             if col not in triage_set_avail.columns:
                 triage_set_avail[col] = 0
         triage_set_avail["available"] = triage_set_avail["available"].apply(_safe_int)
         triage_set_avail["total_office"] = triage_set_avail["total_office"].apply(_safe_int)
         triage_set_avail["out_for_case"] = triage_set_avail["out_for_case"].apply(_safe_int)
+        triage_set_avail["booked_for_case"] = triage_set_avail["booked_for_case"].apply(_safe_int)
         triage_set_avail["reserved_total"] = triage_set_avail["reserved_total"].apply(_safe_int)
         set_ratio = triage_set_avail["available"].div(triage_set_avail["total_office"].replace(0, pd.NA))
         triage_set_avail["is_critical"] = triage_set_avail["total_office"].gt(0) & triage_set_avail["available"].eq(0)
@@ -824,12 +844,13 @@ with inv_tabs[0]:
 
         triage_set_avail["out_with"] = triage_set_avail["category_norm"].map(holders_by_category).fillna("")
         set_display = triage_set_avail[[
-            "category", "availability_display", "out_for_case", "reserved_total", "out_with", "is_critical", "is_watch"
+            "category", "availability_display", "out_for_case", "booked_for_case", "reserved_total", "out_with", "is_critical", "is_watch"
         ]].rename(columns={
             "category": "Category",
             "availability_display": "Avail",
-            "out_for_case": "Out",
-            "reserved_total": "Reserved",
+            "out_for_case": "Out Now",
+            "booked_for_case": "Booked",
+            "reserved_total": "Reserved Total",
             "out_with": "Out With",
         })
         set_critical_view = set_display[set_display["is_critical"]].drop(columns=["is_critical", "is_watch"])
@@ -924,43 +945,60 @@ with inv_tabs[0]:
     with kpi3:
         st.markdown(_kpi_card("Low Plates", len(plate_critical_view) + len(plate_watch_view), "alert"), unsafe_allow_html=True)
 
-    if search_query:
-        st.caption(f"Filtered by search: {search_query}")
+    st.markdown(
+        _triage_note(
+            "<strong>Out Now</strong> means sets physically out on active cases. "
+            "<strong>Booked</strong> means sets still in office but already committed to an upcoming case. "
+            "<strong>Reserved Total</strong> is both together, and <strong>Avail</strong> is what is still free after that."
+        ),
+        unsafe_allow_html=True,
+    )
 
-    st.markdown("##### Sets Running Low")
+    if search_query:
+        st.markdown(
+            _triage_note(f"<strong>Search filter</strong>: {escape(search_query)}", "warn"),
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("<div class='triage-section-title'>Sets Running Low</div>", unsafe_allow_html=True)
     set_col_critical, set_col_watch = st.columns(2)
     with set_col_critical:
-        st.caption("Critical: nothing left in office")
+        st.markdown(_triage_note("<strong>Critical</strong>: nothing left in office.", "alert"), unsafe_allow_html=True)
         if set_critical_view.empty:
-            st.info("No critical set shortages.")
+            st.markdown(_triage_empty("No critical set shortages."), unsafe_allow_html=True)
         else:
             st.dataframe(set_critical_view, use_container_width=True, hide_index=True)
     with set_col_watch:
-        st.caption("Watch: only one left or <=25% remaining")
+        st.markdown(_triage_note("<strong>Watch</strong>: only one left or 25% or less remaining.", "warn"), unsafe_allow_html=True)
         if set_watch_view.empty:
-            st.info("No set categories on watch.")
+            st.markdown(_triage_empty("No set categories on watch."), unsafe_allow_html=True)
         else:
             st.dataframe(set_watch_view, use_container_width=True, hide_index=True)
 
-    st.markdown("##### Sales Posted, Still Outstanding")
+    st.markdown("<div class='triage-section-title'>Sales Posted, Still Outstanding</div>", unsafe_allow_html=True)
     if collect_view.empty:
-        st.info("No cases with sales posted and equipment still out.")
+        st.markdown(_triage_empty("No cases with sales posted and equipment still out."), unsafe_allow_html=True)
     else:
-        st.caption("These are the current collect cases: sales code is posted, but no return date is recorded yet.")
+        st.markdown(
+            _triage_note(
+                "<strong>Collect queue</strong>: these cases already have a sales code, but no return date is recorded yet."
+            ),
+            unsafe_allow_html=True,
+        )
         st.dataframe(collect_view, use_container_width=True, hide_index=True)
 
-    st.markdown("##### Plates Running Low")
+    st.markdown("<div class='triage-section-title'>Plates Running Low</div>", unsafe_allow_html=True)
     plate_col_critical, plate_col_watch = st.columns(2)
     with plate_col_critical:
-        st.caption("Critical: out of stock")
+        st.markdown(_triage_note("<strong>Critical</strong>: out of stock.", "alert"), unsafe_allow_html=True)
         if plate_critical_view.empty:
-            st.info("No plates are fully out.")
+            st.markdown(_triage_empty("No plates are fully out."), unsafe_allow_html=True)
         else:
             st.dataframe(plate_critical_view, use_container_width=True, hide_index=True)
     with plate_col_watch:
-        st.caption("Watch: partial availability")
+        st.markdown(_triage_note("<strong>Watch</strong>: partial availability.", "warn"), unsafe_allow_html=True)
         if plate_watch_view.empty:
-            st.info("No plates are partially depleted.")
+            st.markdown(_triage_empty("No plates are partially depleted."), unsafe_allow_html=True)
         else:
             st.dataframe(plate_watch_view, use_container_width=True, hide_index=True)
 
