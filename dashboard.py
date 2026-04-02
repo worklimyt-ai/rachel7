@@ -39,12 +39,18 @@ st.markdown("""
   --buff-deep: #8c6b3f;
   --danger-soft: #f8dfdb;
   --danger-ink: #a13b35;
+  --font-body: 16px;
+  --font-label: 13px;
+  --font-caption: 12px;
+  --font-h1: clamp(28px, 4.6vw, 40px);
 }
 
 html, body {
   font-family: 'Inter', sans-serif;
   background-color: var(--ivory-buff);
   color: var(--ink-main);
+  font-size: var(--font-body);
+  line-height: 1.5;
 }
 
 body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
@@ -78,13 +84,23 @@ section[data-testid="stSidebar"] * {
   letter-spacing: -0.02em;
 }
 
-.stMarkdown p, .stMarkdown li, .stCaption, label, small {
+.stMarkdown h1 {
+  font-size: var(--font-h1);
+}
+
+.stMarkdown p, .stMarkdown li {
   color: var(--ink-main);
+  font-size: var(--font-body);
+}
+
+.stCaption, label, small {
+  color: var(--ink-main);
+  font-size: var(--font-label);
 }
 
 .app-title {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 32px;
+  font-size: var(--font-h1);
   font-weight: 800;
   letter-spacing: -0.05em;
   color: var(--green-blue-deep);
@@ -94,13 +110,13 @@ section[data-testid="stSidebar"] * {
 .page-timestamp {
   text-align: right;
   color: var(--ink-muted);
-  font-size: 13px;
+  font-size: var(--font-label);
   font-weight: 600;
   padding-top: 14px;
 }
 
 .app-footer {
-  font-size: 11px;
+  font-size: var(--font-caption);
   color: var(--ink-muted);
   text-align: center;
 }
@@ -121,6 +137,7 @@ button[data-baseweb="tab"], button[role="tab"] {
 button[data-baseweb="tab"] *, button[role="tab"] * {
   color: inherit !important;
   font-weight: 700 !important;
+  font-size: 16px !important;
 }
 
 button[data-baseweb="tab"]:hover, button[role="tab"]:hover {
@@ -165,6 +182,11 @@ div[data-baseweb="input"] > div {
 
 div[data-baseweb="input"] input {
   color: var(--ink-main);
+  font-size: 16px !important;
+}
+
+textarea, input, select {
+  font-size: 16px !important;
 }
 
 div[data-baseweb="input"]:focus-within > div {
@@ -197,7 +219,7 @@ details[data-testid="stExpander"] summary * {
 }
 
 .kpi-card { background: var(--ivory-surface); border: 1px solid var(--line-soft); border-radius: 10px; padding: 14px 18px; text-align: center; box-shadow: 0 1px 4px rgba(36,79,86,.08); }
-.kpi-label { font-size: 10px; letter-spacing: .09em; color: var(--ink-muted); text-transform: uppercase; margin-bottom: 4px; font-weight: 600; }
+.kpi-label { font-size: 12px; letter-spacing: .09em; color: var(--ink-muted); text-transform: uppercase; margin-bottom: 4px; font-weight: 600; }
 .kpi-value { font-size: 26px; font-weight: 600; color: var(--green-blue-deep); font-family: 'JetBrains Mono', monospace; }
 .kpi-value.warn  { color: var(--buff-deep); }
 .kpi-value.alert { color: var(--danger-ink); }
@@ -257,7 +279,7 @@ details[data-testid="stExpander"] summary * {
 .out-hosp-wrap.is-plate .out-hosp-name      { font-size: 15px; padding: 3px 10px 3px 9px; }
 .out-surg  { color: var(--ink-muted); font-size: 14px; }
 
-.sec-header { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-muted); font-weight: 700; border-bottom: 1px solid var(--line-soft); padding-bottom: 6px; margin: 24px 0 14px 0; }
+.sec-header { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-muted); font-weight: 700; border-bottom: 1px solid var(--line-soft); padding-bottom: 6px; margin: 24px 0 14px 0; }
 
 /* ── Meeple track ── */
 .meeple-track { display: flex; align-items: flex-start; width: 100%; margin: 8px 0 4px 0; overflow-x: auto; }
@@ -319,7 +341,83 @@ details[data-testid="stExpander"] summary * {
 .triage-note.is-alert { background: var(--danger-soft); border-color: #e8b7b2; }
 .triage-note.is-alert strong { color: var(--danger-ink); }
 .triage-empty { margin: 8px 0; padding: 12px 14px; border-radius: 12px; border: 1px dashed var(--glaucous-light); background: var(--ivory-highlight); color: var(--ink-muted); font-size: 13px; font-style: italic; }
-.triage-section-title { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 800; color: var(--green-blue-deep); margin: 18px 0 4px 0; }
+.triage-section-title { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; font-weight: 800; color: var(--green-blue-deep); margin: 18px 0 4px 0; }
+.triage-table-wrap { width: 100%; overflow-x: auto; margin-top: 8px; border-radius: 12px; border: 1px solid var(--line-soft); background: var(--ivory-highlight); box-shadow: 0 1px 4px rgba(36,79,86,.06); }
+.triage-table { width: 100%; border-collapse: collapse; min-width: 760px; color: var(--ink-main); }
+.triage-table thead th { position: sticky; top: 0; background: var(--green-blue-soft); color: var(--green-blue-deep); font-size: 13px; font-weight: 800; letter-spacing: .04em; text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--glaucous-light); white-space: nowrap; }
+.triage-table tbody td { color: var(--ink-main); font-size: 16px; padding: 12px 14px; border-bottom: 1px solid rgba(216, 204, 180, 0.7); vertical-align: top; line-height: 1.45; }
+.triage-table tbody tr:nth-child(even) td { background: rgba(219, 234, 234, 0.22); }
+.triage-table tbody tr:hover td { background: rgba(219, 234, 234, 0.38); }
+.triage-table td:first-child, .triage-table th:first-child { font-family: 'JetBrains Mono', monospace; }
+
+@media (max-width: 768px) {
+  :root {
+    --font-body: 16px;
+    --font-label: 12px;
+    --font-caption: 12px;
+    --font-h1: clamp(28px, 8vw, 34px);
+  }
+
+  .main .block-container {
+    padding-top: 1rem;
+    padding-left: 0.9rem;
+    padding-right: 0.9rem;
+  }
+
+  .page-timestamp {
+    text-align: left;
+    padding-top: 8px;
+  }
+
+  .kpi-card {
+    padding: 12px 14px;
+  }
+
+  .kpi-value {
+    font-size: 28px;
+  }
+
+  .triage-note,
+  .triage-empty,
+  .inv-sub,
+  .out-surg {
+    font-size: 16px;
+  }
+
+  .out-tag,
+  .home-set-home,
+  .home-set-date,
+  .service-set-date,
+  .meeple-pill,
+  .meeple-step-label,
+  .meeple-terminal,
+  .upcoming-chip,
+  .upcoming-more,
+  .out-next-chip,
+  .dr-hdr,
+  .dh-out-tag,
+  .dh-out-sr,
+  .dh-out-stock,
+  .sc,
+  .sr-legend-item,
+  .triage-section-title,
+  .sec-header,
+  .kpi-label {
+    font-size: 12px !important;
+  }
+
+  .triage-table {
+    min-width: 680px;
+  }
+
+  .triage-table thead th {
+    font-size: 12px;
+  }
+
+  .triage-table tbody td {
+    font-size: 16px;
+  }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -638,6 +736,26 @@ def _case_item_labels(items, fallback: str = "") -> str:
         return "; ".join(labels)
     text = str(fallback or "").strip()
     return text or "—"
+
+def _triage_table(df: pd.DataFrame) -> str:
+    if df.empty:
+        return ""
+    headers = "".join(f"<th>{escape(str(col))}</th>" for col in df.columns)
+    body_rows: list[str] = []
+    for _, row in df.iterrows():
+        cells: list[str] = []
+        for value in row.tolist():
+            text = "—" if pd.isna(value) or str(value).strip() == "" else str(value)
+            cells.append(f"<td>{escape(text)}</td>")
+        body_rows.append(f"<tr>{''.join(cells)}</tr>")
+    return (
+        "<div class='triage-table-wrap'>"
+        "<table class='triage-table'>"
+        f"<thead><tr>{headers}</tr></thead>"
+        f"<tbody>{''.join(body_rows)}</tbody>"
+        "</table>"
+        "</div>"
+    )
 
 # ── Meeple track ──────────────────────────────────────────────────────────────
 def _render_meeple_steps(steps: list, accent: str) -> str:
@@ -1053,7 +1171,7 @@ with inv_tabs[0]:
             ),
             unsafe_allow_html=True,
         )
-        st.dataframe(deliver_today_view, use_container_width=True, hide_index=True)
+        st.markdown(_triage_table(deliver_today_view), unsafe_allow_html=True)
 
     st.markdown("<div class='triage-section-title'>Sets Running Low</div>", unsafe_allow_html=True)
     set_col_critical, set_col_watch = st.columns(2)
@@ -1062,13 +1180,13 @@ with inv_tabs[0]:
         if set_critical_view.empty:
             st.markdown(_triage_empty("No critical set shortages."), unsafe_allow_html=True)
         else:
-            st.dataframe(set_critical_view, use_container_width=True, hide_index=True)
+            st.markdown(_triage_table(set_critical_view), unsafe_allow_html=True)
     with set_col_watch:
         st.markdown(_triage_note("<strong>Watch</strong>: only one left or 25% or less remaining.", "warn"), unsafe_allow_html=True)
         if set_watch_view.empty:
             st.markdown(_triage_empty("No set categories on watch."), unsafe_allow_html=True)
         else:
-            st.dataframe(set_watch_view, use_container_width=True, hide_index=True)
+            st.markdown(_triage_table(set_watch_view), unsafe_allow_html=True)
 
     st.markdown("<div class='triage-section-title'>Sales Posted, Still Outstanding</div>", unsafe_allow_html=True)
     if collect_view.empty:
@@ -1080,7 +1198,7 @@ with inv_tabs[0]:
             ),
             unsafe_allow_html=True,
         )
-        st.dataframe(collect_view, use_container_width=True, hide_index=True)
+        st.markdown(_triage_table(collect_view), unsafe_allow_html=True)
 
     st.markdown("<div class='triage-section-title'>Plates Running Low</div>", unsafe_allow_html=True)
     plate_col_critical, plate_col_watch = st.columns(2)
@@ -1089,13 +1207,13 @@ with inv_tabs[0]:
         if plate_critical_view.empty:
             st.markdown(_triage_empty("No plates are fully out."), unsafe_allow_html=True)
         else:
-            st.dataframe(plate_critical_view, use_container_width=True, hide_index=True)
+            st.markdown(_triage_table(plate_critical_view), unsafe_allow_html=True)
     with plate_col_watch:
         st.markdown(_triage_note("<strong>Watch</strong>: partial availability.", "warn"), unsafe_allow_html=True)
         if plate_watch_view.empty:
             st.markdown(_triage_empty("No plates are partially depleted."), unsafe_allow_html=True)
         else:
-            st.dataframe(plate_watch_view, use_container_width=True, hide_index=True)
+            st.markdown(_triage_table(plate_watch_view), unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SETS TAB
