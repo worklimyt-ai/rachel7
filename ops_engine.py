@@ -1799,8 +1799,10 @@ def build_case_sent_item_details(
                     "plate_uid": resolved_uid,
                     "proper_name": meta["proper_name"] or raw_token,
                     "size_ranges": set(),
+                    "from_stock": False,
                     "is_resolved": True,
                 })
+                item["from_stock"] = bool(item.get("from_stock")) or bool(parsed.get("from_stock"))
                 resolved_ranges = [
                     size_range
                     for size_range in parsed["needed_ranges"]
@@ -1813,6 +1815,7 @@ def build_case_sent_item_details(
                 "plate_uid": parsed["base_uid"],
                 "proper_name": raw_token,
                 "size_ranges": set(),
+                "from_stock": bool(parsed.get("from_stock")),
                 "is_resolved": False,
             })
 
@@ -1823,12 +1826,15 @@ def build_case_sent_item_details(
             label = item["plate_uid"] if item.get("is_resolved") else item["proper_name"]
             if size_ranges_label:
                 label = f"{label} ({size_ranges_label})"
+            if item.get("from_stock"):
+                label = f"{label} [stk]"
             sent_plates.append({
                 "plate_uid": item["plate_uid"],
                 "proper_name": item["proper_name"],
                 "size_ranges": size_ranges,
                 "size_ranges_label": size_ranges_label,
                 "label": label,
+                "from_stock": bool(item.get("from_stock")),
                 "is_resolved": item["is_resolved"],
             })
         sent_plates.sort(key=lambda item: (str(item.get("plate_uid", "")), str(item.get("size_ranges_label", ""))))

@@ -1114,6 +1114,8 @@ with inv_tabs[0]:
                         case_id = str(item.get("case_id", "") or "").strip()
                         hospital = str(item.get("hospital", "") or "").strip()
                         token = f"{case_id} @ {hospital}" if case_id and hospital else case_id or hospital
+                        if token and item.get("from_stock"):
+                            token = f"{token} [stk]"
                         if token and token not in labels:
                             labels.append(token)
                 plate_holders[uid_norm] = "; ".join(labels)
