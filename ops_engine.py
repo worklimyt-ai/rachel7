@@ -2,6 +2,7 @@
 ops_engine.py  –  Osteo Ops core logic
 Timezone : Asia/Kuala_Lumpur
 """
+
 from __future__ import annotations
 
 import argparse
@@ -28,7 +29,7 @@ from zoneinfo import ZoneInfo
 KL_TZ = ZoneInfo("Asia/Kuala_Lumpur")
 
 OFFICE_COORDS = (3.1857858767423703, 101.63494178629432)
-TBS_COORDS    = (3.0781643275980146, 101.71154614310385)
+TBS_COORDS = (3.0781643275980146, 101.71154614310385)
 
 DEFAULT_CASES_URL = (
     "https://docs.google.com/spreadsheets/d/e/"
@@ -40,7 +41,7 @@ DEFAULT_ARCHIVE_URL = (
     "2PACX-1vQrbm_5s59966ZVWFmrqkg1vQ21YR1YEd1h_J0M7Fc6FjO0ai3l-aWns0IY"
     "nirCfsnGHoMyn5xPoG5c/pub?gid=1320419668&single=true&output=csv"
 )
-DEFAULT_CASES_LOCAL   = Path("/Users/bellbell/Downloads/cases - cases.csv")
+DEFAULT_CASES_LOCAL = Path("/Users/bellbell/Downloads/cases - cases.csv")
 DEFAULT_ARCHIVE_LOCAL = Path("/Users/bellbell/Downloads/cases - archive.csv")
 MODULE_DIR = Path(__file__).resolve().parent
 DEFAULT_MASTER_DATA_PATH = MODULE_DIR / "master_data.py"
@@ -51,15 +52,15 @@ BOOKING_HOLD_DAYS = 3
 
 # Known CSV code aliases → master_data HOSPITALS keys
 HOSPITAL_ALIASES: dict[str, str] = {
-    "QE1":        "HQE1",
-    "QE2":        "HQE2",
-    "HRPZII":     "HRPZ",
-    "UMSC":       "UKMSC",
-    "KPMC":       "KPMCK",
-    "KPJT":       "KPJTWK",
-    "KPJJS":      "KPJJ",
-    "HUKMHCTM":   "HUKM",
-    "SMCI":       "SMSJ",
+    "QE1": "HQE1",
+    "QE2": "HQE2",
+    "HRPZII": "HRPZ",
+    "UMSC": "UKMSC",
+    "KPMC": "KPMCK",
+    "KPJT": "KPJTWK",
+    "KPJJS": "KPJJ",
+    "HUKMHCTM": "HUKM",
+    "SMCI": "SMSJ",
     "GLENEAGLES": "GHKL",
 }
 
@@ -67,11 +68,14 @@ HOSPITAL_ALIASES: dict[str, str] = {
 # Date / time helpers
 # ---------------------------------------------------------------------------
 
+
 def now_kl() -> datetime:
     return datetime.now(KL_TZ)
 
+
 def now_kl_date() -> date:
     return now_kl().date()
+
 
 def parse_date(value: Any) -> date | None:
     text = str(value or "").strip()
@@ -84,8 +88,10 @@ def parse_date(value: Any) -> date | None:
             continue
     return None
 
+
 def format_date(value: date | None) -> str:
     return value.strftime("%d/%m/%Y") if value else ""
+
 
 def case_order_key(
     row_number: int,
@@ -98,35 +104,39 @@ def case_order_key(
         row_number,
     )
 
+
 # ---------------------------------------------------------------------------
 # String / token normalisers
 # ---------------------------------------------------------------------------
 
+
 def normalize_code(value: Any) -> str:
     return str(value or "").strip().upper().replace(" ", "")
+
 
 def normalize_set_code(value: Any) -> str:
     return re.sub(r"[^A-Z0-9.]", "", normalize_code(value))
 
+
 def normalize_plate_code(value: Any) -> str:
     return re.sub(r"[^A-Z0-9.\-_*]", "", normalize_code(value))
 
+
 def normalize_header_name(value: Any) -> str:
     return re.sub(r"[^A-Z0-9]", "", str(value or "").upper())
+
 
 def row_value(row: dict[str, Any], *names: str) -> str:
     for name in names:
         if name in row:
             return str(row.get(name, "") or "")
-    normalized = {
-        normalize_header_name(key): value
-        for key, value in row.items()
-    }
+    normalized = {normalize_header_name(key): value for key, value in row.items()}
     for name in names:
         key = normalize_header_name(name)
         if key in normalized:
             return str(normalized[key] or "")
     return ""
+
 
 def canonical_powertool_uid(value: Any) -> str:
     raw = re.sub(r"[^A-Z0-9]", "", normalize_code(value))
@@ -142,6 +152,7 @@ def canonical_powertool_uid(value: Any) -> str:
     prefix, suffix = m.groups()
     return f"{prefix}{suffix}"
 
+
 def canonical_powertool_shorthand(value: Any) -> str:
     raw = re.sub(r"[^A-Z0-9]", "", normalize_code(value))
     if not raw.startswith("P"):
@@ -150,6 +161,7 @@ def canonical_powertool_shorthand(value: Any) -> str:
     m = re.match(r"^(P\d{4})", raw)
     return m.group(1) if m else raw
 
+
 def split_tokens(value: Any, pattern: str = r"[;]+") -> list[str]:
     text = str(value or "").strip()
     return [p.strip() for p in re.split(pattern, text) if p.strip()] if text else []
@@ -157,17 +169,19 @@ def split_tokens(value: Any, pattern: str = r"[;]+") -> list[str]:
 
 def split_powertool_tokens(value: Any) -> list[str]:
     text = str(value or "").strip()
-    return [
-        p.strip() for p in re.split(r"[;,/\n\r\t ]+", text)
-        if p.strip()
-    ] if text else []
+    return (
+        [p.strip() for p in re.split(r"[;,/\n\r\t ]+", text) if p.strip()]
+        if text
+        else []
+    )
+
 
 def split_extra_item_tokens(value: Any) -> list[str]:
     text = str(value or "").strip()
-    return [
-        p.strip() for p in re.split(r"[;,\n\r]+", text)
-        if p.strip()
-    ] if text else []
+    return (
+        [p.strip() for p in re.split(r"[;,\n\r]+", text) if p.strip()] if text else []
+    )
+
 
 def split_plate_tokens(value: Any) -> list[str]:
     out: list[str] = []
@@ -176,13 +190,23 @@ def split_plate_tokens(value: Any) -> list[str]:
             out.append(sub)
     return out
 
+
 def location_no_stock_state(value: Any) -> bool | None:
     token = normalize_code(value)
-    if token in {"NOSTOCK", "NO_STOCK", "OUT", "OUTOFSTOCK", "OUT_OF_STOCK", "MISSING", "NS"}:
+    if token in {
+        "NOSTOCK",
+        "NO_STOCK",
+        "OUT",
+        "OUTOFSTOCK",
+        "OUT_OF_STOCK",
+        "MISSING",
+        "NS",
+    }:
         return True
     if token in {"AVAILABLE", "IN", "INSTOCK", "IN_STOCK", "OK"}:
         return False
     return None
+
 
 def parse_plate_locations(
     raw_location: Any,
@@ -203,8 +227,7 @@ def parse_plate_locations(
         if match:
             flag_text = match.group(2).strip()
             flags = [
-                flag.strip() for flag in re.split(r"[|/;]+", flag_text)
-                if flag.strip()
+                flag.strip() for flag in re.split(r"[|/;]+", flag_text) if flag.strip()
             ]
             explicit_state = None
             for flag in flags:
@@ -213,12 +236,15 @@ def parse_plate_locations(
                     explicit_state = state
             if explicit_state is not None:
                 no_stock = explicit_state
-        locations.append({
-            "name": token,
-            "is_drawer": bool(re.match(r"^D\d+$", token)),
-            "no_stock": no_stock,
-        })
+        locations.append(
+            {
+                "name": token,
+                "is_drawer": bool(re.match(r"^D\d+$", token)),
+                "no_stock": no_stock,
+            }
+        )
     return locations
+
 
 def canonical_size_range(value: Any) -> str:
     token = normalize_code(value).replace("_", " ").replace("-", " ")
@@ -244,7 +270,9 @@ def plate_uses_reversed_lr_sequence(uid: Any) -> bool:
     return normalize_set_code(uid) in CLAVICLE_REVERSED_UIDS
 
 
-def plate_label_sort_key(value: Any, *, reverse_lr: bool = False) -> tuple[int, int, str]:
+def plate_label_sort_key(
+    value: Any, *, reverse_lr: bool = False
+) -> tuple[int, int, str]:
     token = normalize_code(value)
     side_rank = 1
     numeric_rank = 10_000
@@ -280,11 +308,13 @@ def drawer_sort_key(value: Any) -> tuple[int, str]:
         return (int(token[1:]), token)
     return (10_000, token)
 
+
 def compact_set_id(value: Any) -> str:
     text = str(value or "").strip()
     if not text:
         return "?"
     return str(int(text)) if re.fullmatch(r"\d+", text) else text
+
 
 def format_set_display(shorthand: Any, set_id: Any) -> str:
     short = str(shorthand or "").strip()
@@ -346,30 +376,31 @@ def is_booking_hold_active(delivery_date: date | None, today_kl: date) -> bool:
 
 def serialize_case_common(case: dict[str, Any]) -> dict[str, Any]:
     return {
-        "case_id":              case["case_id"],
-        "prefix":               case["prefix"],
-        "hospital":             case["hospital"],
-        "patient_doctor":       case["patient_doctor"],
-        "delivery_date":        case["delivery_date"],
-        "surgery_date":         case["surgery_date"],
-        "sales_code":           case["sales_code"],
-        "return_date":          case["return_date"],
-        "status":               case["status"],
-        "smart_status":         case["smart_status"],
-        "sets_raw":             case["sets_raw"],
-        "sets":                 case["sets_display"],
-        "sets_returned_raw":    case.get("sets_returned_raw", ""),
-        "sets_returned":        case.get("sets_returned_display", ""),
+        "case_id": case["case_id"],
+        "prefix": case["prefix"],
+        "hospital": case["hospital"],
+        "patient_doctor": case["patient_doctor"],
+        "delivery_date": case["delivery_date"],
+        "surgery_date": case["surgery_date"],
+        "sales_code": case["sales_code"],
+        "return_date": case["return_date"],
+        "status": case["status"],
+        "smart_status": case["smart_status"],
+        "sets_raw": case["sets_raw"],
+        "sets": case["sets_display"],
+        "sets_returned_raw": case.get("sets_returned_raw", ""),
+        "sets_returned": case.get("sets_returned_display", ""),
         "sets_outstanding_raw": case.get("sets_outstanding_raw", ""),
-        "sets_outstanding":     case.get("sets_outstanding_display", ""),
-        "set_categories":       case.get("set_categories", []),
-        "plates_raw":           case.get("plates_raw", ""),
-        "powertools_raw":       case.get("powertools_raw", ""),
-        "bonegraft_raw":        case.get("bonegraft_raw", ""),
-        "extra_items_raw":      case.get("extra_items_raw", ""),
-        "suggested_sets":       case.get("suggested_sets", []),
+        "sets_outstanding": case.get("sets_outstanding_display", ""),
+        "set_categories": case.get("set_categories", []),
+        "plates_raw": case.get("plates_raw", ""),
+        "powertools_raw": case.get("powertools_raw", ""),
+        "bonegraft_raw": case.get("bonegraft_raw", ""),
+        "extra_items_raw": case.get("extra_items_raw", ""),
+        "suggested_sets": case.get("suggested_sets", []),
         "suggested_sets_summary": case.get("suggested_sets_summary", ""),
     }
+
 
 def is_na_status(value: Any) -> bool:
     return "NA" in normalize_code(value)
@@ -382,9 +413,11 @@ def is_standby_status(value: Any) -> bool:
 def is_powertool_category(category: str) -> bool:
     return bool(re.match(r"^P\d", normalize_code(category)))
 
+
 # ---------------------------------------------------------------------------
 # Plate request parsing
 # ---------------------------------------------------------------------------
+
 
 def parse_plate_request(token: str) -> dict[str, Any] | None:
     raw = str(token or "").strip()
@@ -433,23 +466,25 @@ def parse_plate_request(token: str) -> dict[str, Any] | None:
     needed_ranges = ["STANDARD"]
     for suffix, ranges in suffix_rules:
         if cleaned.endswith(suffix):
-            base_uid = cleaned[:-len(suffix)]
+            base_uid = cleaned[: -len(suffix)]
             needed_ranges = ranges
             break
     uid_norm = normalize_set_code(base_uid)
     if not uid_norm:
         return None
     return {
-        "raw_token":    token,
-        "base_uid":     uid_norm,
+        "raw_token": token,
+        "base_uid": uid_norm,
         "needed_ranges": needed_ranges,
-        "from_stock":   from_stock,
-        "drawer":       drawer,
+        "from_stock": from_stock,
+        "drawer": drawer,
     }
+
 
 # ---------------------------------------------------------------------------
 # Hospital resolution
 # ---------------------------------------------------------------------------
+
 
 def resolve_hospital_code(
     raw_code: Any, hospitals: dict[str, Any]
@@ -469,9 +504,11 @@ def resolve_hospital_code(
         return code[1:], "stripped_H"
     return None, "unresolved"
 
+
 # ---------------------------------------------------------------------------
 # Distance / drive estimates
 # ---------------------------------------------------------------------------
+
 
 def haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     R = 6371.0
@@ -482,16 +519,20 @@ def haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     )
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
+
 def estimated_drive_km(straight_km: float) -> float:
     """Road-winding multiplier for Peninsular Malaysia."""
     return straight_km * 1.3
 
+
 def estimated_drive_minutes(drive_km: float, avg_speed_kmh: float = 55.0) -> float:
     return (drive_km / avg_speed_kmh) * 60.0 if drive_km > 0 else 0.0
+
 
 # ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
+
 
 def load_master_data(module_path: str | Path) -> dict[str, Any]:
     module_file = Path(module_path)
@@ -499,7 +540,9 @@ def load_master_data(module_path: str | Path) -> dict[str, Any]:
         raise FileNotFoundError(f"master_data not found: {module_file}")
 
     def _exec() -> Any:
-        spec = importlib.util.spec_from_file_location("master_data_runtime", module_file)
+        spec = importlib.util.spec_from_file_location(
+            "master_data_runtime", module_file
+        )
         if spec is None or spec.loader is None:
             raise RuntimeError(f"Cannot load module: {module_file}")
         mod = importlib.util.module_from_spec(spec)
@@ -521,10 +564,10 @@ def load_master_data(module_path: str | Path) -> dict[str, Any]:
             else:
                 sys.modules["pandas"] = prev
 
-    sets       = getattr(module, "SETS", None)
+    sets = getattr(module, "SETS", None)
     raw_plates = getattr(module, "PLATES_BY_CODE", getattr(module, "PLATES", None))
-    hospitals  = getattr(module, "HOSPITALS", None)
-    bonegraft  = getattr(module, "BONEGRAFT", [])
+    hospitals = getattr(module, "HOSPITALS", None)
+    bonegraft = getattr(module, "BONEGRAFT", [])
     if not (isinstance(sets, list) and isinstance(hospitals, dict)):
         raise RuntimeError(
             "master_data.py must expose SETS (list), HOSPITALS (dict), and PLATES"
@@ -550,7 +593,12 @@ def load_master_data(module_path: str | Path) -> dict[str, Any]:
         )
     if not isinstance(bonegraft, list):
         bonegraft = []
-    return {"SETS": sets, "PLATES": plates, "HOSPITALS": hospitals, "BONEGRAFT": bonegraft}
+    return {
+        "SETS": sets,
+        "PLATES": plates,
+        "HOSPITALS": hospitals,
+        "BONEGRAFT": bonegraft,
+    }
 
 
 def read_csv_records(source: str | Path) -> list[dict[str, str]]:
@@ -574,53 +622,58 @@ def auto_source(explicit: str | None, local: Path, fallback_url: str) -> str:
         return explicit
     return str(local) if local.exists() else fallback_url
 
+
 # ---------------------------------------------------------------------------
 # Index builders
 # ---------------------------------------------------------------------------
 
+
 def build_set_indexes(master_sets: list[dict[str, Any]]) -> dict[str, Any]:
-    uid_map:       dict[str, list[dict[str, Any]]] = defaultdict(list)
+    uid_map: dict[str, list[dict[str, Any]]] = defaultdict(list)
     shorthand_map: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    category_map:  dict[str, list[dict[str, Any]]] = defaultdict(list)
-    office_sets:   list[dict[str, Any]] = []
-    standby_sets:  list[dict[str, Any]] = []
-    normalized:    list[dict[str, Any]] = []
+    category_map: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    office_sets: list[dict[str, Any]] = []
+    standby_sets: list[dict[str, Any]] = []
+    normalized: list[dict[str, Any]] = []
 
     for row in master_sets:
         item = dict(row)
         item["category"] = str(item.get("category", "")).strip()
-        item["id"]       = str(item.get("id", "")).strip()
-        item["home"]     = str(item.get("home", "")).strip().upper()
-        item["uid"]      = str(item.get("uid", "")).strip()
-        item["shorthand"]= str(item.get("shorthand", "")).strip()
-        item["status"]   = str(item.get("status", "")).strip()
-        item["_uid_norm"]       = normalize_set_code(item["uid"])
+        item["id"] = str(item.get("id", "")).strip()
+        item["home"] = str(item.get("home", "")).strip().upper()
+        item["uid"] = str(item.get("uid", "")).strip()
+        item["shorthand"] = str(item.get("shorthand", "")).strip()
+        item["status"] = str(item.get("status", "")).strip()
+        item["_uid_norm"] = normalize_set_code(item["uid"])
         item["_shorthand_norm"] = normalize_set_code(item["shorthand"])
-        item["_category_norm"]  = normalize_set_code(item["category"])
-        item["_set_key"]        = f"{item['_uid_norm']}|{item['category']}|{item['id']}"
+        item["_category_norm"] = normalize_set_code(item["category"])
+        item["_set_key"] = f"{item['_uid_norm']}|{item['category']}|{item['id']}"
         normalized.append(item)
 
-        if item["_uid_norm"]:       uid_map[item["_uid_norm"]].append(item)
-        if item["_shorthand_norm"]: shorthand_map[item["_shorthand_norm"]].append(item)
-        if item["_category_norm"]:  category_map[item["_category_norm"]].append(item)
+        if item["_uid_norm"]:
+            uid_map[item["_uid_norm"]].append(item)
+        if item["_shorthand_norm"]:
+            shorthand_map[item["_shorthand_norm"]].append(item)
+        if item["_category_norm"]:
+            category_map[item["_category_norm"]].append(item)
         if item["home"] == "OFFICE":
             office_sets.append(item)
         elif item["home"] == "STANDBY":
             standby_sets.append(item)
 
     return {
-        "all_sets":     normalized,
-        "uid_map":      uid_map,
-        "shorthand_map":shorthand_map,
+        "all_sets": normalized,
+        "uid_map": uid_map,
+        "shorthand_map": shorthand_map,
         "category_map": category_map,
-        "office_sets":  office_sets,
+        "office_sets": office_sets,
         "standby_sets": standby_sets,
     }
 
 
 def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str, Any]:
     size_buckets: dict[tuple[str, str], dict[str, Any]] = {}
-    uid_ranges:   dict[str, set[str]] = defaultdict(set)
+    uid_ranges: dict[str, set[str]] = defaultdict(set)
     uid_alias_candidates: dict[str, set[str]] = defaultdict(set)
 
     for sku_code, row in master_plates.items():
@@ -632,35 +685,41 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
         size_range = canonical_size_range(row.get("size_range", "STANDARD"))
         key = (uid, size_range)
 
-        bucket = size_buckets.setdefault(key, {
-            "plate_uid":    uid,
-            "plate_name":   str(row.get("proper_name", "")).strip(),
-            "set_category": str(row.get("set", "")).strip(),
-            "size_range":   size_range,
-            "screw_sizes_set": set(),
-            "total_drawer_units": 0,
-            "total_stock_units": 0,
-            "out_drawer_units": 0,
-            "out_stock_units":  0,
-            "drawer_locations": set(),
-            "stock_locations":  set(),
-            "drawer_size_map": defaultdict(list),
-            "stock_size_map": defaultdict(list),
-            # drawer_size_detail[drawer] = [{label, size_range, no_stock}]
-            # Add "status": "no_stock" to a plate SKU in master_data.py to mark unavailable
-            "drawer_size_detail": defaultdict(list),
-            "stock_size_detail": defaultdict(list),
-            "all_size_labels": [],
-            "out_details":  [],
-        })
+        bucket = size_buckets.setdefault(
+            key,
+            {
+                "plate_uid": uid,
+                "plate_name": str(row.get("proper_name", "")).strip(),
+                "set_category": str(row.get("set", "")).strip(),
+                "size_range": size_range,
+                "screw_sizes_set": set(),
+                "total_drawer_units": 0,
+                "total_stock_units": 0,
+                "out_drawer_units": 0,
+                "out_stock_units": 0,
+                "drawer_locations": set(),
+                "stock_locations": set(),
+                "drawer_size_map": defaultdict(list),
+                "stock_size_map": defaultdict(list),
+                # drawer_size_detail[drawer] = [{label, size_range, no_stock}]
+                # Add "status": "no_stock" to a plate SKU in master_data.py to mark unavailable
+                "drawer_size_detail": defaultdict(list),
+                "stock_size_detail": defaultdict(list),
+                "all_size_labels": [],
+                "out_details": [],
+            },
+        )
         screw_sizes = str(row.get("screw_sizes", "")).strip()
         if screw_sizes:
             bucket["screw_sizes_set"].add(screw_sizes)
         size_label = str(row.get("size", "")).strip()
         lr_label = str(row.get("left_right", "")).strip()
-        plate_label = " ".join(part for part in (size_label, lr_label) if part).strip() or str(sku_code).strip()
+        plate_label = (
+            " ".join(part for part in (size_label, lr_label) if part).strip()
+            or str(sku_code).strip()
+        )
         # Detect "status": "no_stock" (or "out", "out_of_stock") on this SKU
-        sku_status   = normalize_code(str(row.get("status", "")))  # uppercased, no spaces
+        sku_status = normalize_code(str(row.get("status", "")))  # uppercased, no spaces
         sku_no_stock = sku_status in {"NO_STOCK", "NOSTOCK", "OUT", "OUTOFSTOCK"}
         locations = parse_plate_locations(
             row.get("location", ""),
@@ -669,12 +728,12 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
         drawers = [loc["name"] for loc in locations if loc["is_drawer"]]
         others = [loc["name"] for loc in locations if not loc["is_drawer"]]
         drawer_units = len(drawers)
-        stock_units  = len(others) or (1 if not drawers and not others else 0)
+        stock_units = len(others) or (1 if not drawers and not others else 0)
         for location in locations:
             detail_row = {
-                "label":      plate_label,
+                "label": plate_label,
                 "size_range": size_range,
-                "no_stock":   bool(location["no_stock"]),
+                "no_stock": bool(location["no_stock"]),
             }
             if location["is_drawer"]:
                 drawer = location["name"]
@@ -704,7 +763,11 @@ def build_plate_inventory(master_plates: dict[str, dict[str, Any]]) -> dict[str,
         for alias, targets in uid_alias_candidates.items()
         if len(targets) == 1
     }
-    return {"size_buckets": size_buckets, "uid_ranges": uid_ranges, "uid_alias_map": uid_alias_map}
+    return {
+        "size_buckets": size_buckets,
+        "uid_ranges": uid_ranges,
+        "uid_alias_map": uid_alias_map,
+    }
 
 
 def finalize_set_assignments(
@@ -719,18 +782,16 @@ def finalize_set_assignments(
         ordered_rows = sorted(rows, key=lambda row: row["_case_order_key"])
         winner = dict(ordered_rows[-1])
         related_case_ids = [row["case_id"] for row in ordered_rows]
-        related_hospitals = sorted({
-            row["location_now"]
-            for row in ordered_rows
-            if row.get("location_now")
-        })
+        related_hospitals = sorted(
+            {row["location_now"] for row in ordered_rows if row.get("location_now")}
+        )
         winner["ownership_related_cases"] = ";".join(related_case_ids)
         winner["ownership_related_hospitals"] = ";".join(related_hospitals)
         if len(ordered_rows) > 1:
             winner["ownership_status"] = (
                 "REVIEW_CONFLICT"
-                if len(related_hospitals) > 1 else
-                repeated_same_hospital_status
+                if len(related_hospitals) > 1
+                else repeated_same_hospital_status
             )
         else:
             winner["ownership_status"] = ""
@@ -741,18 +802,20 @@ def finalize_set_assignments(
     finalized.sort(key=lambda row: (row["category"], row["id"], row["set_uid"]))
     return finalized, keys_by_case
 
+
 # ---------------------------------------------------------------------------
 # Case summariser
 # ---------------------------------------------------------------------------
+
 
 def summarize_cases(
     cases_rows: list[dict[str, str]],
     set_indexes: dict[str, Any],
     today_kl: date,
 ) -> dict[str, Any]:
-    uid_map       = set_indexes["uid_map"]
+    uid_map = set_indexes["uid_map"]
     shorthand_map = set_indexes["shorthand_map"]
-    category_map  = set_indexes["category_map"]
+    category_map = set_indexes["category_map"]
 
     parsed_cases: list[dict[str, Any]] = []
     unknown_set_tokens: Counter[str] = Counter()
@@ -763,7 +826,9 @@ def summarize_cases(
         prefix = row_value(row, "prefix").strip()
         is_booking_case = is_booking_prefix(prefix)
         booking_hold_from = booking_hold_start(delivery_date)
-        booking_is_active = is_booking_case and is_booking_hold_active(delivery_date, today_kl)
+        booking_is_active = is_booking_case and is_booking_hold_active(
+            delivery_date, today_kl
+        )
         sets_raw = row_value(row, "sets").strip()
         sets_returned_raw = row_value(row, "sets_returned").strip()
         plate_tokens = split_plate_tokens(row_value(row, "plates"))
@@ -814,21 +879,27 @@ def summarize_cases(
                 set_display_tokens.append(token)
 
             if uid_matches:
-                labels = sorted({
-                    format_set_display(
-                        item.get("shorthand") or item.get("category"),
-                        item.get("id"),
-                    )
-                    for item in uid_matches
-                })
+                labels = sorted(
+                    {
+                        format_set_display(
+                            item.get("shorthand") or item.get("category"),
+                            item.get("id"),
+                        )
+                        for item in uid_matches
+                    }
+                )
                 set_display_tokens.append("/".join(labels))
             elif shorthand_matches:
-                labels = sorted({
-                    f"{(item.get('shorthand') or item.get('category') or '').strip()} (?)"
-                    for item in shorthand_matches
-                })
+                labels = sorted(
+                    {
+                        f"{(item.get('shorthand') or item.get('category') or '').strip()} (?)"
+                        for item in shorthand_matches
+                    }
+                )
                 if labels:
-                    set_display_tokens.append("/".join(label for label in labels if label.strip()))
+                    set_display_tokens.append(
+                        "/".join(label for label in labels if label.strip())
+                    )
 
         uid_hit_by_key = {item["_set_key"]: item for item in uid_hits}
         shorthand_hit_keys = {
@@ -838,11 +909,13 @@ def summarize_cases(
         }
         has_uid_set = bool(uid_hit_by_key)
         has_shorthand_only = bool(shorthand_hit_keys) and not has_uid_set
-        set_categories = sorted({
-            str(item.get("category", "")).strip()
-            for item in list(uid_hit_by_key.values()) + shorthand_hits
-            if str(item.get("category", "")).strip()
-        })
+        set_categories = sorted(
+            {
+                str(item.get("category", "")).strip()
+                for item in list(uid_hit_by_key.values()) + shorthand_hits
+                if str(item.get("category", "")).strip()
+            }
+        )
 
         returned_hit_by_key: dict[str, dict[str, Any]] = {}
         returned_display_tokens: list[str] = []
@@ -852,19 +925,22 @@ def summarize_cases(
                 continue
             global_uid_matches = uid_map.get(norm, [])
             matched_items = [
-                item for item in global_uid_matches
+                item
+                for item in global_uid_matches
                 if item["_set_key"] in uid_hit_by_key
             ]
             if matched_items:
                 for item in matched_items:
                     returned_hit_by_key[item["_set_key"]] = item
-                labels = sorted({
-                    format_set_display(
-                        item.get("shorthand") or item.get("category"),
-                        item.get("id"),
-                    )
-                    for item in matched_items
-                })
+                labels = sorted(
+                    {
+                        format_set_display(
+                            item.get("shorthand") or item.get("category"),
+                            item.get("id"),
+                        )
+                        for item in matched_items
+                    }
+                )
                 if labels:
                     returned_display_tokens.append("/".join(labels))
             elif not global_uid_matches:
@@ -873,72 +949,78 @@ def summarize_cases(
 
         exact_set_rows = []
         for item in uid_hit_by_key.values():
-            exact_set_rows.append({
-                "set_key": item["_set_key"],
-                "set_uid": item["uid"],
-                "set_uid_norm": item["_uid_norm"],
-                "category": item["category"],
-                "id": item["id"],
-                "home": item["home"],
-                "set_status": item.get("status", ""),
-                "set_display": format_set_display(
-                    item.get("shorthand") or item.get("category"),
-                    item.get("id"),
-                ),
-            })
+            exact_set_rows.append(
+                {
+                    "set_key": item["_set_key"],
+                    "set_uid": item["uid"],
+                    "set_uid_norm": item["_uid_norm"],
+                    "category": item["category"],
+                    "id": item["id"],
+                    "home": item["home"],
+                    "set_status": item.get("status", ""),
+                    "set_display": format_set_display(
+                        item.get("shorthand") or item.get("category"),
+                        item.get("id"),
+                    ),
+                }
+            )
 
         case_id = f"C{idx:03d}"
         hospital_code = normalize_code(row_value(row, "hospital"))
 
         case_record: dict[str, Any] = {
-            "case_id":            case_id,
-            "row_number":         idx,
-            "prefix":             prefix,
-            "hospital":           hospital_code,
-            "patient_doctor":     row_value(row, "patient_doctor").strip(),
-            "delivery_date":      format_date(delivery_date),
-            "surgery_date":       format_date(surgery_date),
-            "sales_code":         row_value(row, "sales_code").strip(),
-            "return_date":        row_value(row, "return_date").strip(),
-            "status":             row_value(row, "status").strip(),
-            "smart_status":       row_value(row, "Smart Status").strip(),
-            "sets_raw":           sets_raw,
-            "sets_display":       "; ".join(token for token in set_display_tokens if token) or sets_raw,
-            "sets_returned_raw":  sets_returned_raw,
+            "case_id": case_id,
+            "row_number": idx,
+            "prefix": prefix,
+            "hospital": hospital_code,
+            "patient_doctor": row_value(row, "patient_doctor").strip(),
+            "delivery_date": format_date(delivery_date),
+            "surgery_date": format_date(surgery_date),
+            "sales_code": row_value(row, "sales_code").strip(),
+            "return_date": row_value(row, "return_date").strip(),
+            "status": row_value(row, "status").strip(),
+            "smart_status": row_value(row, "Smart Status").strip(),
+            "sets_raw": sets_raw,
+            "sets_display": "; ".join(token for token in set_display_tokens if token)
+            or sets_raw,
+            "sets_returned_raw": sets_returned_raw,
             "sets_returned_display": (
-                "; ".join(token for token in returned_display_tokens if token) or sets_returned_raw
+                "; ".join(token for token in returned_display_tokens if token)
+                or sets_returned_raw
             ),
             "sets_outstanding_raw": "",
             "sets_outstanding_display": "",
-            "plates_raw":         row_value(row, "plates").strip(),
-            "powertools_raw":     powertools_raw,
-            "bonegraft_raw":      bonegraft_raw,
-            "extra_items_raw":    extra_items_raw,
-            "has_uid_set":        has_uid_set,
+            "plates_raw": row_value(row, "plates").strip(),
+            "powertools_raw": powertools_raw,
+            "bonegraft_raw": bonegraft_raw,
+            "extra_items_raw": extra_items_raw,
+            "has_uid_set": has_uid_set,
             "has_active_uid_set": False,
             "has_shorthand_only": has_shorthand_only,
-            "is_booking_case":    is_booking_case,
+            "is_booking_case": is_booking_case,
             "booking_hold_active": booking_is_active,
             "booking_hold_start": format_date(booking_hold_from),
-            "set_categories":     set_categories,
-            "set_uid_tokens":     sorted({item["_uid_norm"] for item in uid_hit_by_key.values()}),
-            "returned_set_uid_tokens": sorted({
-                item["_uid_norm"] for item in returned_hit_by_key.values()
-            }),
+            "set_categories": set_categories,
+            "set_uid_tokens": sorted(
+                {item["_uid_norm"] for item in uid_hit_by_key.values()}
+            ),
+            "returned_set_uid_tokens": sorted(
+                {item["_uid_norm"] for item in returned_hit_by_key.values()}
+            ),
             "active_set_uid_tokens": [],
             "booked_set_uid_tokens": [],
             "set_shorthand_tokens": sorted(shorthand_hit_keys),
             "delivery_date_obj": delivery_date,
-            "surgery_date_obj":  surgery_date,
-            "set_tokens":        set_tokens,
-            "plate_tokens":      plate_tokens,
-            "powertool_tokens":  powertool_tokens,
-            "bonegraft_tokens":  bonegraft_tokens,
+            "surgery_date_obj": surgery_date,
+            "set_tokens": set_tokens,
+            "plate_tokens": plate_tokens,
+            "powertool_tokens": powertool_tokens,
+            "bonegraft_tokens": bonegraft_tokens,
             "extra_item_tokens": extra_item_tokens,
-            "sent_set_items":    [],
-            "_case_order_key":   case_order_key(idx, delivery_date, surgery_date),
+            "sent_set_items": [],
+            "_case_order_key": case_order_key(idx, delivery_date, surgery_date),
             "_assigned_exact_sets": exact_set_rows,
-            "_returned_set_keys":   set(returned_hit_by_key),
+            "_returned_set_keys": set(returned_hit_by_key),
         }
         parsed_cases.append(case_record)
 
@@ -947,7 +1029,8 @@ def summarize_cases(
     for case in parsed_cases:
         days_since = (
             (today_kl - case["surgery_date_obj"]).days
-            if case.get("surgery_date_obj") else None
+            if case.get("surgery_date_obj")
+            else None
         )
         for item in case["_assigned_exact_sets"]:
             if item["set_key"] in case["_returned_set_keys"]:
@@ -961,25 +1044,29 @@ def summarize_cases(
                 if case.get("booking_hold_active")
                 else out_candidates_by_key
             )
-            target_map[item["set_key"]].append({
-                "set_key":            item["set_key"],
-                "set_uid":            item["set_uid"],
-                "category":           item["category"],
-                "id":                 item["id"],
-                "set_display":        item["set_display"],
-                "home":               item["home"],
-                "set_status":         item.get("set_status", ""),
-                "assignment_kind":    "BOOKED" if case.get("booking_hold_active") else "OUT",
-                "location_now":       case["hospital"] or "UNKNOWN",
-                "case_id":            case["case_id"],
-                "delivery_date":      case["delivery_date"],
-                "surgery_date":       case["surgery_date"],
-                "days_since_surgery": days_since,
-                "case_status":        case["status"],
-                "smart_status":       case["smart_status"],
-                "patient_doctor":     case["patient_doctor"],
-                "_case_order_key":    case["_case_order_key"],
-            })
+            target_map[item["set_key"]].append(
+                {
+                    "set_key": item["set_key"],
+                    "set_uid": item["set_uid"],
+                    "category": item["category"],
+                    "id": item["id"],
+                    "set_display": item["set_display"],
+                    "home": item["home"],
+                    "set_status": item.get("set_status", ""),
+                    "assignment_kind": "BOOKED"
+                    if case.get("booking_hold_active")
+                    else "OUT",
+                    "location_now": case["hospital"] or "UNKNOWN",
+                    "case_id": case["case_id"],
+                    "delivery_date": case["delivery_date"],
+                    "surgery_date": case["surgery_date"],
+                    "days_since_surgery": days_since,
+                    "case_status": case["status"],
+                    "smart_status": case["smart_status"],
+                    "patient_doctor": case["patient_doctor"],
+                    "_case_order_key": case["_case_order_key"],
+                }
+            )
 
     set_out_assignments, active_office_keys_by_case = finalize_set_assignments(
         out_candidates_by_key,
@@ -998,23 +1085,33 @@ def summarize_cases(
                 continue
             if item.get("home") == "OFFICE":
                 if case.get("booking_hold_active"):
-                    if item["set_key"] in active_booking_keys_by_case.get(case["case_id"], set()):
+                    if item["set_key"] in active_booking_keys_by_case.get(
+                        case["case_id"], set()
+                    ):
                         booked_exact_sets.append(item)
                     continue
-                if item["set_key"] not in active_office_keys_by_case.get(case["case_id"], set()):
+                if item["set_key"] not in active_office_keys_by_case.get(
+                    case["case_id"], set()
+                ):
                     continue
             active_exact_sets.append(item)
-        active_exact_sets.sort(key=lambda item: (item["category"], item["id"], item["set_uid"]))
-        booked_exact_sets.sort(key=lambda item: (item["category"], item["id"], item["set_uid"]))
-        case["active_set_uid_tokens"] = sorted({
-            item["set_uid_norm"] for item in active_exact_sets
-        })
-        case["booked_set_uid_tokens"] = sorted({
-            item["set_uid_norm"] for item in booked_exact_sets
-        })
+        active_exact_sets.sort(
+            key=lambda item: (item["category"], item["id"], item["set_uid"])
+        )
+        booked_exact_sets.sort(
+            key=lambda item: (item["category"], item["id"], item["set_uid"])
+        )
+        case["active_set_uid_tokens"] = sorted(
+            {item["set_uid_norm"] for item in active_exact_sets}
+        )
+        case["booked_set_uid_tokens"] = sorted(
+            {item["set_uid_norm"] for item in booked_exact_sets}
+        )
         case["has_active_uid_set"] = bool(case["active_set_uid_tokens"])
         if active_exact_sets:
-            case["sets_outstanding_raw"] = ";".join(item["set_uid"] for item in active_exact_sets)
+            case["sets_outstanding_raw"] = ";".join(
+                item["set_uid"] for item in active_exact_sets
+            )
             case["sets_outstanding_display"] = "; ".join(
                 item["set_display"] for item in active_exact_sets
             )
@@ -1030,12 +1127,14 @@ def summarize_cases(
                 assignment_kind = "BOOKED"
             elif item["set_key"] in active_keys:
                 assignment_kind = "OUT"
-            sent_set_items.append({
-                "category": item["category"],
-                "id": item["id"],
-                "assignment_kind": assignment_kind,
-                "label": format_case_item_label(item["category"], item["id"]),
-            })
+            sent_set_items.append(
+                {
+                    "category": item["category"],
+                    "id": item["id"],
+                    "assignment_kind": assignment_kind,
+                    "label": format_case_item_label(item["category"], item["id"]),
+                }
+            )
         case["sent_set_items"] = sorted(
             sent_set_items,
             key=lambda item: (
@@ -1050,15 +1149,17 @@ def summarize_cases(
         case.pop("_returned_set_keys", None)
 
     return {
-        "parsed_cases":        parsed_cases,
+        "parsed_cases": parsed_cases,
         "set_out_assignments": set_out_assignments,
         "set_booking_assignments": set_booking_assignments,
-        "unknown_set_tokens":  unknown_set_tokens,
+        "unknown_set_tokens": unknown_set_tokens,
     }
+
 
 # ---------------------------------------------------------------------------
 # Output builders
 # ---------------------------------------------------------------------------
+
 
 def build_set_outputs(
     set_indexes: dict[str, Any],
@@ -1071,8 +1172,10 @@ def build_set_outputs(
 
     # Exclude NA and STANDBY from availability totals.
     active_office_sets = [
-        s for s in office_sets
-        if not is_na_status(s.get("status", "")) and not is_standby_status(s.get("status", ""))
+        s
+        for s in office_sets
+        if not is_na_status(s.get("status", ""))
+        and not is_standby_status(s.get("status", ""))
     ]
 
     total_by_category = Counter(item["category"] for item in active_office_sets)
@@ -1095,18 +1198,22 @@ def build_set_outputs(
     unique_reserved_by_key = dict(unique_booked_by_key)
     unique_reserved_by_key.update(unique_out_by_key)
     out_by_category = Counter(item["category"] for item in unique_out_by_key.values())
-    booked_by_category = Counter(item["category"] for item in unique_booked_by_key.values())
-    reserved_by_category = Counter(item["category"] for item in unique_reserved_by_key.values())
+    booked_by_category = Counter(
+        item["category"] for item in unique_booked_by_key.values()
+    )
+    reserved_by_category = Counter(
+        item["category"] for item in unique_reserved_by_key.values()
+    )
     booked_rows_by_category: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for item in unique_booked_by_key.values():
         booked_rows_by_category[item["category"]].append(item)
 
     set_category_availability: list[dict[str, Any]] = []
     for category in sorted(total_by_category):
-        total     = total_by_category[category]
-        out       = out_by_category.get(category, 0)
-        booked    = booked_by_category.get(category, 0)
-        reserved  = reserved_by_category.get(category, 0)
+        total = total_by_category[category]
+        out = out_by_category.get(category, 0)
+        booked = booked_by_category.get(category, 0)
+        reserved = reserved_by_category.get(category, 0)
         available = max(total - reserved, 0)
         next_booking = None
         category_bookings = booked_rows_by_category.get(category, [])
@@ -1120,19 +1227,29 @@ def build_set_outputs(
                     str(item.get("id", "")),
                 ),
             )
-        set_category_availability.append({
-            "category":    category,
-            "total_office": total,
-            "booked_for_case": booked,
-            "out_for_case": out,
-            "reserved_total": reserved,
-            "available":    available,
-            "availability": f"{available}/{total}",
-            "next_booking_date": str(next_booking.get("delivery_date", "")) if next_booking else "",
-            "next_booking_hospital": str(next_booking.get("location_now", "")) if next_booking else "",
-            "next_booking_case_id": str(next_booking.get("case_id", "")) if next_booking else "",
-            "next_booking_set": str(next_booking.get("set_display", "")) if next_booking else "",
-        })
+        set_category_availability.append(
+            {
+                "category": category,
+                "total_office": total,
+                "booked_for_case": booked,
+                "out_for_case": out,
+                "reserved_total": reserved,
+                "available": available,
+                "availability": f"{available}/{total}",
+                "next_booking_date": str(next_booking.get("delivery_date", ""))
+                if next_booking
+                else "",
+                "next_booking_hospital": str(next_booking.get("location_now", ""))
+                if next_booking
+                else "",
+                "next_booking_case_id": str(next_booking.get("case_id", ""))
+                if next_booking
+                else "",
+                "next_booking_set": str(next_booking.get("set_display", ""))
+                if next_booking
+                else "",
+            }
+        )
 
     # Per-set location status
     by_set_key: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -1144,53 +1261,61 @@ def build_set_outputs(
     set_office_status: list[dict[str, Any]] = []
     visible_sets = office_sets + standby_sets
     for s in sorted(visible_sets, key=lambda x: (x["category"], x["id"], x["uid"])):
-        key         = s["_set_key"]
+        key = s["_set_key"]
         assignments = by_set_key.get(key, [])
-        base_row    = {
-            "set_key":           key,
-            "category":          s["category"],
-            "id":                s["id"],
-            "set_display":       format_set_display(
-                                     s.get("shorthand") or s.get("category"), s.get("id")
-                                 ),
-            "home":              s["home"],
-            "set_status":        s.get("status", ""),
-            "assignment_kind":   "",
+        base_row = {
+            "set_key": key,
+            "category": s["category"],
+            "id": s["id"],
+            "set_display": format_set_display(
+                s.get("shorthand") or s.get("category"), s.get("id")
+            ),
+            "home": s["home"],
+            "set_status": s.get("status", ""),
+            "assignment_kind": "",
         }
         if not assignments:
-            in_standby = (
-                str(s.get("home", "")).strip().upper() == "STANDBY"
-                or is_standby_status(s.get("status", ""))
+            in_standby = str(
+                s.get("home", "")
+            ).strip().upper() == "STANDBY" or is_standby_status(s.get("status", ""))
+            set_office_status.append(
+                {
+                    **base_row,
+                    "location_now": "STANDBY"
+                    if in_standby
+                    else (
+                        s["home"]
+                        if str(s.get("home", "")).strip().upper()
+                        in {"OFFICE", "STANDBY"}
+                        else "OFFICE"
+                    ),
+                    "delivery_date": "",
+                    "surgery_date": "",
+                    "days_since_surgery": "",
+                    "case_status": "",
+                    "case_id": "",
+                    "patient_doctor": "",
+                }
             )
-            set_office_status.append({
-                **base_row,
-                "location_now":      "STANDBY" if in_standby else (
-                    s["home"] if str(s.get("home", "")).strip().upper() in {"OFFICE", "STANDBY"} else "OFFICE"
-                ),
-                "delivery_date":     "",
-                "surgery_date":      "",
-                "days_since_surgery":"",
-                "case_status":       "",
-                "case_id":           "",
-                "patient_doctor":    "",
-            })
         else:
             for row in assignments:
-                set_office_status.append({
-                    **base_row,
-                    "location_now":      row["location_now"],
-                    "delivery_date":     row["delivery_date"],
-                    "surgery_date":      row["surgery_date"],
-                    "days_since_surgery":row["days_since_surgery"],
-                    "case_status":       row["case_status"],
-                    "case_id":           row["case_id"],
-                    "patient_doctor":    row["patient_doctor"],
-                    "assignment_kind":   row.get("assignment_kind", ""),
-                })
+                set_office_status.append(
+                    {
+                        **base_row,
+                        "location_now": row["location_now"],
+                        "delivery_date": row["delivery_date"],
+                        "surgery_date": row["surgery_date"],
+                        "days_since_surgery": row["days_since_surgery"],
+                        "case_status": row["case_status"],
+                        "case_id": row["case_id"],
+                        "patient_doctor": row["patient_doctor"],
+                        "assignment_kind": row.get("assignment_kind", ""),
+                    }
+                )
 
     return {
         "set_category_availability": set_category_availability,
-        "set_office_status":         set_office_status,
+        "set_office_status": set_office_status,
     }
 
 
@@ -1198,8 +1323,8 @@ def build_plate_outputs(
     parsed_cases: list[dict[str, Any]],
     plate_inventory: dict[str, Any],
 ) -> dict[str, Any]:
-    size_buckets  = plate_inventory["size_buckets"]
-    uid_ranges    = plate_inventory["uid_ranges"]
+    size_buckets = plate_inventory["size_buckets"]
+    uid_ranges = plate_inventory["uid_ranges"]
     uid_alias_map = plate_inventory["uid_alias_map"]
     unknown_plate_tokens: Counter[str] = Counter()
     drawer_available_by_bucket: dict[tuple[str, str], dict[str, int]] = {}
@@ -1226,16 +1351,18 @@ def build_plate_outputs(
                     bucket["out_stock_units"] += 1
                 else:
                     bucket["out_drawer_units"] += 1
-                bucket["out_details"].append({
-                    "case_id":        case["case_id"],
-                    "hospital":       case["hospital"],
-                    "delivery_date":  case["delivery_date"],
-                    "surgery_date":   case["surgery_date"],
-                    "raw_plate_token":parsed["raw_token"],
-                    "case_status":    case.get("status", ""),
-                    "from_stock":     parsed["from_stock"],
-                    "requested_drawer": parsed.get("drawer"),
-                })
+                bucket["out_details"].append(
+                    {
+                        "case_id": case["case_id"],
+                        "hospital": case["hospital"],
+                        "delivery_date": case["delivery_date"],
+                        "surgery_date": case["surgery_date"],
+                        "raw_plate_token": parsed["raw_token"],
+                        "case_status": case.get("status", ""),
+                        "from_stock": parsed["from_stock"],
+                        "requested_drawer": parsed.get("drawer"),
+                    }
+                )
 
     plate_size_range_availability: list[dict[str, Any]] = []
     plate_out_cases: list[dict[str, Any]] = []
@@ -1249,10 +1376,10 @@ def build_plate_outputs(
         stock_keys = sorted(bucket["stock_size_map"].keys(), key=drawer_sort_key)
         td = len(bucket["drawer_locations"])
         ts = len(bucket["stock_locations"])
-        od        = bucket["out_drawer_units"]
+        od = bucket["out_drawer_units"]
         out_stock = bucket["out_stock_units"]
-        total     = td + ts
-        out       = od + out_stock
+        total = td + ts
+        out = od + out_stock
         available_units = max(total - out, 0)
         if available_units == total:
             range_status = "READY"
@@ -1262,8 +1389,12 @@ def build_plate_outputs(
             range_status = "PARTIAL"
 
         out_case_details: list[dict[str, Any]] = []
-        drawer_case_map: dict[str, list[dict[str, Any]]] = {drawer: [] for drawer in drawer_keys}
-        stock_case_map: dict[str, list[dict[str, Any]]] = {stock: [] for stock in stock_keys}
+        drawer_case_map: dict[str, list[dict[str, Any]]] = {
+            drawer: [] for drawer in drawer_keys
+        }
+        stock_case_map: dict[str, list[dict[str, Any]]] = {
+            stock: [] for stock in stock_keys
+        }
         next_drawer_idx = 0
         next_stock_idx = 0
         bucket_key = (uid, size_range)
@@ -1281,11 +1412,11 @@ def build_plate_outputs(
 
         for d in bucket["out_details"]:
             case_detail = {
-                "case_id":      d["case_id"],
-                "hospital":     d["hospital"],
+                "case_id": d["case_id"],
+                "hospital": d["hospital"],
                 "surgery_date": d["surgery_date"],
-                "case_status":  d.get("case_status", ""),
-                "from_stock":   d["from_stock"],
+                "case_status": d.get("case_status", ""),
+                "from_stock": d["from_stock"],
                 "requested_drawer": d.get("requested_drawer"),
             }
             out_case_details.append(case_detail)
@@ -1299,7 +1430,9 @@ def build_plate_outputs(
             requested_drawer = d.get("requested_drawer")
             target_drawer = None
             if requested_drawer and requested_drawer in drawer_case_map:
-                if bucket_drawer_used[requested_drawer] < bucket_drawer_capacity.get(requested_drawer, 0):
+                if bucket_drawer_used[requested_drawer] < bucket_drawer_capacity.get(
+                    requested_drawer, 0
+                ):
                     target_drawer = requested_drawer
 
             auto_assigned = False
@@ -1309,7 +1442,9 @@ def build_plate_outputs(
                 for offset in range(len(drawer_keys)):
                     candidate_idx = (next_drawer_idx + offset) % len(drawer_keys)
                     candidate = drawer_keys[candidate_idx]
-                    if bucket_drawer_used[candidate] < bucket_drawer_capacity.get(candidate, 0):
+                    if bucket_drawer_used[candidate] < bucket_drawer_capacity.get(
+                        candidate, 0
+                    ):
                         found_drawer = candidate
                         next_drawer_idx = candidate_idx
                         break
@@ -1317,7 +1452,9 @@ def build_plate_outputs(
                 if found_drawer is not None:
                     target_drawer = found_drawer
                 else:
-                    target_drawer = drawer_keys[min(next_drawer_idx, len(drawer_keys) - 1)]
+                    target_drawer = drawer_keys[
+                        min(next_drawer_idx, len(drawer_keys) - 1)
+                    ]
 
             if target_drawer:
                 drawer_case_map[target_drawer].append(case_detail)
@@ -1326,26 +1463,26 @@ def build_plate_outputs(
                     next_drawer_idx += 1
 
         row = {
-            "plate_uid":             uid,
-            "proper_name":           bucket["plate_name"],
-            "plate_name":            bucket["plate_name"],
-            "screw_sizes":           ", ".join(sorted(bucket["screw_sizes_set"])),
-            "set_category":          bucket["set_category"],
-            "size_range":            size_range,
-            "drawer_locations":      ", ".join(sorted(bucket["drawer_locations"])),
-            "stock_locations":       ", ".join(sorted(bucket["stock_locations"])),
-            "total_drawer_units":    td,
-            "total_stock_units":     ts,
-            "total_units":           total,
-            "out_drawer_units":      od,
-            "out_stock_units":       out_stock,
-            "out_units":             out,
-            "available_drawer_units":max(td - od, 0),
+            "plate_uid": uid,
+            "proper_name": bucket["plate_name"],
+            "plate_name": bucket["plate_name"],
+            "screw_sizes": ", ".join(sorted(bucket["screw_sizes_set"])),
+            "set_category": bucket["set_category"],
+            "size_range": size_range,
+            "drawer_locations": ", ".join(sorted(bucket["drawer_locations"])),
+            "stock_locations": ", ".join(sorted(bucket["stock_locations"])),
+            "total_drawer_units": td,
+            "total_stock_units": ts,
+            "total_units": total,
+            "out_drawer_units": od,
+            "out_stock_units": out_stock,
+            "out_units": out,
+            "available_drawer_units": max(td - od, 0),
             "available_stock_units": max(ts - out_stock, 0),
-            "available_units":       available_units,
-            "availability":          f"{available_units}/{total}",
-            "range_status":          range_status,
-            "out_case_details":      out_case_details,
+            "available_units": available_units,
+            "availability": f"{available_units}/{total}",
+            "range_status": range_status,
+            "out_case_details": out_case_details,
         }
         plate_size_range_availability.append(row)
 
@@ -1364,22 +1501,24 @@ def build_plate_outputs(
                 for d in raw_detail
             ]
             labels = [d["label"] for d in detail]
-            plate_drawer_detail.append({
-                "plate_uid":         uid,
-                "proper_name":       bucket["plate_name"],
-                "screw_sizes":       ", ".join(sorted(bucket["screw_sizes_set"])),
-                "size_range":        size_range,
-                "drawer":            drawer,
-                "drawer_sizes":      ", ".join(labels),
-                "drawer_size_detail": detail,         # [{label, size_range, no_stock}]
-                "drawer_count":      len(labels),
-                "available_units":   available_units,
-                "total_units":       total,
-                "availability":      f"{available_units}/{total}",
-                "range_status":      range_status,
-                "out_case_details":  out_case_details,
-                "drawer_out_case_details": drawer_case_map.get(drawer, []),
-            })
+            plate_drawer_detail.append(
+                {
+                    "plate_uid": uid,
+                    "proper_name": bucket["plate_name"],
+                    "screw_sizes": ", ".join(sorted(bucket["screw_sizes_set"])),
+                    "size_range": size_range,
+                    "drawer": drawer,
+                    "drawer_sizes": ", ".join(labels),
+                    "drawer_size_detail": detail,  # [{label, size_range, no_stock}]
+                    "drawer_count": len(labels),
+                    "available_units": available_units,
+                    "total_units": total,
+                    "availability": f"{available_units}/{total}",
+                    "range_status": range_status,
+                    "out_case_details": out_case_details,
+                    "drawer_out_case_details": drawer_case_map.get(drawer, []),
+                }
+            )
         for stock_loc in stock_keys:
             raw_detail = sorted(
                 bucket["stock_size_detail"].get(stock_loc, []),
@@ -1394,64 +1533,75 @@ def build_plate_outputs(
                 for d in raw_detail
             ]
             labels = [d["label"] for d in detail]
-            plate_drawer_detail.append({
-                "plate_uid":         uid,
-                "proper_name":       bucket["plate_name"],
-                "screw_sizes":       ", ".join(sorted(bucket["screw_sizes_set"])),
-                "size_range":        size_range,
-                "drawer":            stock_loc,
-                "drawer_sizes":      ", ".join(labels),
-                "drawer_size_detail": detail,
-                "drawer_count":      len(labels),
-                "available_units":   available_units,
-                "total_units":       total,
-                "availability":      f"{available_units}/{total}",
-                "range_status":      range_status,
-                "out_case_details":  out_case_details,
-                "drawer_out_case_details": stock_case_map.get(stock_loc, []),
-            })
+            plate_drawer_detail.append(
+                {
+                    "plate_uid": uid,
+                    "proper_name": bucket["plate_name"],
+                    "screw_sizes": ", ".join(sorted(bucket["screw_sizes_set"])),
+                    "size_range": size_range,
+                    "drawer": stock_loc,
+                    "drawer_sizes": ", ".join(labels),
+                    "drawer_size_detail": detail,
+                    "drawer_count": len(labels),
+                    "available_units": available_units,
+                    "total_units": total,
+                    "availability": f"{available_units}/{total}",
+                    "range_status": range_status,
+                    "out_case_details": out_case_details,
+                    "drawer_out_case_details": stock_case_map.get(stock_loc, []),
+                }
+            )
 
         for detail in bucket["out_details"]:
-            plate_out_cases.append({
-                "plate_uid":       uid,
-                "size_range":      size_range,
-                "hospital":        detail["hospital"],
-                "case_id":         detail["case_id"],
-                "delivery_date":   detail["delivery_date"],
-                "surgery_date":    detail["surgery_date"],
-                "from_stock":      detail["from_stock"],
-                "raw_plate_token": detail["raw_plate_token"],
-            })
+            plate_out_cases.append(
+                {
+                    "plate_uid": uid,
+                    "size_range": size_range,
+                    "hospital": detail["hospital"],
+                    "case_id": detail["case_id"],
+                    "delivery_date": detail["delivery_date"],
+                    "surgery_date": detail["surgery_date"],
+                    "from_stock": detail["from_stock"],
+                    "raw_plate_token": detail["raw_plate_token"],
+                }
+            )
 
     # UID-level summary
     uid_summary_map: dict[str, dict[str, Any]] = {}
     for row in plate_size_range_availability:
         uid = row["plate_uid"]
-        s   = uid_summary_map.setdefault(uid, {
-            "plate_uid":    uid,
-            "proper_name":  row.get("proper_name", row["plate_name"]),
-            "plate_name":   row["plate_name"],
-            "screw_sizes_set": set(),
-            "set_category": row["set_category"],
-            "aggregate_total_units":  0,
-            "aggregate_out_units":    0,
-            "aggregate_available_units": 0,
-            "size_ranges":  [],
-            "size_ranges_detail": [],
-            "missing_ranges": [],
-            "partial_ranges": [],
-            "summary_basis": "ALL_RANGES",
-            "_standard_row": None,
-        })
-        for ss in [p.strip() for p in str(row.get("screw_sizes", "")).split(",") if p.strip()]:
+        s = uid_summary_map.setdefault(
+            uid,
+            {
+                "plate_uid": uid,
+                "proper_name": row.get("proper_name", row["plate_name"]),
+                "plate_name": row["plate_name"],
+                "screw_sizes_set": set(),
+                "set_category": row["set_category"],
+                "aggregate_total_units": 0,
+                "aggregate_out_units": 0,
+                "aggregate_available_units": 0,
+                "size_ranges": [],
+                "size_ranges_detail": [],
+                "missing_ranges": [],
+                "partial_ranges": [],
+                "summary_basis": "ALL_RANGES",
+                "_standard_row": None,
+            },
+        )
+        for ss in [
+            p.strip() for p in str(row.get("screw_sizes", "")).split(",") if p.strip()
+        ]:
             s["screw_sizes_set"].add(ss)
-        s["aggregate_total_units"]    += row["total_units"]
-        s["aggregate_out_units"]      += row["out_units"]
-        s["aggregate_available_units"]+= row["available_units"]
-        s["size_ranges_detail"].append({
-            "size_range": row["size_range"],
-            "text": f"{row['size_range']}({row['available_units']}/{row['total_units']})",
-        })
+        s["aggregate_total_units"] += row["total_units"]
+        s["aggregate_out_units"] += row["out_units"]
+        s["aggregate_available_units"] += row["available_units"]
+        s["size_ranges_detail"].append(
+            {
+                "size_range": row["size_range"],
+                "text": f"{row['size_range']}({row['available_units']}/{row['total_units']})",
+            }
+        )
         if row["available_units"] == 0:
             s["missing_ranges"].append(row["size_range"])
         elif row["available_units"] < row["total_units"]:
@@ -1464,7 +1614,10 @@ def build_plate_outputs(
     for uid_key, s in sorted(uid_summary_map.items()):
         s["size_ranges"] = ", ".join(
             item["text"]
-            for item in sorted(s["size_ranges_detail"], key=lambda item: size_range_sort_key(item["size_range"]))
+            for item in sorted(
+                s["size_ranges_detail"],
+                key=lambda item: size_range_sort_key(item["size_range"]),
+            )
         )
         s.pop("size_ranges_detail", None)
         s["screw_sizes"] = ", ".join(sorted(s["screw_sizes_set"]))
@@ -1476,11 +1629,13 @@ def build_plate_outputs(
             s["available_units"] = standard_row["available_units"]
             s["availability"] = standard_row["availability"]
             extra_missing = [
-                size_range for size_range in s["missing_ranges"]
+                size_range
+                for size_range in s["missing_ranges"]
                 if size_range != "STANDARD"
             ]
             extra_partial = [
-                size_range for size_range in s["partial_ranges"]
+                size_range
+                for size_range in s["partial_ranges"]
                 if size_range != "STANDARD"
             ]
             if standard_row["available_units"] == 0:
@@ -1488,13 +1643,17 @@ def build_plate_outputs(
             elif standard_row["available_units"] < standard_row["total_units"]:
                 s["status_note"] = "PARTIAL: STANDARD"
             elif extra_missing:
-                s["status_note"] = "READY (extras missing: " + ", ".join(
-                    sorted(extra_missing, key=size_range_sort_key)
-                ) + ")"
+                s["status_note"] = (
+                    "READY (extras missing: "
+                    + ", ".join(sorted(extra_missing, key=size_range_sort_key))
+                    + ")"
+                )
             elif extra_partial:
-                s["status_note"] = "READY (extras partial: " + ", ".join(
-                    sorted(extra_partial, key=size_range_sort_key)
-                ) + ")"
+                s["status_note"] = (
+                    "READY (extras partial: "
+                    + ", ".join(sorted(extra_partial, key=size_range_sort_key))
+                    + ")"
+                )
             else:
                 s["status_note"] = "READY"
         else:
@@ -1519,13 +1678,13 @@ def build_plate_outputs(
 
     return {
         "plate_size_range_availability": plate_size_range_availability,
-        "plate_drawer_detail":           plate_drawer_detail,
-        "plate_uid_summary":             plate_uid_summary,
-        "plate_out_cases":               sorted(
+        "plate_drawer_detail": plate_drawer_detail,
+        "plate_uid_summary": plate_uid_summary,
+        "plate_out_cases": sorted(
             plate_out_cases,
             key=lambda x: (x["plate_uid"], x["hospital"], x["case_id"]),
         ),
-        "unknown_plate_tokens":          unknown_plate_tokens,
+        "unknown_plate_tokens": unknown_plate_tokens,
     }
 
 
@@ -1538,18 +1697,20 @@ def build_powertool_outputs(
     office_sets = set_indexes["office_sets"]
     office_powertools = [s for s in office_sets if is_powertool_category(s["category"])]
 
-    power_uid_map:      dict[str, list[dict[str, Any]]] = defaultdict(list)
-    power_shorthand_map:dict[str, list[dict[str, Any]]] = defaultdict(list)
+    power_uid_map: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    power_shorthand_map: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
     for item in office_powertools:
-        item["_power_uid"]      = canonical_powertool_uid(item["uid"])
-        sh_src                  = item.get("shorthand") or item.get("category")
-        item["_power_shorthand"]= canonical_powertool_shorthand(sh_src)
-        item["_power_key"]      = f"{item['_power_uid']}|{item['category']}|{item['id']}"
-        item["_is_na_hold"]     = is_na_status(item.get("status", ""))
+        item["_power_uid"] = canonical_powertool_uid(item["uid"])
+        sh_src = item.get("shorthand") or item.get("category")
+        item["_power_shorthand"] = canonical_powertool_shorthand(sh_src)
+        item["_power_key"] = f"{item['_power_uid']}|{item['category']}|{item['id']}"
+        item["_is_na_hold"] = is_na_status(item.get("status", ""))
         item["_is_standby_hold"] = is_standby_status(item.get("status", ""))
-        if item["_power_uid"]:       power_uid_map[item["_power_uid"]].append(item)
-        if item["_power_shorthand"]: power_shorthand_map[item["_power_shorthand"]].append(item)
+        if item["_power_uid"]:
+            power_uid_map[item["_power_uid"]].append(item)
+        if item["_power_shorthand"]:
+            power_shorthand_map[item["_power_shorthand"]].append(item)
 
     delivered_assignments: list[dict[str, Any]] = []
     unknown_powertool_tokens: Counter[str] = Counter()
@@ -1563,25 +1724,27 @@ def build_powertool_outputs(
                     if item["_power_key"] in used_keys:
                         continue
                     used_keys.add(item["_power_key"])
-                    delivered_assignments.append({
-                        "powertool_uid":           item["uid"],
-                        "powertool_uid_canonical": item["_power_uid"],
-                        "_power_key":              item["_power_key"],
-                        "category":                item["category"],
-                        "id":                      item["id"],
-                        "home":                    item["home"],
-                        "status":                  item.get("status", ""),
-                        "is_na_hold":              item["_is_na_hold"],
-                        "case_id":                 case["case_id"],
-                        "hospital":                case["hospital"],
-                        "delivery_date":           case["delivery_date"],
-                        "surgery_date":            case["surgery_date"],
-                        "patient_doctor":          case["patient_doctor"],
-                    })
+                    delivered_assignments.append(
+                        {
+                            "powertool_uid": item["uid"],
+                            "powertool_uid_canonical": item["_power_uid"],
+                            "_power_key": item["_power_key"],
+                            "category": item["category"],
+                            "id": item["id"],
+                            "home": item["home"],
+                            "status": item.get("status", ""),
+                            "is_na_hold": item["_is_na_hold"],
+                            "case_id": case["case_id"],
+                            "hospital": case["hospital"],
+                            "delivery_date": case["delivery_date"],
+                            "surgery_date": case["surgery_date"],
+                            "patient_doctor": case["patient_doctor"],
+                        }
+                    )
                 continue
             shorthand_norm = canonical_powertool_shorthand(token)
             if shorthand_norm in power_shorthand_map:
-                continue   # pending delivery – not yet assigned
+                continue  # pending delivery – not yet assigned
             unk = re.sub(r"[^A-Z0-9]", "", normalize_code(token))
             if unk:
                 unknown_powertool_tokens[unk] += 1
@@ -1595,27 +1758,33 @@ def build_powertool_outputs(
     }
     out_by_cat = Counter(a["category"] for a in unique_out_by_key.values())
     total_by_cat = Counter(item["category"] for item in office_powertools)
-    na_by_cat    = Counter(item["category"] for item in office_powertools if item.get("_is_na_hold"))
-    standby_by_cat = Counter(item["category"] for item in office_powertools if item.get("_is_standby_hold"))
+    na_by_cat = Counter(
+        item["category"] for item in office_powertools if item.get("_is_na_hold")
+    )
+    standby_by_cat = Counter(
+        item["category"] for item in office_powertools if item.get("_is_standby_hold")
+    )
 
     powertool_category_availability: list[dict[str, Any]] = []
     for cat in sorted(total_by_cat):
-        total    = total_by_cat[cat]
-        na_hold  = na_by_cat.get(cat, 0)
+        total = total_by_cat[cat]
+        na_hold = na_by_cat.get(cat, 0)
         standby_hold = standby_by_cat.get(cat, 0)
-        usable   = max(total - na_hold - standby_hold, 0)
-        out      = out_by_cat.get(cat, 0)
-        available= max(usable - out, 0)
-        powertool_category_availability.append({
-            "category":    cat,
-            "total_office": total,
-            "na_hold":     na_hold,
-            "standby_hold":standby_hold,
-            "usable_total":usable,
-            "out_for_case":out,
-            "available":   available,
-            "availability":f"{available}/{usable}",
-        })
+        usable = max(total - na_hold - standby_hold, 0)
+        out = out_by_cat.get(cat, 0)
+        available = max(usable - out, 0)
+        powertool_category_availability.append(
+            {
+                "category": cat,
+                "total_office": total,
+                "na_hold": na_hold,
+                "standby_hold": standby_hold,
+                "usable_total": usable,
+                "out_for_case": out,
+                "available": available,
+                "availability": f"{available}/{usable}",
+            }
+        )
 
     assignment_by_key: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for a in delivered_assignments:
@@ -1623,42 +1792,55 @@ def build_powertool_outputs(
         assignment_by_key[key].append(a)
 
     powertool_uid_availability: list[dict[str, Any]] = []
-    for item in sorted(office_powertools, key=lambda x: (x["category"], x["uid"], x["id"])):
-        key   = item["_power_key"]
-        rows  = assignment_by_key.get(key, [])
-        base  = {
-            "powertool_uid":item["uid"],
-            "category":     item["category"],
-            "id":           item["id"],
-            "home":         item["home"],
-            "status":       item.get("status", ""),
-            "is_na_hold":   item.get("_is_na_hold", False),
+    for item in sorted(
+        office_powertools, key=lambda x: (x["category"], x["uid"], x["id"])
+    ):
+        key = item["_power_key"]
+        rows = assignment_by_key.get(key, [])
+        base = {
+            "powertool_uid": item["uid"],
+            "category": item["category"],
+            "id": item["id"],
+            "home": item["home"],
+            "status": item.get("status", ""),
+            "is_na_hold": item.get("_is_na_hold", False),
             "is_standby_hold": item.get("_is_standby_hold", False),
         }
         if not rows:
-            powertool_uid_availability.append({
-                **base,
-                "availability":(
-                    "NA_HOLD" if item.get("_is_na_hold")
-                    else "STANDBY_HOLD" if item.get("_is_standby_hold")
-                    else "AVAILABLE"
-                ),
-                "hospital":"", "case_id":"", "delivery_date":"", "surgery_date":"",
-            })
+            powertool_uid_availability.append(
+                {
+                    **base,
+                    "availability": (
+                        "NA_HOLD"
+                        if item.get("_is_na_hold")
+                        else "STANDBY_HOLD"
+                        if item.get("_is_standby_hold")
+                        else "AVAILABLE"
+                    ),
+                    "hospital": "",
+                    "case_id": "",
+                    "delivery_date": "",
+                    "surgery_date": "",
+                }
+            )
         else:
             for a in rows:
-                powertool_uid_availability.append({
-                    **base,
-                    "availability":(
-                        "OUT_NA_HOLD" if item.get("_is_na_hold")
-                        else "OUT_STANDBY_HOLD" if item.get("_is_standby_hold")
-                        else "OUT"
-                    ),
-                    "hospital":     a["hospital"],
-                    "case_id":      a["case_id"],
-                    "delivery_date":a["delivery_date"],
-                    "surgery_date": a["surgery_date"],
-                })
+                powertool_uid_availability.append(
+                    {
+                        **base,
+                        "availability": (
+                            "OUT_NA_HOLD"
+                            if item.get("_is_na_hold")
+                            else "OUT_STANDBY_HOLD"
+                            if item.get("_is_standby_hold")
+                            else "OUT"
+                        ),
+                        "hospital": a["hospital"],
+                        "case_id": a["case_id"],
+                        "delivery_date": a["delivery_date"],
+                        "surgery_date": a["surgery_date"],
+                    }
+                )
 
     # 30-day usage from archive
     window_start = today_kl - timedelta(days=30)
@@ -1667,33 +1849,41 @@ def build_powertool_outputs(
         row_date = parse_date(row.get("surgery_date") or row.get("delivery_date") or "")
         if row_date is None or not (window_start <= row_date <= today_kl):
             continue
-        for token in split_powertool_tokens(row.get("powertool") or row.get("powertools") or ""):
+        for token in split_powertool_tokens(
+            row.get("powertool") or row.get("powertools") or ""
+        ):
             uid_norm = canonical_powertool_uid(token)
             if uid_norm in power_uid_map:
                 usage_counter[uid_norm] += 1
 
     powertool_usage_30d: list[dict[str, Any]] = []
-    for item in sorted(office_powertools, key=lambda x: (x["category"], x["uid"], x["id"])):
-        powertool_usage_30d.append({
-            "powertool_uid":item["uid"],
-            "category":     item["category"],
-            "id":           item["id"],
-            "is_na_hold":   item.get("_is_na_hold", False),
-            "usage_30d":    usage_counter.get(item["_power_uid"], 0),
-            "window_start": format_date(window_start),
-            "window_end":   format_date(today_kl),
-        })
+    for item in sorted(
+        office_powertools, key=lambda x: (x["category"], x["uid"], x["id"])
+    ):
+        powertool_usage_30d.append(
+            {
+                "powertool_uid": item["uid"],
+                "category": item["category"],
+                "id": item["id"],
+                "is_na_hold": item.get("_is_na_hold", False),
+                "usage_30d": usage_counter.get(item["_power_uid"], 0),
+                "window_start": format_date(window_start),
+                "window_end": format_date(today_kl),
+            }
+        )
 
     return {
         "powertool_category_availability": powertool_category_availability,
-        "powertool_uid_availability":      powertool_uid_availability,
-        "powertool_delivered":             delivered_assignments,
-        "powertool_usage_30d":             powertool_usage_30d,
-        "unknown_powertool_tokens":        unknown_powertool_tokens,
+        "powertool_uid_availability": powertool_uid_availability,
+        "powertool_delivered": delivered_assignments,
+        "powertool_usage_30d": powertool_usage_30d,
+        "unknown_powertool_tokens": unknown_powertool_tokens,
     }
 
 
-def build_bonegraft_index(master_bonegraft: list[dict[str, Any]]) -> dict[str, dict[str, dict[str, str]]]:
+def build_bonegraft_index(
+    master_bonegraft: list[dict[str, Any]],
+) -> dict[str, dict[str, dict[str, str]]]:
     by_ref: dict[str, dict[str, str]] = {}
     by_alias: dict[str, dict[str, str]] = {}
     for item in master_bonegraft:
@@ -1722,7 +1912,9 @@ def build_bonegraft_index(master_bonegraft: list[dict[str, Any]]) -> dict[str, d
             aliases.add(shorthand_norm[:-1])
         presentation_token = normalize_bonegraft_token(presentation)
         if presentation.lower().endswith("cc"):
-            bare_match = re.match(r"^([0-9.]+)\s*cc$", presentation.strip(), flags=re.IGNORECASE)
+            bare_match = re.match(
+                r"^([0-9.]+)\s*cc$", presentation.strip(), flags=re.IGNORECASE
+            )
             if bare_match:
                 bare_value = normalize_bonegraft_token(bare_match.group(1))
                 if bare_value:
@@ -1744,10 +1936,13 @@ def build_case_sent_item_details(
     uid_alias_map = plate_inventory["uid_alias_map"]
     plate_meta_by_uid: dict[str, dict[str, Any]] = {}
     for (uid, size_range), bucket in size_buckets.items():
-        meta = plate_meta_by_uid.setdefault(uid, {
-            "proper_name": str(bucket.get("plate_name", "")).strip(),
-            "ranges": set(),
-        })
+        meta = plate_meta_by_uid.setdefault(
+            uid,
+            {
+                "proper_name": str(bucket.get("plate_name", "")).strip(),
+                "ranges": set(),
+            },
+        )
         meta["ranges"].add(size_range)
         if not meta["proper_name"]:
             meta["proper_name"] = str(bucket.get("proper_name", "")).strip()
@@ -1758,7 +1953,10 @@ def build_case_sent_item_details(
         case_id = str(item.get("case_id", "")).strip()
         if not case_id:
             continue
-        key = str(item.get("_power_key", "")).strip() or f"{item.get('category', '')}|{item.get('id', '')}"
+        key = (
+            str(item.get("_power_key", "")).strip()
+            or f"{item.get('category', '')}|{item.get('id', '')}"
+        )
         label = format_case_item_label(item.get("category", ""), item.get("id", ""))
         powertool_items_by_case[case_id][key] = {
             "category": str(item.get("category", "")).strip(),
@@ -1795,14 +1993,19 @@ def build_case_sent_item_details(
             resolved_uid = uid_alias_map.get(parsed["base_uid"], parsed["base_uid"])
             meta = plate_meta_by_uid.get(resolved_uid)
             if meta:
-                item = plate_items_by_key.setdefault(resolved_uid, {
-                    "plate_uid": resolved_uid,
-                    "proper_name": meta["proper_name"] or raw_token,
-                    "size_ranges": set(),
-                    "from_stock": False,
-                    "is_resolved": True,
-                })
-                item["from_stock"] = bool(item.get("from_stock")) or bool(parsed.get("from_stock"))
+                item = plate_items_by_key.setdefault(
+                    resolved_uid,
+                    {
+                        "plate_uid": resolved_uid,
+                        "proper_name": meta["proper_name"] or raw_token,
+                        "size_ranges": set(),
+                        "from_stock": False,
+                        "is_resolved": True,
+                    },
+                )
+                item["from_stock"] = bool(item.get("from_stock")) or bool(
+                    parsed.get("from_stock")
+                )
                 resolved_ranges = [
                     size_range
                     for size_range in parsed["needed_ranges"]
@@ -1811,56 +2014,80 @@ def build_case_sent_item_details(
                 item["size_ranges"].update(resolved_ranges or parsed["needed_ranges"])
                 continue
             fallback_key = normalize_plate_code(raw_token) or raw_token
-            plate_items_by_key.setdefault(fallback_key, {
-                "plate_uid": parsed["base_uid"],
-                "proper_name": raw_token,
-                "size_ranges": set(),
-                "from_stock": bool(parsed.get("from_stock")),
-                "is_resolved": False,
-            })
+            plate_items_by_key.setdefault(
+                fallback_key,
+                {
+                    "plate_uid": parsed["base_uid"],
+                    "proper_name": raw_token,
+                    "size_ranges": set(),
+                    "from_stock": bool(parsed.get("from_stock")),
+                    "is_resolved": False,
+                },
+            )
 
         sent_plates: list[dict[str, Any]] = []
         for item in plate_items_by_key.values():
             size_ranges = sorted(item["size_ranges"], key=size_range_sort_key)
             size_ranges_label = ", ".join(size_ranges)
-            label = item["plate_uid"] if item.get("is_resolved") else item["proper_name"]
+            label = (
+                item["plate_uid"] if item.get("is_resolved") else item["proper_name"]
+            )
             if size_ranges_label:
                 label = f"{label} ({size_ranges_label})"
             if item.get("from_stock"):
                 label = f"{label} [stk]"
-            sent_plates.append({
-                "plate_uid": item["plate_uid"],
-                "proper_name": item["proper_name"],
-                "size_ranges": size_ranges,
-                "size_ranges_label": size_ranges_label,
-                "label": label,
-                "from_stock": bool(item.get("from_stock")),
-                "is_resolved": item["is_resolved"],
-            })
-        sent_plates.sort(key=lambda item: (str(item.get("plate_uid", "")), str(item.get("size_ranges_label", ""))))
+            sent_plates.append(
+                {
+                    "plate_uid": item["plate_uid"],
+                    "proper_name": item["proper_name"],
+                    "size_ranges": size_ranges,
+                    "size_ranges_label": size_ranges_label,
+                    "label": label,
+                    "from_stock": bool(item.get("from_stock")),
+                    "is_resolved": item["is_resolved"],
+                }
+            )
+        sent_plates.sort(
+            key=lambda item: (
+                str(item.get("plate_uid", "")),
+                str(item.get("size_ranges_label", "")),
+            )
+        )
 
         powertool_items = dict(powertool_items_by_case.get(case_id, {}))
-        resolved_powertool_tokens = resolved_powertool_tokens_by_case.get(case_id, set())
+        resolved_powertool_tokens = resolved_powertool_tokens_by_case.get(
+            case_id, set()
+        )
         for token in case.get("powertool_tokens", []):
             raw_token = str(token).strip()
             if not raw_token:
                 continue
             canonical_uid = canonical_powertool_uid(raw_token)
             canonical_short = canonical_powertool_shorthand(raw_token)
-            if canonical_uid in resolved_powertool_tokens or canonical_short in resolved_powertool_tokens:
+            if (
+                canonical_uid in resolved_powertool_tokens
+                or canonical_short in resolved_powertool_tokens
+            ):
                 continue
             fallback_key = normalize_code(raw_token)
             if not fallback_key:
                 continue
-            powertool_items.setdefault(fallback_key, {
-                "category": raw_token,
-                "id": "",
-                "label": raw_token,
-                "is_resolved": False,
-            })
+            powertool_items.setdefault(
+                fallback_key,
+                {
+                    "category": raw_token,
+                    "id": "",
+                    "label": raw_token,
+                    "is_resolved": False,
+                },
+            )
         sent_powertools = sorted(
             powertool_items.values(),
-            key=lambda item: (not item.get("is_resolved", False), str(item.get("category", "")), str(item.get("id", ""))),
+            key=lambda item: (
+                not item.get("is_resolved", False),
+                str(item.get("category", "")),
+                str(item.get("id", "")),
+            ),
         )
 
         bonegraft_items_by_key: dict[str, dict[str, Any]] = {}
@@ -1869,24 +2096,37 @@ def build_case_sent_item_details(
             if not raw_token:
                 continue
             norm = normalize_bonegraft_token(raw_token)
-            resolved = bonegraft_index["by_ref"].get(norm) or bonegraft_index["by_alias"].get(norm)
+            resolved = bonegraft_index["by_ref"].get(norm) or bonegraft_index[
+                "by_alias"
+            ].get(norm)
             if resolved:
-                bonegraft_items_by_key.setdefault(resolved["label"], {
-                    **resolved,
-                    "raw_token": raw_token,
-                    "is_resolved": True,
-                })
+                bonegraft_items_by_key.setdefault(
+                    resolved["label"],
+                    {
+                        **resolved,
+                        "raw_token": raw_token,
+                        "is_resolved": True,
+                    },
+                )
                 continue
-            bonegraft_items_by_key.setdefault(raw_token, {
-                "name": raw_token,
-                "presentation": "",
-                "label": raw_token,
-                "raw_token": raw_token,
-                "is_resolved": False,
-            })
+            bonegraft_items_by_key.setdefault(
+                raw_token,
+                {
+                    "name": raw_token,
+                    "presentation": "",
+                    "label": raw_token,
+                    "raw_token": raw_token,
+                    "is_resolved": False,
+                },
+            )
         sent_bonegraft = sorted(
             bonegraft_items_by_key.values(),
-            key=lambda item: (not item.get("is_resolved", False), str(item.get("name", "")), str(item.get("presentation", "")), str(item.get("label", ""))),
+            key=lambda item: (
+                not item.get("is_resolved", False),
+                str(item.get("name", "")),
+                str(item.get("presentation", "")),
+                str(item.get("label", "")),
+            ),
         )
 
         sent_extra_items = [
@@ -1912,7 +2152,11 @@ def is_cancelled_case(case: dict[str, Any]) -> bool:
     prefix_token = normalize_code(case.get("prefix", ""))
     cancel_tokens = [status_token, smart_status_token, prefix_token]
     cancel_markers = ("CANCEL", "CANCELLED", "CANCELED", "CXL", "CNCL", "CNX")
-    if any(any(marker in token for marker in cancel_markers) for token in cancel_tokens if token):
+    if any(
+        any(marker in token for marker in cancel_markers)
+        for token in cancel_tokens
+        if token
+    ):
         return True
 
     has_sales = bool(normalize_code(case.get("sales_code", "")))
@@ -1956,11 +2200,15 @@ def attach_upcoming_set_suggestions(
     for row in set_booking_assignments or []:
         key = str(row.get("set_key", "")).strip()
         if key:
-            assignments_by_key[key] = dict(row, assignment_kind=row.get("assignment_kind") or "BOOKED")
+            assignments_by_key[key] = dict(
+                row, assignment_kind=row.get("assignment_kind") or "BOOKED"
+            )
     for row in set_out_assignments:
         key = str(row.get("set_key", "")).strip()
         if key:
-            assignments_by_key[key] = dict(row, assignment_kind=row.get("assignment_kind") or "OUT")
+            assignments_by_key[key] = dict(
+                row, assignment_kind=row.get("assignment_kind") or "OUT"
+            )
 
     candidate_sets_by_category: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for item in set_indexes["office_sets"] + set_indexes.get("standby_sets", []):
@@ -1974,7 +2222,8 @@ def attach_upcoming_set_suggestions(
     suggested_counts: Counter[str] = Counter()
     ordered_cases = sorted(
         (
-            case for case in parsed_cases
+            case
+            for case in parsed_cases
             if case.get("has_shorthand_only")
             and not is_cancelled_case(case)
             and case.get("delivery_date_obj")
@@ -2004,26 +2253,46 @@ def attach_upcoming_set_suggestions(
             for set_row in candidates:
                 set_key = str(set_row.get("_set_key", "")).strip()
                 assignment = assignments_by_key.get(set_key)
-                source_case = case_by_id.get(str(assignment.get("case_id", "")).strip(), {}) if assignment else {}
+                source_case = (
+                    case_by_id.get(str(assignment.get("case_id", "")).strip(), {})
+                    if assignment
+                    else {}
+                )
                 current_state = "OFFICE"
                 current_location = "OFFICE"
                 if assignment:
-                    current_state = str(assignment.get("assignment_kind", "")).strip().upper() or "OUT"
-                    current_location = str(assignment.get("location_now", "")).strip() or current_state
-                elif (
-                    str(set_row.get("home", "")).strip().upper() == "STANDBY"
-                    or is_standby_status(set_row.get("status", ""))
+                    current_state = (
+                        str(assignment.get("assignment_kind", "")).strip().upper()
+                        or "OUT"
+                    )
+                    current_location = (
+                        str(assignment.get("location_now", "")).strip() or current_state
+                    )
+                elif str(
+                    set_row.get("home", "")
+                ).strip().upper() == "STANDBY" or is_standby_status(
+                    set_row.get("status", "")
                 ):
                     current_state = "STANDBY"
                     current_location = "STANDBY"
 
-                source_delivery = parse_date(assignment.get("delivery_date")) if assignment else None
-                source_surgery = parse_date(assignment.get("surgery_date")) if assignment else None
-                source_return = parse_date(source_case.get("return_date", "")) if source_case else None
+                source_delivery = (
+                    parse_date(assignment.get("delivery_date")) if assignment else None
+                )
+                source_surgery = (
+                    parse_date(assignment.get("surgery_date")) if assignment else None
+                )
+                source_return = (
+                    parse_date(source_case.get("return_date", ""))
+                    if source_case
+                    else None
+                )
                 source_sales_code = str(source_case.get("sales_code", "")).strip()
                 source_cancelled = bool(source_case) and is_cancelled_case(source_case)
-                reusable_date = infer_set_reusable_date(source_case) if source_case else (
-                    source_surgery or source_delivery
+                reusable_date = (
+                    infer_set_reusable_date(source_case)
+                    if source_case
+                    else (source_surgery or source_delivery)
                 )
                 is_reused_candidate = suggested_counts.get(set_key, 0) > 0
 
@@ -2032,8 +2301,8 @@ def attach_upcoming_set_suggestions(
                     suggestion_rank = 0
                     suggestion_reason = (
                         "only set in office"
-                        if len(candidates) == 1 else
-                        "next available in office"
+                        if len(candidates) == 1
+                        else "next available in office"
                     )
                     confirmed = not is_reused_candidate
                 elif current_state == "STANDBY":
@@ -2042,8 +2311,12 @@ def attach_upcoming_set_suggestions(
                     suggestion_reason = "available in standby"
                     confirmed = False
                 elif current_state == "BOOKED":
-                    ready_by_target = reusable_date is not None and reusable_date <= target_delivery
-                    suggestion_kind = "BOOKED_READY" if ready_by_target else "BOOKED_LATER"
+                    ready_by_target = (
+                        reusable_date is not None and reusable_date <= target_delivery
+                    )
+                    suggestion_kind = (
+                        "BOOKED_READY" if ready_by_target else "BOOKED_LATER"
+                    )
                     suggestion_rank = 3 if ready_by_target else 5
                     if source_delivery and source_delivery <= target_delivery:
                         suggestion_reason = (
@@ -2053,12 +2326,14 @@ def attach_upcoming_set_suggestions(
                     else:
                         suggestion_reason = (
                             f"booked for {source_case.get('case_id', assignment.get('case_id', ''))}"
-                            if source_case or assignment else
-                            "booked for another case"
+                            if source_case or assignment
+                            else "booked for another case"
                         )
                     confirmed = False
                 else:
-                    ready_by_target = reusable_date is not None and reusable_date <= target_delivery
+                    ready_by_target = (
+                        reusable_date is not None and reusable_date <= target_delivery
+                    )
                     if source_cancelled:
                         suggestion_kind = "OUT_CANCELLED"
                         suggestion_rank = 2
@@ -2068,38 +2343,26 @@ def attach_upcoming_set_suggestions(
                     elif source_return:
                         suggestion_kind = "OUT_RETURNED"
                         suggestion_rank = 2
-                        suggestion_reason = (
-                            f"currently at {current_location}; return dated {format_date(source_return)}"
-                        )
+                        suggestion_reason = f"currently at {current_location}; return dated {format_date(source_return)}"
                     elif source_sales_code:
                         suggestion_kind = "OUT_SALES_POSTED"
                         suggestion_rank = 2
-                        suggestion_reason = (
-                            f"currently at {current_location}; sales posted on {source_case.get('case_id', assignment.get('case_id', ''))}"
-                        )
+                        suggestion_reason = f"currently at {current_location}; sales posted on {source_case.get('case_id', assignment.get('case_id', ''))}"
                     elif ready_by_target and source_surgery:
                         suggestion_kind = "OUT_SURGERY_DONE"
                         suggestion_rank = 2
-                        suggestion_reason = (
-                            f"currently at {current_location}; surgery done {format_date(source_surgery)}"
-                        )
+                        suggestion_reason = f"currently at {current_location}; surgery done {format_date(source_surgery)}"
                     elif ready_by_target and source_delivery:
                         suggestion_kind = "OUT_DELIVERED"
                         suggestion_rank = 3
-                        suggestion_reason = (
-                            f"currently at {current_location}; delivered {format_date(source_delivery)}"
-                        )
+                        suggestion_reason = f"currently at {current_location}; delivered {format_date(source_delivery)}"
                     else:
                         suggestion_kind = "OUT_WAITING"
                         suggestion_rank = 4
                         if source_surgery:
-                            suggestion_reason = (
-                                f"currently at {current_location}; surgery {format_date(source_surgery)}"
-                            )
+                            suggestion_reason = f"currently at {current_location}; surgery {format_date(source_surgery)}"
                         elif source_delivery:
-                            suggestion_reason = (
-                                f"currently at {current_location}; delivered {format_date(source_delivery)}"
-                            )
+                            suggestion_reason = f"currently at {current_location}; delivered {format_date(source_delivery)}"
                         else:
                             suggestion_reason = f"currently at {current_location}"
                     confirmed = False
@@ -2114,29 +2377,52 @@ def attach_upcoming_set_suggestions(
                     compact_set_id(set_row.get("id", "")),
                     str(set_row.get("uid", "")),
                 )
-                ranked_candidates.append((rank_key, {
-                    "category":             str(category).strip(),
-                    "set_key":              set_key,
-                    "set_uid":              str(set_row.get("uid", "")).strip(),
-                    "set_id":               str(set_row.get("id", "")).strip(),
-                    "set_display":          format_set_display(
-                        set_row.get("shorthand") or set_row.get("category"),
-                        set_row.get("id"),
-                    ),
-                    "current_state":        current_state,
-                    "current_location":     current_location,
-                    "suggestion_kind":      suggestion_kind,
-                    "suggestion_reason":    suggestion_reason,
-                    "confirmed":            confirmed,
-                    "source_case_id":       str(source_case.get("case_id", assignment.get("case_id", "")) if source_case or assignment else "").strip(),
-                    "source_hospital":      str(source_case.get("hospital", assignment.get("location_now", "")) if source_case or assignment else "").strip(),
-                    "source_delivery_date": format_date(source_delivery),
-                    "source_surgery_date":  format_date(source_surgery),
-                    "source_sales_code":    source_sales_code,
-                    "source_return_date":   format_date(source_return),
-                    "source_case_status":   str(source_case.get("status", assignment.get("case_status", "")) if source_case or assignment else "").strip(),
-                    "source_case_cancelled": source_cancelled,
-                }))
+                ranked_candidates.append(
+                    (
+                        rank_key,
+                        {
+                            "category": str(category).strip(),
+                            "set_key": set_key,
+                            "set_uid": str(set_row.get("uid", "")).strip(),
+                            "set_id": str(set_row.get("id", "")).strip(),
+                            "set_display": format_set_display(
+                                set_row.get("shorthand") or set_row.get("category"),
+                                set_row.get("id"),
+                            ),
+                            "current_state": current_state,
+                            "current_location": current_location,
+                            "suggestion_kind": suggestion_kind,
+                            "suggestion_reason": suggestion_reason,
+                            "confirmed": confirmed,
+                            "source_case_id": str(
+                                source_case.get(
+                                    "case_id", assignment.get("case_id", "")
+                                )
+                                if source_case or assignment
+                                else ""
+                            ).strip(),
+                            "source_hospital": str(
+                                source_case.get(
+                                    "hospital", assignment.get("location_now", "")
+                                )
+                                if source_case or assignment
+                                else ""
+                            ).strip(),
+                            "source_delivery_date": format_date(source_delivery),
+                            "source_surgery_date": format_date(source_surgery),
+                            "source_sales_code": source_sales_code,
+                            "source_return_date": format_date(source_return),
+                            "source_case_status": str(
+                                source_case.get(
+                                    "status", assignment.get("case_status", "")
+                                )
+                                if source_case or assignment
+                                else ""
+                            ).strip(),
+                            "source_case_cancelled": source_cancelled,
+                        },
+                    )
+                )
 
             if not ranked_candidates:
                 continue
@@ -2168,12 +2454,15 @@ def build_case_region_summary(
         sales_recorded = bool(normalize_code(case.get("sales_code", "")))
         cancelled = is_cancelled_case(case)
 
-        bucket = summary_by_region.setdefault(region, {
-            "region": region,
-            "total_cases": 0,
-            "cancelled_cases": 0,
-            "sales_cases": 0,
-        })
+        bucket = summary_by_region.setdefault(
+            region,
+            {
+                "region": region,
+                "total_cases": 0,
+                "cancelled_cases": 0,
+                "sales_cases": 0,
+            },
+        )
         bucket["total_cases"] += 1
         if cancelled:
             bucket["cancelled_cases"] += 1
@@ -2192,13 +2481,18 @@ def build_case_region_summary(
             }
 
     summary_rows: list[dict[str, Any]] = []
-    for row in sorted(summary_by_region.values(), key=lambda item: (-item["total_cases"], item["region"])):
+    for row in sorted(
+        summary_by_region.values(),
+        key=lambda item: (-item["total_cases"], item["region"]),
+    ):
         total = int(row["total_cases"])
         sales = int(row["sales_cases"])
-        summary_rows.append({
-            **row,
-            "sales_total_cases": f"{sales}/{total}" if total else "0/0",
-        })
+        summary_rows.append(
+            {
+                **row,
+                "sales_total_cases": f"{sales}/{total}" if total else "0/0",
+            }
+        )
 
     return summary_rows, case_region_meta
 
@@ -2218,19 +2512,23 @@ def build_archive_30d_summary(
     sets_delivered = 0
 
     for row in archive_rows:
-        row_date = parse_date(row_value(row, "surgery_date")) or parse_date(row_value(row, "delivery_date"))
+        row_date = parse_date(row_value(row, "surgery_date")) or parse_date(
+            row_value(row, "delivery_date")
+        )
         if row_date is None or not (window_start <= row_date <= today_kl):
             continue
         raw_hospital = row_value(row, "hospital")
         resolved_code, _ = resolve_hospital_code(raw_hospital, hospitals)
         hospital_meta = hospitals.get(resolved_code, {}) if resolved_code else {}
         region = str(hospital_meta.get("region", "")).strip() or "Unknown"
-        cancelled = is_cancelled_case({
-            "status": row_value(row, "status"),
-            "smart_status": row_value(row, "Smart Status"),
-            "prefix": row_value(row, "prefix"),
-            "sales_code": row_value(row, "sales_code"),
-        })
+        cancelled = is_cancelled_case(
+            {
+                "status": row_value(row, "status"),
+                "smart_status": row_value(row, "Smart Status"),
+                "prefix": row_value(row, "prefix"),
+                "sales_code": row_value(row, "sales_code"),
+            }
+        )
         total_cases += 1
         cases_by_region[region] += 1
         if cancelled:
@@ -2252,11 +2550,15 @@ def build_archive_30d_summary(
         "sets_delivered_30d": sets_delivered,
         "cases_by_region_30d": [
             {"region": region, "cases": count}
-            for region, count in sorted(cases_by_region.items(), key=lambda item: (-item[1], item[0]))
+            for region, count in sorted(
+                cases_by_region.items(), key=lambda item: (-item[1], item[0])
+            )
         ],
         "cancelled_by_region_30d": [
             {"region": region, "cancelled_cases": count}
-            for region, count in sorted(cancelled_by_region.items(), key=lambda item: (-item[1], item[0]))
+            for region, count in sorted(
+                cancelled_by_region.items(), key=lambda item: (-item[1], item[0])
+            )
         ],
     }
 
@@ -2271,23 +2573,23 @@ def build_case_buckets(
     tomorrow = today_kl + timedelta(days=1)
 
     buckets: dict[str, list[dict[str, Any]]] = {
-        "to_collect":          [],
-        "to_deliver":          [],
-        "to_check":            [],
-        "to_top_up":           [],
-        "to_follow_up":        [],
-        "delivered_today":     [],
+        "to_collect": [],
+        "to_deliver": [],
+        "to_check": [],
+        "to_top_up": [],
+        "to_follow_up": [],
+        "delivered_today": [],
         "to_deliver_tomorrow": [],
     }
 
     for case in parsed_cases:
         delivery_date = case["delivery_date_obj"]
-        surgery_date  = case["surgery_date_obj"]
-        sales_code    = normalize_code(case["sales_code"])
-        return_date   = normalize_code(case["return_date"])
-        status        = normalize_code(case["status"])
-        prefix        = normalize_code(case["prefix"])
-        cancelled     = is_cancelled_case(case)
+        surgery_date = case["surgery_date_obj"]
+        sales_code = normalize_code(case["sales_code"])
+        return_date = normalize_code(case["return_date"])
+        status = normalize_code(case["status"])
+        prefix = normalize_code(case["prefix"])
+        cancelled = is_cancelled_case(case)
 
         # Sales code recorded but equipment not yet returned
         if sales_code and not return_date:
@@ -2315,13 +2617,17 @@ def build_case_buckets(
             buckets["to_follow_up"].append(case)
 
         # Delivered today (UID confirmed)
-        if delivery_date == today_kl and case["has_uid_set"] and not case.get("is_booking_case"):
+        if (
+            delivery_date == today_kl
+            and case["has_uid_set"]
+            and not case.get("is_booking_case")
+        ):
             buckets["delivered_today"].append(case)
 
     def _strip(case: dict[str, Any]) -> dict[str, Any]:
         return {
             **serialize_case_common(case),
-            "plates":     case["plates_raw"],
+            "plates": case["plates_raw"],
             "powertools": case["powertools_raw"],
         }
 
@@ -2340,57 +2646,65 @@ def build_distance_rows(
         raw_code = case["hospital"]
         resolved_code, resolved_by = resolve_hospital_code(raw_code, hospitals)
         base_row = {
-            "route_group":           route_tag,
-            "case_id":               case["case_id"],
-            "hospital":              raw_code,
-            "resolved_by":           resolved_by,
-            "delivery_date":         case["delivery_date"],
-            "surgery_date":          case["surgery_date"],
-            "sets":                  case.get("sets", ""),
-            "plates":                case.get("plates", ""),
-            "sales_code":            case.get("sales_code", ""),
+            "route_group": route_tag,
+            "case_id": case["case_id"],
+            "hospital": raw_code,
+            "resolved_by": resolved_by,
+            "delivery_date": case["delivery_date"],
+            "surgery_date": case["surgery_date"],
+            "sets": case.get("sets", ""),
+            "plates": case.get("plates", ""),
+            "sales_code": case.get("sales_code", ""),
         }
 
         if resolved_code is None:
             unresolved[raw_code] += 1
-            rows.append({
-                **base_row,
-                "resolved_hospital":    "",
-                "hospital_name":        "Unknown hospital code",
-                "office_to_hospital_km":"",
-                "office_est_drive_km":  "",
-                "office_est_drive_min": "",
-                "tbs_to_hospital_km":   "",
-            })
+            rows.append(
+                {
+                    **base_row,
+                    "resolved_hospital": "",
+                    "hospital_name": "Unknown hospital code",
+                    "office_to_hospital_km": "",
+                    "office_est_drive_km": "",
+                    "office_est_drive_min": "",
+                    "tbs_to_hospital_km": "",
+                }
+            )
             continue
 
         meta = hospitals[resolved_code]
         lat, lng = float(meta["lat"]), float(meta["lng"])
-        straight  = haversine_km(OFFICE_COORDS[0], OFFICE_COORDS[1], lat, lng)
-        tbs_dist  = haversine_km(TBS_COORDS[0], TBS_COORDS[1], lat, lng)
-        drive_km  = estimated_drive_km(straight)
+        straight = haversine_km(OFFICE_COORDS[0], OFFICE_COORDS[1], lat, lng)
+        tbs_dist = haversine_km(TBS_COORDS[0], TBS_COORDS[1], lat, lng)
+        drive_km = estimated_drive_km(straight)
         drive_min = estimated_drive_minutes(drive_km)
 
-        rows.append({
-            **base_row,
-            "resolved_hospital":    resolved_code,
-            "hospital_name":        meta.get("name", ""),
-            "office_to_hospital_km":round(straight, 2),
-            "office_est_drive_km":  round(drive_km, 2),
-            "office_est_drive_min": round(drive_min, 1),
-            "tbs_to_hospital_km":   round(tbs_dist, 2),
-        })
+        rows.append(
+            {
+                **base_row,
+                "resolved_hospital": resolved_code,
+                "hospital_name": meta.get("name", ""),
+                "office_to_hospital_km": round(straight, 2),
+                "office_est_drive_km": round(drive_km, 2),
+                "office_est_drive_min": round(drive_min, 1),
+                "tbs_to_hospital_km": round(tbs_dist, 2),
+            }
+        )
 
-    rows.sort(key=lambda r: (
-        parse_date(r.get("delivery_date", "")) or date.max,
-        normalize_code(r.get("hospital", "")),
-        r.get("case_id", ""),
-    ))
+    rows.sort(
+        key=lambda r: (
+            parse_date(r.get("delivery_date", "")) or date.max,
+            normalize_code(r.get("hospital", "")),
+            r.get("case_id", ""),
+        )
+    )
     return rows, unresolved
+
 
 # ---------------------------------------------------------------------------
 # Main report builder
 # ---------------------------------------------------------------------------
+
 
 def build_operations_report(
     master_data_path: str | Path = DEFAULT_MASTER_DATA_PATH,
@@ -2400,16 +2714,18 @@ def build_operations_report(
 ) -> dict[str, Any]:
     today = today_kl or now_kl_date()
 
-    chosen_cases   = auto_source(cases_source,   DEFAULT_CASES_LOCAL,   DEFAULT_CASES_URL)
-    chosen_archive = auto_source(archive_source, DEFAULT_ARCHIVE_LOCAL, DEFAULT_ARCHIVE_URL)
+    chosen_cases = auto_source(cases_source, DEFAULT_CASES_LOCAL, DEFAULT_CASES_URL)
+    chosen_archive = auto_source(
+        archive_source, DEFAULT_ARCHIVE_LOCAL, DEFAULT_ARCHIVE_URL
+    )
 
-    master       = load_master_data(master_data_path)
-    cases_rows   = read_csv_records(chosen_cases)
+    master = load_master_data(master_data_path)
+    cases_rows = read_csv_records(chosen_cases)
     archive_rows = read_csv_records(chosen_archive)
 
-    set_indexes   = build_set_indexes(master["SETS"])
-    case_summary  = summarize_cases(cases_rows, set_indexes, today)
-    set_outputs   = build_set_outputs(
+    set_indexes = build_set_indexes(master["SETS"])
+    case_summary = summarize_cases(cases_rows, set_indexes, today)
+    set_outputs = build_set_outputs(
         set_indexes,
         case_summary["set_out_assignments"],
         case_summary.get("set_booking_assignments", []),
@@ -2423,7 +2739,7 @@ def build_operations_report(
     )
 
     plate_inventory = build_plate_inventory(master["PLATES"])
-    plate_outputs   = build_plate_outputs(case_summary["parsed_cases"], plate_inventory)
+    plate_outputs = build_plate_outputs(case_summary["parsed_cases"], plate_inventory)
 
     powertool_outputs = build_powertool_outputs(
         case_summary["parsed_cases"], archive_rows, set_indexes, today
@@ -2457,16 +2773,28 @@ def build_operations_report(
 
     hospital_directory: list[dict[str, Any]] = [
         {
-            "hosp_code":              code,
-            "name":                   str(info.get("name", "")),
-            "region":                 str(info.get("region", "")),
-            "lat":                    float(info.get("lat", 0)),
-            "lng":                    float(info.get("lng", 0)),
-            "office_to_hospital_km":  round(
-                haversine_km(OFFICE_COORDS[0], OFFICE_COORDS[1], float(info.get("lat",0)), float(info.get("lng",0))), 2
+            "hosp_code": code,
+            "name": str(info.get("name", "")),
+            "region": str(info.get("region", "")),
+            "lat": float(info.get("lat", 0)),
+            "lng": float(info.get("lng", 0)),
+            "office_to_hospital_km": round(
+                haversine_km(
+                    OFFICE_COORDS[0],
+                    OFFICE_COORDS[1],
+                    float(info.get("lat", 0)),
+                    float(info.get("lng", 0)),
+                ),
+                2,
             ),
-            "tbs_to_hospital_km":     round(
-                haversine_km(TBS_COORDS[0], TBS_COORDS[1], float(info.get("lat",0)), float(info.get("lng",0))), 2
+            "tbs_to_hospital_km": round(
+                haversine_km(
+                    TBS_COORDS[0],
+                    TBS_COORDS[1],
+                    float(info.get("lat", 0)),
+                    float(info.get("lng", 0)),
+                ),
+                2,
             ),
         }
         for code, info in sorted(master["HOSPITALS"].items())
@@ -2474,15 +2802,24 @@ def build_operations_report(
 
     unknown = {
         "set_tokens": sorted(
-            [{"token": t, "count": c} for t, c in case_summary["unknown_set_tokens"].items()],
+            [
+                {"token": t, "count": c}
+                for t, c in case_summary["unknown_set_tokens"].items()
+            ],
             key=lambda x: (-x["count"], x["token"]),
         ),
         "plate_tokens": sorted(
-            [{"token": t, "count": c} for t, c in plate_outputs["unknown_plate_tokens"].items()],
+            [
+                {"token": t, "count": c}
+                for t, c in plate_outputs["unknown_plate_tokens"].items()
+            ],
             key=lambda x: (-x["count"], x["token"]),
         ),
         "powertool_tokens": sorted(
-            [{"token": t, "count": c} for t, c in powertool_outputs["unknown_powertool_tokens"].items()],
+            [
+                {"token": t, "count": c}
+                for t, c in powertool_outputs["unknown_powertool_tokens"].items()
+            ],
             key=lambda x: (-x["count"], x["token"]),
         ),
         "hospitals_for_routes": sorted(
@@ -2494,91 +2831,101 @@ def build_operations_report(
     cases_all = [
         {
             **serialize_case_common(c),
-            "has_uid_set":             c["has_uid_set"],
-            "has_active_uid_set":      c.get("has_active_uid_set", False),
-            "has_shorthand_only":      c["has_shorthand_only"],
-            "is_booking_case":         c.get("is_booking_case", False),
-            "booking_hold_active":     c.get("booking_hold_active", False),
-            "booking_hold_start":      c.get("booking_hold_start", ""),
+            "has_uid_set": c["has_uid_set"],
+            "has_active_uid_set": c.get("has_active_uid_set", False),
+            "has_shorthand_only": c["has_shorthand_only"],
+            "is_booking_case": c.get("is_booking_case", False),
+            "booking_hold_active": c.get("booking_hold_active", False),
+            "booking_hold_start": c.get("booking_hold_start", ""),
             "returned_set_uid_tokens": c.get("returned_set_uid_tokens", []),
-            "active_set_uid_tokens":   c.get("active_set_uid_tokens", []),
-            "booked_set_uid_tokens":   c.get("booked_set_uid_tokens", []),
-            **case_region_meta.get(c["case_id"], {
-                "region": "Unknown",
-                "resolved_hospital": "",
-                "resolved_by": "unresolved",
-                "hospital_name": "",
-                "is_cancelled_case": False,
-                "has_sales": False,
-            }),
-            **case_sent_items.get(c["case_id"], {
-                "sent_sets": [],
-                "sent_plates": [],
-                "sent_powertools": [],
-                "sent_bonegraft": [],
-                "sent_extra_items": [],
-            }),
+            "active_set_uid_tokens": c.get("active_set_uid_tokens", []),
+            "booked_set_uid_tokens": c.get("booked_set_uid_tokens", []),
+            **case_region_meta.get(
+                c["case_id"],
+                {
+                    "region": "Unknown",
+                    "resolved_hospital": "",
+                    "resolved_by": "unresolved",
+                    "hospital_name": "",
+                    "is_cancelled_case": False,
+                    "has_sales": False,
+                },
+            ),
+            **case_sent_items.get(
+                c["case_id"],
+                {
+                    "sent_sets": [],
+                    "sent_plates": [],
+                    "sent_powertools": [],
+                    "sent_bonegraft": [],
+                    "sent_extra_items": [],
+                },
+            ),
         }
         for c in case_summary["parsed_cases"]
     ]
 
     return {
         "meta": {
-            "timezone":    "Asia/Kuala_Lumpur",
-            "today_kl":    str(today),
+            "timezone": "Asia/Kuala_Lumpur",
+            "today_kl": str(today),
             "tomorrow_kl": str(today + timedelta(days=1)),
             "office_coords": {"lat": OFFICE_COORDS[0], "lng": OFFICE_COORDS[1]},
-            "tbs_coords":    {"lat": TBS_COORDS[0],    "lng": TBS_COORDS[1]},
+            "tbs_coords": {"lat": TBS_COORDS[0], "lng": TBS_COORDS[1]},
             "sources": {
                 "master_data": str(master_data_path),
-                "cases":       chosen_cases,
-                "archive":     chosen_archive,
+                "cases": chosen_cases,
+                "archive": chosen_archive,
             },
             "counts": {
-                "cases_rows":      len(cases_rows),
-                "archive_rows":    len(archive_rows),
-                "master_sets":     len(master["SETS"]),
-                "master_plates":   len(master["PLATES"]),
-                "master_hospitals":len(master["HOSPITALS"]),
+                "cases_rows": len(cases_rows),
+                "archive_rows": len(archive_rows),
+                "master_sets": len(master["SETS"]),
+                "master_plates": len(master["PLATES"]),
+                "master_hospitals": len(master["HOSPITALS"]),
             },
         },
         "kpis": {
-            "cases_total":        len(case_summary["parsed_cases"]),
-            "sets_out":           len(case_summary["set_out_assignments"]),
-            "powertools_out":     len(powertool_outputs["powertool_delivered"]),
-            "to_collect":         len(case_buckets["to_collect"]),
-            "to_deliver":         len(case_buckets["to_deliver"]),
-            "to_check":           len(case_buckets["to_check"]),
-            "to_top_up":          len(case_buckets["to_top_up"]),
-            "to_follow_up":       len(case_buckets["to_follow_up"]),
-            "delivered_today":    len(case_buckets["delivered_today"]),
-            "to_deliver_tomorrow":len(case_buckets["to_deliver_tomorrow"]),
+            "cases_total": len(case_summary["parsed_cases"]),
+            "sets_out": len(case_summary["set_out_assignments"]),
+            "powertools_out": len(powertool_outputs["powertool_delivered"]),
+            "to_collect": len(case_buckets["to_collect"]),
+            "to_deliver": len(case_buckets["to_deliver"]),
+            "to_check": len(case_buckets["to_check"]),
+            "to_top_up": len(case_buckets["to_top_up"]),
+            "to_follow_up": len(case_buckets["to_follow_up"]),
+            "delivered_today": len(case_buckets["delivered_today"]),
+            "to_deliver_tomorrow": len(case_buckets["to_deliver_tomorrow"]),
         },
-        "set_category_availability":      set_outputs["set_category_availability"],
-        "set_office_status":              set_outputs["set_office_status"],
-        "plate_size_range_availability":  plate_outputs["plate_size_range_availability"],
-        "plate_drawer_detail":            plate_outputs["plate_drawer_detail"],
-        "plate_uid_summary":              plate_outputs["plate_uid_summary"],
-        "plate_out_cases":                plate_outputs["plate_out_cases"],
-        "powertool_category_availability":powertool_outputs["powertool_category_availability"],
-        "powertool_uid_availability":     powertool_outputs["powertool_uid_availability"],
-        "powertool_delivered":            powertool_outputs["powertool_delivered"],
-        "powertool_usage_30d":            powertool_outputs["powertool_usage_30d"],
-        "hospital_directory":             hospital_directory,
-        "case_region_summary":            case_region_summary,
-        "archive_30d_summary":           archive_30d_summary,
-        "cases_all":                      cases_all,
-        "case_buckets":                   case_buckets,
+        "set_category_availability": set_outputs["set_category_availability"],
+        "set_office_status": set_outputs["set_office_status"],
+        "plate_size_range_availability": plate_outputs["plate_size_range_availability"],
+        "plate_drawer_detail": plate_outputs["plate_drawer_detail"],
+        "plate_uid_summary": plate_outputs["plate_uid_summary"],
+        "plate_out_cases": plate_outputs["plate_out_cases"],
+        "powertool_category_availability": powertool_outputs[
+            "powertool_category_availability"
+        ],
+        "powertool_uid_availability": powertool_outputs["powertool_uid_availability"],
+        "powertool_delivered": powertool_outputs["powertool_delivered"],
+        "powertool_usage_30d": powertool_outputs["powertool_usage_30d"],
+        "hospital_directory": hospital_directory,
+        "case_region_summary": case_region_summary,
+        "archive_30d_summary": archive_30d_summary,
+        "cases_all": cases_all,
+        "case_buckets": case_buckets,
         "distance_routes": {
             "to_deliver_tomorrow": deliver_tomorrow_rows,
-            "delivered_today":     delivered_today_rows,
+            "delivered_today": delivered_today_rows,
         },
         "unknown": unknown,
     }
 
+
 # ---------------------------------------------------------------------------
 # CSV / JSON file writers
 # ---------------------------------------------------------------------------
+
 
 def write_csv_table(path: Path, rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -2596,40 +2943,52 @@ def write_csv_table(path: Path, rows: list[dict[str, Any]]) -> None:
         writer = csv.DictWriter(fh, fieldnames=fieldnames)
         writer.writeheader()
         for row in rows:
-            writer.writerow({
-                k: json.dumps(v, ensure_ascii=True) if isinstance(v, (dict, list)) else v
-                for k, v in row.items()
-            })
+            writer.writerow(
+                {
+                    k: json.dumps(v, ensure_ascii=True)
+                    if isinstance(v, (dict, list))
+                    else v
+                    for k, v in row.items()
+                }
+            )
 
 
-def write_report_files(report: dict[str, Any], output_dir: str | Path) -> dict[str, str]:
+def write_report_files(
+    report: dict[str, Any], output_dir: str | Path
+) -> dict[str, str]:
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     paths: dict[str, str] = {}
 
     json_path = out / "operations_report.json"
-    json_path.write_text(json.dumps(report, indent=2, ensure_ascii=True), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(report, indent=2, ensure_ascii=True), encoding="utf-8"
+    )
     paths["operations_report_json"] = str(json_path)
 
     tables: dict[str, list[dict[str, Any]]] = {
-        "set_category_availability.csv":      report["set_category_availability"],
-        "set_office_status.csv":              report["set_office_status"],
-        "plate_size_range_availability.csv":  report["plate_size_range_availability"],
-        "plate_drawer_detail.csv":            report["plate_drawer_detail"],
-        "plate_uid_summary.csv":              report["plate_uid_summary"],
-        "plate_out_cases.csv":                report["plate_out_cases"],
-        "powertool_category_availability.csv":report["powertool_category_availability"],
-        "powertool_uid_availability.csv":     report["powertool_uid_availability"],
-        "powertool_delivered.csv":            report["powertool_delivered"],
-        "powertool_usage_30d.csv":            report["powertool_usage_30d"],
-        "hospital_directory.csv":             report["hospital_directory"],
-        "cases_all.csv":                      report.get("cases_all", []),
-        "distance_to_deliver_tomorrow.csv":   report["distance_routes"]["to_deliver_tomorrow"],
-        "distance_delivered_today.csv":       report["distance_routes"]["delivered_today"],
-        "unknown_set_tokens.csv":             report["unknown"]["set_tokens"],
-        "unknown_plate_tokens.csv":           report["unknown"]["plate_tokens"],
-        "unknown_powertool_tokens.csv":       report["unknown"]["powertool_tokens"],
-        "unknown_route_hospitals.csv":        report["unknown"]["hospitals_for_routes"],
+        "set_category_availability.csv": report["set_category_availability"],
+        "set_office_status.csv": report["set_office_status"],
+        "plate_size_range_availability.csv": report["plate_size_range_availability"],
+        "plate_drawer_detail.csv": report["plate_drawer_detail"],
+        "plate_uid_summary.csv": report["plate_uid_summary"],
+        "plate_out_cases.csv": report["plate_out_cases"],
+        "powertool_category_availability.csv": report[
+            "powertool_category_availability"
+        ],
+        "powertool_uid_availability.csv": report["powertool_uid_availability"],
+        "powertool_delivered.csv": report["powertool_delivered"],
+        "powertool_usage_30d.csv": report["powertool_usage_30d"],
+        "hospital_directory.csv": report["hospital_directory"],
+        "cases_all.csv": report.get("cases_all", []),
+        "distance_to_deliver_tomorrow.csv": report["distance_routes"][
+            "to_deliver_tomorrow"
+        ],
+        "distance_delivered_today.csv": report["distance_routes"]["delivered_today"],
+        "unknown_set_tokens.csv": report["unknown"]["set_tokens"],
+        "unknown_plate_tokens.csv": report["unknown"]["plate_tokens"],
+        "unknown_powertool_tokens.csv": report["unknown"]["powertool_tokens"],
+        "unknown_route_hospitals.csv": report["unknown"]["hospitals_for_routes"],
     }
     for bucket_name, rows in report["case_buckets"].items():
         tables[f"cases_{bucket_name}.csv"] = rows
@@ -2641,18 +3000,22 @@ def write_report_files(report: dict[str, Any], output_dir: str | Path) -> dict[s
 
     return paths
 
+
 # ---------------------------------------------------------------------------
 # CLI entry point
 # ---------------------------------------------------------------------------
+
 
 def _cli() -> None:
     parser = argparse.ArgumentParser(
         description="Build operations report from master_data + cases/archive CSVs"
     )
     parser.add_argument("--master-data", default=str(DEFAULT_MASTER_DATA_PATH))
-    parser.add_argument("--cases",   default=None, help="Cases CSV path or URL")
+    parser.add_argument("--cases", default=None, help="Cases CSV path or URL")
     parser.add_argument("--archive", default=None, help="Archive CSV path or URL")
-    parser.add_argument("--out",     default=str(DEFAULT_OUTPUT_DIR), help="Output directory")
+    parser.add_argument(
+        "--out", default=str(DEFAULT_OUTPUT_DIR), help="Output directory"
+    )
     args = parser.parse_args()
 
     report = build_operations_report(
