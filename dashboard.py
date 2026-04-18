@@ -914,7 +914,7 @@ inv_tabs = st.tabs(["🧰 Sets", "🦾 Plates", "🔌 Powertools"])
 # ══════════════════════════════════════════════════════════════════════════════
 # SETS TAB
 # ══════════════════════════════════════════════════════════════════════════════
-with inv_tabs[1]:
+with inv_tabs[0]:
     set_avail      = pd.DataFrame(report.get("set_category_availability", []))
     set_status_all = pd.DataFrame(report.get("set_office_status", []))
     pt_avail_df    = pd.DataFrame(report.get("powertool_category_availability", []))
@@ -1334,7 +1334,7 @@ with inv_tabs[1]:
 # ══════════════════════════════════════════════════════════════════════════════
 # PLATES TAB
 # ══════════════════════════════════════════════════════════════════════════════
-with inv_tabs[2]:
+with inv_tabs[1]:
     plate_sum = pd.DataFrame(report.get("plate_uid_summary", []))
     if plate_sum.empty:
         st.info("No plate data.")
