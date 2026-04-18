@@ -2103,7 +2103,7 @@ PLATES = {
     '52205365': {'uid': 'DFIBIII', 'set': '2.7-4.0', 'proper_name': 'VA 2.7/3.5mm Distal Lateral Fibular Plates III', 'screw_sizes': '2.7mm, 3.5mm', 'size_range': 'Standard', 'left_right': 'R', 'size': '5H', 'location': 'D1, D2, D3'},
     '52205367': {'uid': 'DFIBIII', 'set': '2.7-4.0', 'proper_name': 'VA 2.7/3.5mm Distal Lateral Fibular Plates III', 'screw_sizes': '2.7mm, 3.5mm', 'size_range': 'Standard', 'left_right': 'R', 'size': '7H', 'location': 'D1, D2, D3'},
     '52205369': {'uid': 'DFIBIII', 'set': '2.7-4.0', 'proper_name': 'VA 2.7/3.5mm Distal Lateral Fibular Plates III', 'screw_sizes': '2.7mm, 3.5mm', 'size_range': 'LONG', 'left_right': 'R', 'size': '8H', 'location': 'D1, D2, D3'},
-    '52200634': {'uid': 'DMH', 'set': '2.7-4.0', 'proper_name': 'VA 2.7/3.5mm Distal Medial Humeral Plates', 'screw_sizes': '2.7mm, 3.5mm', 'size_range': 'Standard', 'left_right': 'L', 'size': '4H', 'location': 'D1, D2[no_stock]'},
+    '52200634': {'uid': 'DMH', 'set': '2.7-4.0', 'proper_name': 'VA 2.7/3.5mm Distal Medial Humeral Plates', 'screw_sizes': '2.7mm, 3.5mm', 'size_range': 'Standard', 'left_right': 'L', 'size': '4H', 'location': 'D1, D2'},
     '52200636': {'uid': 'DMH', 'set': '2.7-4.0', 'proper_name': 'VA 2.7/3.5mm Distal Medial Humeral Plates', 'screw_sizes': '2.7mm, 3.5mm', 'size_range': 'Standard', 'left_right': 'L', 'size': '6H', 'location': 'D1, D2'},
     '52200638': {'uid': 'DMH', 'set': '2.7-4.0', 'proper_name': 'VA 2.7/3.5mm Distal Medial Humeral Plates', 'screw_sizes': '2.7mm, 3.5mm', 'size_range': 'Standard', 'left_right': 'L', 'size': '8H', 'location': 'D1, D2'},
     '52200664': {'uid': 'DMH', 'set': '2.7-4.0', 'proper_name': 'VA 2.7/3.5mm Distal Medial Humeral Plates', 'screw_sizes': '2.7mm, 3.5mm', 'size_range': 'Standard', 'left_right': 'R', 'size': '4H', 'location': 'D1, D2'},
@@ -3682,6 +3682,7 @@ HOSPITALS = {
     'HTAN': {'name': 'Hospital Tuanku Ampuan Najihah', 'lat': 2.7411, 'lng': 102.2472, 'region': 'NS'},
     'HJEM': {'name': 'Hospital Jempol', 'lat': 2.7931, 'lng': 102.3925, 'region': 'NS'},
     'HPD': {'name': 'Hospital Port Dickson', 'lat': 2.4594, 'lng': 101.8547, 'region': 'NS'},
+    'HTAMPIN': {'name': 'Hospital Port Dickson', 'lat': 2.4912, 'lng': 102.2370, 'region': 'NS'}, 
 
     # MELAKA [cite: 1]
     'HMLK': {'name': 'Hospital Melaka', 'lat': 2.2172, 'lng': 102.2619, 'region': 'Melaka'},
