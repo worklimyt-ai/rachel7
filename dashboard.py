@@ -1516,7 +1516,7 @@ with inv_tabs[2]:
 # ══════════════════════════════════════════════════════════════════════════════
 # POWERTOOLS TAB
 # ══════════════════════════════════════════════════════════════════════════════
-with inv_tabs[3]:
+with inv_tabs[2]:
     pt_avail = pd.DataFrame(report.get("powertool_category_availability",[]))
     pt_del   = pd.DataFrame(report.get("powertool_delivered",[]))
     pt_uid   = pd.DataFrame(report.get("powertool_uid_availability",[]))
