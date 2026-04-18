@@ -284,13 +284,13 @@ SETS = [
     {"category": "P5503", "id": "1007", "home": "OFFICE", "status": "", "uid": "P55031007", "shorthand": "P5503"},
     {"category": "P5503", "id": "1008", "home": "OFFICE", "status": "", "uid": "P55031008", "shorthand": "P5503"},
     {"category": "P5503", "id": "1009", "home": "PENANG", "status": "", "uid": "P55031009", "shorthand": "P5503"},
-    {"category": "P5503", "id": "10004", "home": "OFFICE", "status": "STANDBY", "uid": "P550310004", "shorthand": "P5503"},
+    {"category": "P5503", "id": "10004", "home": "OFFICE", "status": "", "uid": "P550310004", "shorthand": "P5503"},
     {"category": "P5503", "id": "10006", "home": "HCJ", "status": "", "uid": "P550310006", "shorthand": "P5503"},
     {"category": "P5503", "id": "10008", "home": "OFFICE", "status": "", "uid": "P550310008", "shorthand": "P5503"},
     {"category": "P5400", "id": "10007", "home": "OFFICE", "status": "", "uid": "P540010007", "shorthand": "P5400"},
     {"category": "P5400", "id": "10008", "home": "OFFICE", "status": "", "uid": "P540010008", "shorthand": "P5400"},
     {"category": "P5400", "id": "1012", "home": "OFFICE", "status": "NA", "uid": "P54001012", "shorthand": "P5400"},
-    {"category": "P5400", "id": "3002", "home": "OFFICE", "status": "NA custom hold", "uid": "P54003002", "shorthand": "P5400"},
+    {"category": "P5400", "id": "3002", "home": "OFFICE", "status": "", "uid": "P54003002", "shorthand": "P5400"},
     {"category": "P5400", "id": "3003", "home": "OFFICE", "status": "NA custom hold", "uid": "P54003003", "shorthand": "P5400"},
     {"category": "P8400", "id": "3003", "home": "OFFICE", "status": "", "uid": "P84003003", "shorthand": "P8400"}
 ]
