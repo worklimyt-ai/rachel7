@@ -1327,8 +1327,6 @@ def build_plate_outputs(
     uid_ranges = plate_inventory["uid_ranges"]
     uid_alias_map = plate_inventory["uid_alias_map"]
     unknown_plate_tokens: Counter[str] = Counter()
-    drawer_available_by_bucket: dict[tuple[str, str], dict[str, int]] = {}
-    drawer_used_by_bucket: dict[tuple[str, str], defaultdict[str, int]] = {}
 
     for case in parsed_cases:
         if not case["has_uid_set"]:
@@ -1374,10 +1372,74 @@ def build_plate_outputs(
     ):
         drawer_keys = sorted(bucket["drawer_size_map"].keys(), key=drawer_sort_key)
         stock_keys = sorted(bucket["stock_size_map"].keys(), key=drawer_sort_key)
+        out_case_details: list[dict[str, Any]] = []
+        drawer_case_map: dict[str, list[dict[str, Any]]] = {
+            drawer: [] for drawer in drawer_keys
+        }
+        stock_targets = list(stock_keys) if stock_keys else ["STOCK"]
+        stock_case_map: dict[str, list[dict[str, Any]]] = {
+            stock: [] for stock in stock_targets
+        }
+        next_drawer_idx = 0
+        next_stock_idx = 0
+        bucket_drawer_capacity = {
+            drawer: 1 if any(not row.get("no_stock") for row in rows) else 0
+            for drawer, rows in bucket["drawer_size_detail"].items()
+        }
+        bucket_drawer_used: defaultdict[str, int] = defaultdict(int)
+
+        for d in bucket["out_details"]:
+            case_detail_base = {
+                "case_id": d["case_id"],
+                "hospital": d["hospital"],
+                "delivery_date": d["delivery_date"],
+                "surgery_date": d["surgery_date"],
+                "raw_plate_token": d["raw_plate_token"],
+                "case_status": d.get("case_status", ""),
+                "requested_drawer": d.get("requested_drawer"),
+            }
+            assign_to_stock = bool(d["from_stock"]) or not drawer_keys
+            requested_drawer = d.get("requested_drawer")
+            target_drawer = None
+            if (
+                not assign_to_stock
+                and requested_drawer
+                and requested_drawer in drawer_case_map
+            ):
+                if bucket_drawer_used[requested_drawer] < bucket_drawer_capacity.get(
+                    requested_drawer, 0
+                ):
+                    target_drawer = requested_drawer
+
+            if not assign_to_stock and target_drawer is None:
+                for offset in range(len(drawer_keys)):
+                    candidate_idx = (next_drawer_idx + offset) % len(drawer_keys)
+                    candidate = drawer_keys[candidate_idx]
+                    if bucket_drawer_used[candidate] < bucket_drawer_capacity.get(
+                        candidate, 0
+                    ):
+                        target_drawer = candidate
+                        next_drawer_idx = (candidate_idx + 1) % len(drawer_keys)
+                        break
+
+            if target_drawer is not None:
+                case_detail = {**case_detail_base, "from_stock": False}
+                out_case_details.append(case_detail)
+                drawer_case_map[target_drawer].append(case_detail)
+                bucket_drawer_used[target_drawer] += 1
+                continue
+
+            case_detail = {**case_detail_base, "from_stock": True}
+            out_case_details.append(case_detail)
+            target_stock = stock_targets[min(next_stock_idx, len(stock_targets) - 1)]
+            stock_case_map[target_stock].append(case_detail)
+            if next_stock_idx < len(stock_targets) - 1:
+                next_stock_idx += 1
+
         td = len(bucket["drawer_locations"])
         ts = len(bucket["stock_locations"])
-        od = bucket["out_drawer_units"]
-        out_stock = bucket["out_stock_units"]
+        od = sum(len(items) for items in drawer_case_map.values())
+        out_stock = sum(len(items) for items in stock_case_map.values())
         total = td + ts
         out = od + out_stock
         available_units = max(total - out, 0)
@@ -1387,80 +1449,6 @@ def build_plate_outputs(
             range_status = "OUT OF STOCK"
         else:
             range_status = "PARTIAL"
-
-        out_case_details: list[dict[str, Any]] = []
-        drawer_case_map: dict[str, list[dict[str, Any]]] = {
-            drawer: [] for drawer in drawer_keys
-        }
-        stock_case_map: dict[str, list[dict[str, Any]]] = {
-            stock: [] for stock in stock_keys
-        }
-        next_drawer_idx = 0
-        next_stock_idx = 0
-        bucket_key = (uid, size_range)
-        bucket_drawer_capacity = drawer_available_by_bucket.setdefault(
-            bucket_key,
-            {
-                drawer: sum(1 for row in rows if not row.get("no_stock"))
-                for drawer, rows in bucket["drawer_size_detail"].items()
-            },
-        )
-        bucket_drawer_used = drawer_used_by_bucket.setdefault(
-            bucket_key,
-            defaultdict(int),
-        )
-
-        for d in bucket["out_details"]:
-            case_detail = {
-                "case_id": d["case_id"],
-                "hospital": d["hospital"],
-                "surgery_date": d["surgery_date"],
-                "case_status": d.get("case_status", ""),
-                "from_stock": d["from_stock"],
-                "requested_drawer": d.get("requested_drawer"),
-            }
-            out_case_details.append(case_detail)
-            if d["from_stock"] or not drawer_keys:
-                if stock_keys:
-                    target_stock = stock_keys[min(next_stock_idx, len(stock_keys) - 1)]
-                    stock_case_map[target_stock].append(case_detail)
-                    if next_stock_idx < len(stock_keys) - 1:
-                        next_stock_idx += 1
-                continue
-            requested_drawer = d.get("requested_drawer")
-            target_drawer = None
-            if requested_drawer and requested_drawer in drawer_case_map:
-                if bucket_drawer_used[requested_drawer] < bucket_drawer_capacity.get(
-                    requested_drawer, 0
-                ):
-                    target_drawer = requested_drawer
-
-            auto_assigned = False
-            if target_drawer is None:
-                auto_assigned = True
-                found_drawer = None
-                for offset in range(len(drawer_keys)):
-                    candidate_idx = (next_drawer_idx + offset) % len(drawer_keys)
-                    candidate = drawer_keys[candidate_idx]
-                    if bucket_drawer_used[candidate] < bucket_drawer_capacity.get(
-                        candidate, 0
-                    ):
-                        found_drawer = candidate
-                        next_drawer_idx = candidate_idx
-                        break
-
-                if found_drawer is not None:
-                    target_drawer = found_drawer
-                else:
-                    target_drawer = drawer_keys[
-                        min(next_drawer_idx, len(drawer_keys) - 1)
-                    ]
-
-            if target_drawer:
-                drawer_case_map[target_drawer].append(case_detail)
-                bucket_drawer_used[target_drawer] += 1
-                if auto_assigned and next_drawer_idx < len(drawer_keys) - 1:
-                    next_drawer_idx += 1
 
         row = {
             "plate_uid": uid,
@@ -1519,7 +1507,10 @@ def build_plate_outputs(
                     "drawer_out_case_details": drawer_case_map.get(drawer, []),
                 }
             )
-        for stock_loc in stock_keys:
+        visible_stock_keys = stock_keys or [
+            stock for stock, items in stock_case_map.items() if items
+        ]
+        for stock_loc in visible_stock_keys:
             raw_detail = sorted(
                 bucket["stock_size_detail"].get(stock_loc, []),
                 key=lambda x: plate_detail_sort_key(uid, x),
@@ -1552,7 +1543,7 @@ def build_plate_outputs(
                 }
             )
 
-        for detail in bucket["out_details"]:
+        for detail in out_case_details:
             plate_out_cases.append(
                 {
                     "plate_uid": uid,

@@ -1536,20 +1536,31 @@ with inv_tabs[1]:
                 sr_map = udl[drawer]
 
                 # Collect unique out cases
-                seen: set[str] = set()
-                unique_out: list[dict] = []
+                unique_out_by_case: dict[str, dict] = {}
                 for sr, srd in sr_map.items():
                     for cd in (srd.get("out_case_details") or []):
-                        k = "|".join([sr,str(cd.get("case_id","")),str(cd.get("hospital","")),
-                                      str(cd.get("surgery_date","")),"1" if cd.get("from_stock") else "0",str(cd.get("case_status",""))])
-                        if k in seen: continue
-                        seen.add(k)
-                        unique_out.append({
-                            "size_range":sr,"case_id":cd.get("case_id",""),"hospital":cd.get("hospital",""),
-                            "surgery_date":cd.get("surgery_date",""),"case_status":cd.get("case_status",""),
-                            "from_stock":bool(cd.get("from_stock",False)),
-                            "date_value":_parse_ui_date(str(cd.get("surgery_date",""))) or date.max,
-                        })
+                        case_key = "|".join([
+                            str(cd.get("case_id","")),
+                            str(cd.get("hospital","")),
+                            str(cd.get("surgery_date","")),
+                            "1" if cd.get("from_stock") else "0",
+                            str(cd.get("case_status","")),
+                        ])
+                        item = unique_out_by_case.setdefault(
+                            case_key,
+                            {
+                                "size_ranges": set(),
+                                "case_id": cd.get("case_id",""),
+                                "hospital": cd.get("hospital",""),
+                                "surgery_date": cd.get("surgery_date",""),
+                                "case_status": cd.get("case_status",""),
+                                "from_stock": bool(cd.get("from_stock",False)),
+                                "date_value": _parse_ui_date(str(cd.get("surgery_date",""))) or date.max,
+                            },
+                        )
+                        item["size_ranges"].add(str(sr))
+                        item["from_stock"] = item["from_stock"] or bool(cd.get("from_stock", False))
+                unique_out = list(unique_out_by_case.values())
 
                 hdr_cls = "dh-out" if unique_out else ""
                 row_has_out = row_has_out or bool(unique_out)
@@ -1562,9 +1573,15 @@ with inv_tabs[1]:
                     surg = cd["surgery_date"] or "—"
                     tc   = "dht-stk" if cd["from_stock"] else ""
                     stks = "<span class='dh-out-stock'>[stk]</span>" if cd["from_stock"] else ""
+                    size_range_label = "/".join(
+                        sorted(
+                            {str(sr).strip() for sr in cd.get("size_ranges", set()) if str(sr).strip()},
+                            key=lambda sr: _SR_ORDER.index(sr) if sr in _SR_ORDER else 99,
+                        )
+                    ) or "PLATE"
                     out_tags += (
                         f"<span class='dh-out-tag {tc}'>"
-                        f"<span class='dh-out-sr'>{escape(str(cd['size_range']))} out</span>"
+                        f"<span class='dh-out-sr'>{escape(size_range_label)} out</span>"
                         f"<span class='out-sep'>→</span>"
                         f"{_hospital_with_led(hosp, surg, variant='plate', sales_code=case_sales_lookup.get(str(cd.get('case_id','')).strip(),''), case_status=cd.get('case_status',''))}"
                         f"{stks}</span>"
