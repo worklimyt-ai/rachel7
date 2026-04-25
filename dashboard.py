@@ -757,6 +757,16 @@ def _triage_table(df: pd.DataFrame) -> str:
         "</div>"
     )
 
+def _render_html_fragment(html: str) -> None:
+    markup = str(html or "").strip()
+    if not markup:
+        return
+    html_renderer = getattr(st, "html", None)
+    if callable(html_renderer):
+        html_renderer(markup)
+    else:
+        st.markdown(markup, unsafe_allow_html=True)
+
 # ── Meeple track ──────────────────────────────────────────────────────────────
 def _render_meeple_steps(steps: list, accent: str) -> str:
     last_done = -1
@@ -782,17 +792,19 @@ def _render_meeple_steps(steps: list, accent: str) -> str:
         d_obj = _parse_ui_date(date_str)
         date_display = d_obj.strftime("%-d %b") if d_obj else ""
         parts.append(
-            f'<div class="meeple-step">'
-            f'<div class="meeple-dot-row">{dot_html}</div>'
-            f'<div class="{pill_cls}" style="{pill_style}">{escape(short)}</div>'
-            f'<div class="meeple-step-label" style="color:{label_color}">{escape(label)}</div>'
-            f'<div class="meeple-step-date">{escape(date_display)}</div>'
-            f'</div>'
+            "\n".join([
+                '<div class="meeple-step">',
+                f'<div class="meeple-dot-row">{dot_html}</div>',
+                f'<div class="{pill_cls}" style="{pill_style}">{escape(short)}</div>',
+                f'<div class="meeple-step-label" style="color:{label_color}">{escape(label)}</div>',
+                f'<div class="meeple-step-date">{escape(date_display)}</div>',
+                '</div>',
+            ])
         )
         if i < len(steps) - 1:
             parts.append(f'<div class="meeple-connector" style="background:{accent if is_done else THEME_LINE_SOFT}"></div>')
     parts.append('</div>')
-    return "".join(parts)
+    return "\n".join(parts)
 
 
 def _build_meeple_steps(*, prefix, delivery, surgery, sales_code, status, is_booking, return_date=""):
@@ -1264,23 +1276,42 @@ with inv_tabs[0]:
                     next_html = f"<div class='out-next-wrap'>{''.join(next_parts)}</div>" if next_parts else ""
                     if assignment == "BOOKED":
                         lines.append(
-                            f"<div class='out-line'>"
-                            f"<span class='out-order'>#{idx}</span>"
-                            f"<span class='out-tag out-tag-booked'>BOOKED</span> "
-                            f"<span class='out-set'>{o['Set']}</span><span class='out-sep'> → </span>"
-                            f"{_hospital_with_led(o['Hospital'], o.get('Delivery Date',''), is_booked=True, sales_code=o.get('Sales Code',''), case_status=o.get('Case Status',''))}"
-                            f"{meeple}{next_html}</div>"
+                            "\n".join([
+                                "<div class='out-line'>",
+                                f"<span class='out-order'>#{idx}</span>",
+                                "<span class='out-tag out-tag-booked'>BOOKED</span> ",
+                                f"<span class='out-set'>{o['Set']}</span><span class='out-sep'> → </span>",
+                                _hospital_with_led(
+                                    o['Hospital'],
+                                    o.get('Delivery Date',''),
+                                    is_booked=True,
+                                    sales_code=o.get('Sales Code',''),
+                                    case_status=o.get('Case Status',''),
+                                ),
+                                meeple,
+                                next_html,
+                                "</div>",
+                            ])
                         )
                     else:
                         lines.append(
-                            f"<div class='out-line'>"
-                            f"<span class='out-order'>#{idx}</span>"
-                            f"<span class='out-tag'>OUT</span> "
-                            f"<span class='out-set'>{o['Set']}</span><span class='out-sep'> → </span>"
-                            f"{_hospital_with_led(o['Hospital'], o['Surgery Date'], sales_code=o.get('Sales Code',''), case_status=o.get('Case Status',''))}"
-                            f"{meeple}{next_html}</div>"
+                            "\n".join([
+                                "<div class='out-line'>",
+                                f"<span class='out-order'>#{idx}</span>",
+                                "<span class='out-tag'>OUT</span> ",
+                                f"<span class='out-set'>{o['Set']}</span><span class='out-sep'> → </span>",
+                                _hospital_with_led(
+                                    o['Hospital'],
+                                    o['Surgery Date'],
+                                    sales_code=o.get('Sales Code',''),
+                                    case_status=o.get('Case Status',''),
+                                ),
+                                meeple,
+                                next_html,
+                                "</div>",
+                            ])
                         )
-                out_lines = "".join(lines)
+                out_lines = "\n".join(lines)
             else:
                 out_lines = "<span style='color:#9ca3af;font-size:12px;font-style:italic'>all in office</span>"
 
@@ -1290,7 +1321,7 @@ with inv_tabs[0]:
             )
 
         if filtered_summary:
-            st.markdown("".join(_set_row_html(r) for r in filtered_summary), unsafe_allow_html=True)
+            _render_html_fragment("\n".join(_set_row_html(r) for r in filtered_summary))
         else:
             st.info("No matching sets.")
 
