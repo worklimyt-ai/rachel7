@@ -855,15 +855,15 @@ def _render_recent_case_history(entries: list[dict], accent: str, *, title: str 
     ]
     for idx, entry in enumerate(display_entries):
         hospital_name = str(entry.get("hospital_name", "") or entry.get("hospital_code", "") or "—").strip()
-        pill_text = _history_hospital_short(entry)
+        hospital_short = str(entry.get("hospital_code", "") or "").strip().upper() or _history_hospital_short(entry)
         d_obj = _parse_ui_date(str(entry.get("date", "")).strip())
         date_display = d_obj.strftime("%-d %b") if d_obj else str(entry.get("date", "") or "—").strip()
         parts.append(
             "\n".join([
                 '<div class="meeple-step is-history">',
                 '<div class="meeple-dot-row"></div>',
-                f'<div class="meeple-pill mp-done" style="background:{accent};border-color:{accent};color:#fff" title="{escape(hospital_name)} · {escape(date_display)}">{escape(pill_text)}</div>',
-                f'<div class="meeple-step-label">{escape(hospital_name)}</div>',
+                f'<div class="meeple-pill mp-done" style="background:{accent};border-color:{accent};color:#fff" title="{escape(hospital_name)} · {escape(date_display)}">{escape(hospital_short)}</div>',
+                f'<div class="meeple-step-label" title="{escape(hospital_name)}">{escape(hospital_short)}</div>',
                 f'<div class="meeple-step-date">{escape(date_display)}</div>',
                 '</div>',
             ])
@@ -1531,6 +1531,7 @@ with inv_tabs[1]:
             # Drawers
             drawer_blocks = ""
             row_has_out = False
+            row_meeple_seen_cases: set[str] = set()
             for drawer in sorted(udl.keys(), key=_dsort):
                 sr_map = udl[drawer]
 
@@ -1556,7 +1557,6 @@ with inv_tabs[1]:
 
                 out_tags = ""
                 out_meeples = ""
-                meeple_seen_cases: set[str] = set()  # one meeple per case_id
                 for cd in ordered_uo:
                     hosp = cd["hospital"] or "—"
                     surg = cd["surgery_date"] or "—"
@@ -1570,8 +1570,8 @@ with inv_tabs[1]:
                         f"{stks}</span>"
                     )
                     cid = str(cd.get("case_id","")).strip()
-                    if cid and cid not in meeple_seen_cases:
-                        meeple_seen_cases.add(cid)
+                    if cid and cid not in row_meeple_seen_cases:
+                        row_meeple_seen_cases.add(cid)
                         mp = _meeple_track_for_case_id(cid, surgery=str(cd.get("surgery_date","")), case_status=str(cd.get("case_status","")))
                         out_meeples += (
                             f"<div style='padding:4px 10px 6px 10px;border-top:1px solid #f3f4f6'>"

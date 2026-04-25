@@ -101,7 +101,7 @@ SETS = [
     {"category": "CANNA 2.5", "id": "06", "home": "OFFICE", "uid": "C2.506", "shorthand": "C2.5"},
     {"category": "CANNA 2.5", "id": "07", "home": "UNCF", "uid": "C2.507", "shorthand": "C2.5"},
     {"category": "CANNA 2.5", "id": "08", "home": "OFFICE", "uid": "C2.508", "shorthand": "C2.5"},
-    {"category": "CANNA 2.5", "id": "09", "home": "CAC", "uid": "C2.509", "shorthand": "C2.5"},
+    {"category": "CANNA 2.5", "id": "09", "home": "KAT", "uid": "C2.509", "shorthand": "C2.5"},
     {"category": "CANNA 3.5", "id": "01", "home": "OFFICE", "uid": "C3.501", "shorthand": "C3.5"},
     {"category": "CANNA 3.5", "id": "02", "home": "OFFICE", "uid": "C3.502", "shorthand": "C3.5"},
     {"category": "CANNA 3.5", "id": "03", "home": "ABMC", "uid": "C3.503", "shorthand": "C3.5", "last_maintained": "2026-03-24"},
@@ -292,7 +292,7 @@ SETS = [
     {"category": "P5400", "id": "1012", "home": "OFFICE", "status": "NA", "uid": "P54001012", "shorthand": "P5400"},
     {"category": "P5400", "id": "3002", "home": "OFFICE", "status": "", "uid": "P54003002", "shorthand": "P5400"},
     {"category": "P5400", "id": "3003", "home": "OFFICE", "status": "NA custom hold", "uid": "P54003003", "shorthand": "P5400"},
-    {"category": "P8400", "id": "3003", "home": "OFFICE", "status": "", "uid": "P84003003", "shorthand": "P8400"}
+    {"category": "P8400", "id": "3003", "home": "OFFICE", "status": "NA", "uid": "P84003003", "shorthand": "P8400"}
 ]
 SET_CONTAINERS=[
 {'1.5-2.0': [{'Product Code': '52401506', 'Quantity': 4},
