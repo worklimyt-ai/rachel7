@@ -295,6 +295,16 @@ details[data-testid="stExpander"] summary * {
 .meeple-connector  { flex: 1 1 0; min-width: 8px; height: 3px; border-radius: 999px; margin-top: 19px; align-self: flex-start; background: var(--line-soft); }
 .meeple-terminal { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .05em; margin: 8px 0 2px 0; background: var(--glaucous-soft); color: var(--green-blue-deep); border: 1px solid var(--glaucous-light); }
 .meeple-terminal.mp-pp  { background:#f5ead2; color:var(--buff-deep); border:2px solid #c8aa79; }
+.idle-history-wrap { margin-top: 8px; padding: 8px 10px 10px 10px; border-radius: 12px; background: rgba(255,250,241,.7); border: 1px dashed var(--glaucous-light); }
+.idle-history-title { font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-muted); margin-bottom: 4px; }
+.idle-history-note { color: var(--ink-muted); font-size: 12px; font-style: italic; margin-top: 6px; }
+.meeple-track.is-history { margin: 4px 0 0 0; }
+.meeple-track.is-history .meeple-step { min-width: 92px; gap: 4px; }
+.meeple-track.is-history .meeple-dot-row { height: 0; margin-bottom: 0; }
+.meeple-track.is-history .meeple-pill { min-width: 60px; height: 24px; font-size: 9px; }
+.meeple-track.is-history .meeple-step-label { max-width: 92px; font-size: 10px; min-height: 24px; color: var(--ink-main); }
+.meeple-track.is-history .meeple-step-date { font-size: 11px; min-height: 14px; color: var(--ink-muted); }
+.meeple-track.is-history .meeple-connector { margin-top: 11px; }
 
 /* ── Upcoming chips ── */
 .upcoming-chip-wrap { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
@@ -512,6 +522,16 @@ report       = st.session_state["report"]
 meta         = report["meta"]
 case_rows_all = report.get("cases_all", [])
 cases_all_df  = pd.DataFrame(case_rows_all)
+set_recent_history_lookup = {
+    str(key).strip().upper(): list(value)
+    for key, value in dict(report.get("set_recent_history", {}) or {}).items()
+    if str(key).strip()
+}
+plate_recent_history_lookup = {
+    str(key).strip().upper(): list(value)
+    for key, value in dict(report.get("plate_recent_history", {}) or {}).items()
+    if str(key).strip()
+}
 
 now_kl = datetime.now(KL_TZ)
 try:
@@ -804,6 +824,53 @@ def _render_meeple_steps(steps: list, accent: str) -> str:
         if i < len(steps) - 1:
             parts.append(f'<div class="meeple-connector" style="background:{accent if is_done else THEME_LINE_SOFT}"></div>')
     parts.append('</div>')
+    return "\n".join(parts)
+
+
+def _history_hospital_short(entry: dict) -> str:
+    code = str(entry.get("hospital_code", "") or "").strip().upper()
+    if code:
+        return code[:8]
+    hospital_name = str(entry.get("hospital_name", "") or "").strip()
+    if not hospital_name:
+        return "—"
+    tokens = re.findall(r"[A-Z0-9]+", hospital_name.upper())
+    if not tokens:
+        return hospital_name[:8].upper()
+    if len(tokens) == 1:
+        return tokens[0][:8]
+    return "".join(token[0] for token in tokens[:6])[:8] or tokens[0][:8]
+
+
+def _render_recent_case_history(entries: list[dict], accent: str, *, title: str = "Last 7 cases") -> str:
+    history_entries = [entry for entry in list(entries or []) if isinstance(entry, dict)]
+    if not history_entries:
+        return ""
+
+    display_entries = list(reversed(history_entries[:7]))
+    parts = [
+        "<div class='idle-history-wrap'>",
+        f"<div class='idle-history-title'>{escape(title)}</div>",
+        '<div class="meeple-track is-history">',
+    ]
+    for idx, entry in enumerate(display_entries):
+        hospital_name = str(entry.get("hospital_name", "") or entry.get("hospital_code", "") or "—").strip()
+        pill_text = _history_hospital_short(entry)
+        d_obj = _parse_ui_date(str(entry.get("date", "")).strip())
+        date_display = d_obj.strftime("%-d %b") if d_obj else str(entry.get("date", "") or "—").strip()
+        parts.append(
+            "\n".join([
+                '<div class="meeple-step is-history">',
+                '<div class="meeple-dot-row"></div>',
+                f'<div class="meeple-pill mp-done" style="background:{accent};border-color:{accent};color:#fff" title="{escape(hospital_name)} · {escape(date_display)}">{escape(pill_text)}</div>',
+                f'<div class="meeple-step-label">{escape(hospital_name)}</div>',
+                f'<div class="meeple-step-date">{escape(date_display)}</div>',
+                '</div>',
+            ])
+        )
+        if idx < len(display_entries) - 1:
+            parts.append(f'<div class="meeple-connector" style="background:{accent}55"></div>')
+    parts.extend(["</div>", "</div>"])
     return "\n".join(parts)
 
 
@@ -1141,6 +1208,10 @@ with inv_tabs[0]:
             total_val = int(total_lookup.get(cn, r["In Office"]+r["Out"]+r.get("Booked",0)))
             total_val = total_val if total_val > 0 else (r["In Office"]+r["Out"]+r.get("Booked",0))
             badge = avail_badge(avail_val, total_val)
+            recent_history_html = _render_recent_case_history(
+                set_recent_history_lookup.get(str(cn).upper().strip(), []),
+                THEME_GLAUCOUS,
+            )
 
             oi = list(r.get("OfficeItems",[])); si = list(r.get("StandbyItems",[]))
             in_html = ""
@@ -1313,7 +1384,12 @@ with inv_tabs[0]:
                         )
                 out_lines = "\n".join(lines)
             else:
-                out_lines = "<span style='color:#9ca3af;font-size:12px;font-style:italic'>all in office</span>"
+                out_lines = (
+                    "<div class='idle-history-note'>all in office</div>"
+                    f"{recent_history_html}"
+                    if recent_history_html
+                    else "<span style='color:#9ca3af;font-size:12px;font-style:italic'>all in office</span>"
+                )
 
             return (
                 f"<div class='inv-row' style='display:flex;align-items:flex-start'>"
@@ -1436,6 +1512,7 @@ with inv_tabs[1]:
 
         def _plate_row_html(row: pd.Series) -> str:
             uid   = row["plate_uid"]
+            uid_norm = str(uid).strip().upper()
             badge = avail_badge(int(row["available_units"]), int(row["total_units"]))
             udl   = _dl.get(uid, {})
 
@@ -1453,6 +1530,7 @@ with inv_tabs[1]:
 
             # Drawers
             drawer_blocks = ""
+            row_has_out = False
             for drawer in sorted(udl.keys(), key=_dsort):
                 sr_map = udl[drawer]
 
@@ -1473,6 +1551,7 @@ with inv_tabs[1]:
                         })
 
                 hdr_cls = "dh-out" if unique_out else ""
+                row_has_out = row_has_out or bool(unique_out)
                 ordered_uo = sorted(unique_out, key=lambda x: (x["date_value"],x.get("case_id","")))
 
                 out_tags = ""
@@ -1523,25 +1602,41 @@ with inv_tabs[1]:
                 )
 
                 drc_cls = "drc-out" if unique_out else ""
-                drawer_blocks += (
-                    f"<div class='dr-block'>"
-                    f"<div class='dr-hdr {hdr_cls}'><span>{drawer}</span><span class='dh-out-list'>{out_tags}</span></div>"
-                    f"{out_meeples}"
-                    f"<div class='dr-chips {drc_cls}'>{chips_html}</div>"
-                    f"</div>"
-                )
+                drawer_blocks += "\n".join([
+                    "<div class='dr-block'>",
+                    f"<div class='dr-hdr {hdr_cls}'><span>{drawer}</span><span class='dh-out-list'>{out_tags}</span></div>",
+                    out_meeples,
+                    f"<div class='dr-chips {drc_cls}'>{chips_html}</div>",
+                    "</div>",
+                ])
             # end for drawer
 
-            return (
-                f"<div class='inv-row'>"
-                f"<div style='display:flex;justify-content:space-between;align-items:center'>"
-                f"<span class='inv-name'>{row['proper_name']}</span><span>{badge}</span></div>"
-                f"<div class='inv-sub'>{uid} &nbsp;·&nbsp; {row['screw_sizes'] or ''}</div>"
-                f"<div class='inv-sub'>{row.get('size_ranges','') or ''} &nbsp;·&nbsp; {row.get('status_note','READY') or 'READY'}</div>"
-                f"{legend_html}{drawer_blocks}</div>"
+            recent_history_html = ""
+            if not row_has_out:
+                recent_history_html = _render_recent_case_history(
+                    plate_recent_history_lookup.get(uid_norm, []),
+                    THEME_BUFF,
+                )
+            history_block = (
+                "<div class='idle-history-note'>all drawers in office</div>"
+                f"{recent_history_html}"
+                if not row_has_out
+                else ""
             )
 
-        st.markdown("".join(_plate_row_html(r) for _,r in plate_sum.iterrows()), unsafe_allow_html=True)
+            return "\n".join([
+                "<div class='inv-row'>",
+                "<div style='display:flex;justify-content:space-between;align-items:center'>",
+                f"<span class='inv-name'>{row['proper_name']}</span><span>{badge}</span></div>",
+                f"<div class='inv-sub'>{uid} &nbsp;·&nbsp; {row['screw_sizes'] or ''}</div>",
+                f"<div class='inv-sub'>{row.get('size_ranges','') or ''} &nbsp;·&nbsp; {row.get('status_note','READY') or 'READY'}</div>",
+                legend_html,
+                history_block,
+                drawer_blocks,
+                "</div>",
+            ])
+
+        _render_html_fragment("\n".join(_plate_row_html(r) for _,r in plate_sum.iterrows()))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1666,7 +1761,8 @@ with inv_tabs[2]:
                 ol = "<span style='color:#9ca3af;font-size:12px;font-style:italic'>all in office</span>"
             return f"<div class='inv-row' style='display:flex;align-items:flex-start'>{lc}<div style='flex:1'>{ol}</div></div>"
 
-        if pt_sum_rows: st.markdown("".join(_pt_html(r) for r in pt_sum_rows), unsafe_allow_html=True)
+        if pt_sum_rows:
+            _render_html_fragment("\n".join(_pt_html(r) for r in pt_sum_rows))
         else: st.info("No matching powertools.")
 
 # ══════════════════════════════════════════════════════════════════════════════

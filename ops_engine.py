@@ -2146,6 +2146,158 @@ def build_case_sent_item_details(
     return case_items
 
 
+def _build_inventory_history_cases(
+    parsed_cases: list[dict[str, Any]],
+    plate_inventory: dict[str, Any],
+    hospitals: dict[str, dict[str, Any]],
+    today_kl: date,
+) -> list[dict[str, Any]]:
+    case_sent_items = build_case_sent_item_details(
+        parsed_cases,
+        plate_inventory,
+        {"powertool_delivered": []},
+    )
+    _, case_region_meta = build_case_region_summary(parsed_cases, hospitals)
+    history_rows: list[dict[str, Any]] = []
+
+    for case in parsed_cases:
+        case_id = str(case.get("case_id", "")).strip()
+        surgery_date = str(case.get("surgery_date", "")).strip()
+        delivery_date = str(case.get("delivery_date", "")).strip()
+        sort_date = (
+            case.get("surgery_date_obj")
+            or parse_date(surgery_date)
+            or case.get("delivery_date_obj")
+            or parse_date(delivery_date)
+        )
+        if sort_date is None or sort_date > today_kl:
+            continue
+
+        meta = case_region_meta.get(case_id, {})
+        if meta.get("is_cancelled_case", False):
+            continue
+
+        case_items = case_sent_items.get(case_id, {})
+        set_categories = sorted(
+            {
+                normalize_code(category)
+                for category in case.get("set_categories", [])
+                if str(category).strip()
+            }
+        )
+        sent_plates = [
+            dict(item)
+            for item in case_items.get("sent_plates", [])
+            if isinstance(item, dict)
+        ]
+        if not set_categories and not sent_plates:
+            continue
+
+        hospital_code = (
+            str(meta.get("resolved_hospital", "")).strip()
+            or str(case.get("hospital", "")).strip()
+        )
+        hospital_name = (
+            str(meta.get("hospital_name", "")).strip() or hospital_code or "—"
+        )
+        plate_uids = sorted(
+            {
+                normalize_plate_code(item.get("plate_uid", ""))
+                for item in sent_plates
+                if normalize_plate_code(item.get("plate_uid", ""))
+            }
+        )
+        signature_parts = [
+            normalize_code(case.get("patient_doctor", "")),
+            normalize_code(hospital_code),
+            surgery_date,
+            delivery_date,
+            ",".join(set_categories),
+            ",".join(plate_uids),
+        ]
+        history_rows.append(
+            {
+                "case_id": case_id,
+                "signature": "|".join(signature_parts),
+                "sort_date": sort_date,
+                "hospital_code": hospital_code,
+                "hospital_name": hospital_name,
+                "date": surgery_date or delivery_date or format_date(sort_date),
+                "set_categories": set_categories,
+                "plate_uids": plate_uids,
+            }
+        )
+
+    return history_rows
+
+
+def build_inventory_recent_histories(
+    current_cases: list[dict[str, Any]],
+    archive_rows: list[dict[str, str]],
+    set_indexes: dict[str, Any],
+    plate_inventory: dict[str, Any],
+    hospitals: dict[str, dict[str, Any]],
+    today_kl: date,
+    limit: int = 7,
+) -> dict[str, dict[str, list[dict[str, str]]]]:
+    history_rows = _build_inventory_history_cases(
+        current_cases,
+        plate_inventory,
+        hospitals,
+        today_kl,
+    )
+    if archive_rows:
+        archive_summary = summarize_cases(archive_rows, set_indexes, today_kl)
+        history_rows.extend(
+            _build_inventory_history_cases(
+                archive_summary["parsed_cases"],
+                plate_inventory,
+                hospitals,
+                today_kl,
+            )
+        )
+
+    ordered_rows = sorted(
+        history_rows,
+        key=lambda item: (item["sort_date"], item["signature"]),
+        reverse=True,
+    )
+
+    set_recent_history: dict[str, list[dict[str, str]]] = defaultdict(list)
+    plate_recent_history: dict[str, list[dict[str, str]]] = defaultdict(list)
+    seen_sets: dict[str, set[str]] = defaultdict(set)
+    seen_plates: dict[str, set[str]] = defaultdict(set)
+
+    for row in ordered_rows:
+        entry = {
+            "hospital_code": str(row.get("hospital_code", "")).strip(),
+            "hospital_name": str(row.get("hospital_name", "")).strip() or "—",
+            "date": str(row.get("date", "")).strip(),
+        }
+        signature = str(row.get("signature", "")).strip()
+
+        for category in row.get("set_categories", []):
+            key = normalize_code(category)
+            if not key or signature in seen_sets[key]:
+                continue
+            seen_sets[key].add(signature)
+            if len(set_recent_history[key]) < limit:
+                set_recent_history[key].append(dict(entry))
+
+        for plate_uid in row.get("plate_uids", []):
+            key = normalize_plate_code(plate_uid)
+            if not key or signature in seen_plates[key]:
+                continue
+            seen_plates[key].add(signature)
+            if len(plate_recent_history[key]) < limit:
+                plate_recent_history[key].append(dict(entry))
+
+    return {
+        "set_recent_history": dict(set_recent_history),
+        "plate_recent_history": dict(plate_recent_history),
+    }
+
+
 def is_cancelled_case(case: dict[str, Any]) -> bool:
     status_token = normalize_code(case.get("status", ""))
     smart_status_token = normalize_code(case.get("smart_status", ""))
@@ -2754,6 +2906,14 @@ def build_operations_report(
         case_summary["parsed_cases"],
         master["HOSPITALS"],
     )
+    recent_histories = build_inventory_recent_histories(
+        case_summary["parsed_cases"],
+        archive_rows,
+        set_indexes,
+        plate_inventory,
+        master["HOSPITALS"],
+        today,
+    )
     archive_30d_summary = build_archive_30d_summary(
         archive_rows,
         master["HOSPITALS"],
@@ -2899,10 +3059,12 @@ def build_operations_report(
         },
         "set_category_availability": set_outputs["set_category_availability"],
         "set_office_status": set_outputs["set_office_status"],
+        "set_recent_history": recent_histories["set_recent_history"],
         "plate_size_range_availability": plate_outputs["plate_size_range_availability"],
         "plate_drawer_detail": plate_outputs["plate_drawer_detail"],
         "plate_uid_summary": plate_outputs["plate_uid_summary"],
         "plate_out_cases": plate_outputs["plate_out_cases"],
+        "plate_recent_history": recent_histories["plate_recent_history"],
         "powertool_category_availability": powertool_outputs[
             "powertool_category_availability"
         ],
