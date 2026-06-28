@@ -4,6 +4,8 @@ This guide explains the text formats the parser accepts from the Google Sheets c
 
 ## General Rules
 
+- The case sheet can use either the older `delivery_date` / `surgery_date` / `return_date` headers or the newer `Delivery` / `Surgery` / `RETURN` headers.
+- Use `CHECK DATE` for returned sets. It is the date the sets are back in the office, checked/restored, and available for the next use.
 - Use `;` to separate multiple `sets`, `sets_returned`, and `bonegraft` values.
 - Use `;` or `/` to separate multiple `plates`.
 - Use spaces, `,`, `/`, or `;` to separate multiple `powertools`.

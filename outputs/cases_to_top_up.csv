@@ -1,4 +1,4 @@
-case_id,prefix,hospital,patient_doctor,delivery_date,surgery_date,sales_code,return_date,status,smart_status,sets_raw,sets,sets_returned_raw,sets_returned,sets_outstanding_raw,sets_outstanding,set_categories,plates_raw,powertools_raw,bonegraft_raw,extra_items_raw,suggested_sets,suggested_sets_summary,plates,powertools
-C056,PC,HTJ,MUTHAYEE,,25/02/2026,SC61/02,,,⚪ PENDING ALLOCATION,PFN09,PFN (9),,,,,"[""PFN""]",,P5503P,,,[],,,P5503P
-C057,PC,HCJ,MASNI,,26/02/2026,,,,⚪ PENDING ALLOCATION,PFN12,PFN (12),,,PFN12,PFN (12),"[""PFN""]",,P55031010,,,[],,,P55031010
-C058,PS,HMLK,HAERREY,,26/02/2026,,,,⚪ PENDING ALLOCATION,FNS,FNS (?),,,FNS,FNS (?),"[""FNS""]",,,,,[],,,
+case_id,prefix,hospital,patient_doctor,delivery_date,surgery_date,sales_code,return_date,check_date,is_checked,sets_available,status,smart_status,sets_raw,sets,sets_returned_raw,sets_returned,sets_outstanding_raw,sets_outstanding,set_categories,plates_raw,powertools_raw,bonegraft_raw,extra_items_raw,suggested_sets,suggested_sets_summary,plates,powertools
+C031,PK,"QUEENELIZABETHHOSPITAL,KOTAKINABALU",EBAR,16/04/2026,,,,,False,False,,,C4.010;2.730;,C4.0 (10); 2.7 (30),,,2.730;C4.010,2.7 (30); C4.0 (10),"[""2.7-4.0"", ""CANNA 4.0""]",DFIBII;DFIBIII,,,,[],,DFIBII;DFIBIII,
+C032,PK,"QUEENELIZABETHHOSPITAL,KOTAKINABALU",RIZALMAN,16/04/2026,,,,,False,False,,,2.005,2.0 (5),,,2.005,2.0 (5),"[""2.0-2.4""]",,,,,[],,,
+C038,PN,HSNZ,ARSHAD,,08/04/2026,,,,False,False,,,ILNT-IPOH,ILNT-IPOH,,,,,[],,,,,[],,,

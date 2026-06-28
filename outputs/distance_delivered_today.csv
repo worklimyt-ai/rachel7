@@ -1,0 +1,5 @@
+route_group,case_id,hospital,resolved_by,delivery_date,surgery_date,sets,plates,sales_code,resolved_hospital,hospital_name,office_to_hospital_km,office_est_drive_km,office_est_drive_min,tbs_to_hospital_km
+delivered_today,C004,COLUMBIAASIAHOSPITALSETAPAK,name_exact,03/05/2026,03/05/2026,2.7 (29),DSC;MSC;DIA,,CAS,Columbia Asia Setapak,8.78,11.41,12.4,13.98
+delivered_today,C003,HOSPITALAMPANG,name_exact,03/05/2026,07/05/2026,ILNT (2),,,HA,Hospital Ampang,15.49,20.14,22.0,7.85
+delivered_today,C005,HTAR,exact,03/05/2026,,3.5 (1),DLF,,HTAR,"Hospital Tengku Ampuan Rahimah, Klang",27.23,35.39,38.6,30.22
+delivered_today,C006,KUALATERENGGANU,alias:KUALATERENGGANU->HSNZ,03/05/2026,06/05/2026,ILNT (7),,,HSNZ,Hospital Sultanah Nur Zahirah (Kuala Terengganu),291.25,378.62,413.0,296.45

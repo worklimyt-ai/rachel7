@@ -62,7 +62,17 @@ HOSPITAL_ALIASES: dict[str, str] = {
     "HUKMHCTM": "HUKM",
     "SMCI": "SMSJ",
     "GLENEAGLES": "GHKL",
+    "QUEENELIZABETHHOSPITALKOTAKINABALU": "HQE1",
+    "QUEENELIZABETHHOSPITALII": "HQE2",
+    "QUEENELIZABETHHOSPITAL2": "HQE2",
+    "KUALATERENGGANU": "HSNZ",
+    "PARKCITYMEDICALCENTRE": "DPCMC",
 }
+
+DELIVERY_DATE_FIELDS = ("delivery_date", "delivery")
+SURGERY_DATE_FIELDS = ("surgery_date", "surgery")
+RETURN_DATE_FIELDS = ("return_date", "return")
+CHECK_DATE_FIELDS = ("check_date", "check date", "checked_date", "checked", "cssd_time")
 
 # ---------------------------------------------------------------------------
 # Date / time helpers
@@ -136,6 +146,10 @@ def row_value(row: dict[str, Any], *names: str) -> str:
         if key in normalized:
             return str(normalized[key] or "")
     return ""
+
+
+def row_date(row: dict[str, Any], *names: str) -> date | None:
+    return parse_date(row_value(row, *names))
 
 
 def canonical_powertool_uid(value: Any) -> str:
@@ -384,6 +398,9 @@ def serialize_case_common(case: dict[str, Any]) -> dict[str, Any]:
         "surgery_date": case["surgery_date"],
         "sales_code": case["sales_code"],
         "return_date": case["return_date"],
+        "check_date": case.get("check_date", ""),
+        "is_checked": case.get("is_checked", False),
+        "sets_available": case.get("sets_available", False),
         "status": case["status"],
         "smart_status": case["smart_status"],
         "sets_raw": case["sets_raw"],
@@ -412,6 +429,30 @@ def is_standby_status(value: Any) -> bool:
 
 def is_powertool_category(category: str) -> bool:
     return bool(re.match(r"^P\d", normalize_code(category)))
+
+
+def hospital_lookup_tokens(value: Any) -> list[str]:
+    tokens: list[str] = []
+    for token in (normalize_code(value), normalize_header_name(value)):
+        if token and token not in tokens:
+            tokens.append(token)
+    return tokens
+
+
+def hospital_name_variants(value: Any) -> set[str]:
+    token = normalize_header_name(value)
+    if not token:
+        return set()
+    variants = {token}
+    without_hospital = token.replace("HOSPITAL", "")
+    if without_hospital:
+        variants.add(without_hospital)
+    roman_suffixes = {"III": "3", "II": "2", "I": "1"}
+    for suffix, number in roman_suffixes.items():
+        for variant in list(variants):
+            if variant.endswith(suffix):
+                variants.add(f"{variant[:-len(suffix)]}{number}")
+    return variants
 
 
 # ---------------------------------------------------------------------------
@@ -489,19 +530,66 @@ def parse_plate_request(token: str) -> dict[str, Any] | None:
 def resolve_hospital_code(
     raw_code: Any, hospitals: dict[str, Any]
 ) -> tuple[str | None, str]:
-    code = normalize_code(raw_code)
-    if not code:
+    tokens = hospital_lookup_tokens(raw_code)
+    if not tokens:
         return None, "empty"
-    if code in hospitals:
-        return code, "exact"
-    if code in HOSPITAL_ALIASES:
-        alias = HOSPITAL_ALIASES[code]
-        if alias in hospitals:
-            return alias, f"alias:{code}->{alias}"
-    if f"H{code}" in hospitals:
-        return f"H{code}", "prefixed_H"
-    if code.startswith("H") and code[1:] in hospitals:
-        return code[1:], "stripped_H"
+    for code in tokens:
+        if code in hospitals:
+            return code, "exact"
+        if code in HOSPITAL_ALIASES:
+            alias = HOSPITAL_ALIASES[code]
+            if alias in hospitals:
+                return alias, f"alias:{code}->{alias}"
+        if f"H{code}" in hospitals:
+            return f"H{code}", "prefixed_H"
+        if code.startswith("H") and code[1:] in hospitals:
+            return code[1:], "stripped_H"
+
+    compact = tokens[-1]
+    code_prefix_matches = sorted(
+        [code for code in hospitals if compact.startswith(code) and len(code) >= 3],
+        key=len,
+        reverse=True,
+    )
+    if code_prefix_matches:
+        best_len = len(code_prefix_matches[0])
+        best_matches = [code for code in code_prefix_matches if len(code) == best_len]
+        if len(best_matches) == 1:
+            return best_matches[0], f"code_prefix:{compact}->{best_matches[0]}"
+
+    raw_variants = {
+        variant
+        for token in tokens
+        for variant in hospital_name_variants(token)
+        if len(variant) >= 8 and variant not in {"HOSPITAL", "SPECIALISTHOSPITAL"}
+    }
+    exact_name_matches: list[str] = []
+    prefix_name_matches: list[str] = []
+    for hospital_code, meta in hospitals.items():
+        name_variants = hospital_name_variants(meta.get("name", ""))
+        if not name_variants:
+            continue
+        if raw_variants & name_variants:
+            exact_name_matches.append(hospital_code)
+            continue
+        for raw_variant in raw_variants:
+            if any(
+                len(name_variant) >= 8
+                and (
+                    name_variant.startswith(raw_variant)
+                    or raw_variant.startswith(name_variant)
+                )
+                for name_variant in name_variants
+            ):
+                prefix_name_matches.append(hospital_code)
+                break
+
+    exact_unique = sorted(set(exact_name_matches))
+    if len(exact_unique) == 1:
+        return exact_unique[0], "name_exact"
+    prefix_unique = sorted(set(prefix_name_matches))
+    if len(prefix_unique) == 1:
+        return prefix_unique[0], "name_prefix"
     return None, "unresolved"
 
 
@@ -821,8 +909,9 @@ def summarize_cases(
     unknown_set_tokens: Counter[str] = Counter()
 
     for idx, row in enumerate(cases_rows, start=1):
-        delivery_date = parse_date(row_value(row, "delivery_date"))
-        surgery_date = parse_date(row_value(row, "surgery_date"))
+        delivery_date = row_date(row, *DELIVERY_DATE_FIELDS)
+        surgery_date = row_date(row, *SURGERY_DATE_FIELDS)
+        check_date = row_date(row, *CHECK_DATE_FIELDS)
         prefix = row_value(row, "prefix").strip()
         is_booking_case = is_booking_prefix(prefix)
         booking_hold_from = booking_hold_start(delivery_date)
@@ -968,6 +1057,8 @@ def summarize_cases(
         case_id = f"C{idx:03d}"
         hospital_code = normalize_code(row_value(row, "hospital"))
 
+        sets_available = check_date is not None and check_date <= today_kl
+
         case_record: dict[str, Any] = {
             "case_id": case_id,
             "row_number": idx,
@@ -977,7 +1068,10 @@ def summarize_cases(
             "delivery_date": format_date(delivery_date),
             "surgery_date": format_date(surgery_date),
             "sales_code": row_value(row, "sales_code").strip(),
-            "return_date": row_value(row, "return_date").strip(),
+            "return_date": row_value(row, *RETURN_DATE_FIELDS).strip(),
+            "check_date": format_date(check_date),
+            "is_checked": sets_available,
+            "sets_available": sets_available,
             "status": row_value(row, "status").strip(),
             "smart_status": row_value(row, "Smart Status").strip(),
             "sets_raw": sets_raw,
@@ -1012,6 +1106,7 @@ def summarize_cases(
             "set_shorthand_tokens": sorted(shorthand_hit_keys),
             "delivery_date_obj": delivery_date,
             "surgery_date_obj": surgery_date,
+            "check_date_obj": check_date,
             "set_tokens": set_tokens,
             "plate_tokens": plate_tokens,
             "powertool_tokens": powertool_tokens,
@@ -1034,6 +1129,8 @@ def summarize_cases(
         )
         for item in case["_assigned_exact_sets"]:
             if item["set_key"] in case["_returned_set_keys"]:
+                continue
+            if case.get("sets_available"):
                 continue
             if item.get("home") != "OFFICE":
                 continue
@@ -1060,6 +1157,7 @@ def summarize_cases(
                     "case_id": case["case_id"],
                     "delivery_date": case["delivery_date"],
                     "surgery_date": case["surgery_date"],
+                    "check_date": case["check_date"],
                     "days_since_surgery": days_since,
                     "case_status": case["status"],
                     "smart_status": case["smart_status"],
@@ -1082,6 +1180,8 @@ def summarize_cases(
         booked_exact_sets = []
         for item in case["_assigned_exact_sets"]:
             if item["set_key"] in case["_returned_set_keys"]:
+                continue
+            if case.get("sets_available"):
                 continue
             if item.get("home") == "OFFICE":
                 if case.get("booking_hold_active"):
@@ -1291,6 +1391,7 @@ def build_set_outputs(
                     ),
                     "delivery_date": "",
                     "surgery_date": "",
+                    "check_date": "",
                     "days_since_surgery": "",
                     "case_status": "",
                     "case_id": "",
@@ -1305,6 +1406,7 @@ def build_set_outputs(
                         "location_now": row["location_now"],
                         "delivery_date": row["delivery_date"],
                         "surgery_date": row["surgery_date"],
+                        "check_date": row.get("check_date", ""),
                         "days_since_surgery": row["days_since_surgery"],
                         "case_status": row["case_status"],
                         "case_id": row["case_id"],
@@ -1837,12 +1939,12 @@ def build_powertool_outputs(
     window_start = today_kl - timedelta(days=30)
     usage_counter: Counter[str] = Counter()
     for row in archive_rows:
-        row_date = parse_date(row.get("surgery_date") or row.get("delivery_date") or "")
-        if row_date is None or not (window_start <= row_date <= today_kl):
+        usage_date = row_date(row, *SURGERY_DATE_FIELDS) or row_date(
+            row, *DELIVERY_DATE_FIELDS
+        )
+        if usage_date is None or not (window_start <= usage_date <= today_kl):
             continue
-        for token in split_powertool_tokens(
-            row.get("powertool") or row.get("powertools") or ""
-        ):
+        for token in split_powertool_tokens(row_value(row, "powertool", "powertools")):
             uid_norm = canonical_powertool_uid(token)
             if uid_norm in power_uid_map:
                 usage_counter[uid_norm] += 1
@@ -2311,9 +2413,8 @@ def is_cancelled_case(case: dict[str, Any]) -> bool:
 
 def infer_set_reusable_date(case: dict[str, Any]) -> date | None:
     return (
-        parse_date(case.get("return_date"))
-        or parse_date(case.get("surgery_date"))
-        or parse_date(case.get("delivery_date"))
+        parse_date(case.get("check_date"))
+        or parse_date(case.get("return_date"))
     )
 
 
@@ -2430,12 +2531,19 @@ def attach_upcoming_set_suggestions(
                     if source_case
                     else None
                 )
+                source_check = (
+                    parse_date(source_case.get("check_date", ""))
+                    if source_case
+                    else parse_date(assignment.get("check_date", ""))
+                    if assignment
+                    else None
+                )
                 source_sales_code = str(source_case.get("sales_code", "")).strip()
                 source_cancelled = bool(source_case) and is_cancelled_case(source_case)
                 reusable_date = (
                     infer_set_reusable_date(source_case)
                     if source_case
-                    else (source_surgery or source_delivery)
+                    else source_check or source_return
                 )
                 is_reused_candidate = suggested_counts.get(set_key, 0) > 0
 
@@ -2461,7 +2569,12 @@ def attach_upcoming_set_suggestions(
                         "BOOKED_READY" if ready_by_target else "BOOKED_LATER"
                     )
                     suggestion_rank = 3 if ready_by_target else 5
-                    if source_delivery and source_delivery <= target_delivery:
+                    if reusable_date:
+                        suggestion_reason = (
+                            f"booked for {source_case.get('case_id', assignment.get('case_id', ''))}"
+                            f"; available from {format_date(reusable_date)}"
+                        )
+                    elif source_delivery and source_delivery <= target_delivery:
                         suggestion_reason = (
                             f"booked for {source_case.get('case_id', assignment.get('case_id', ''))}"
                             f" on {format_date(source_delivery)}"
@@ -2483,22 +2596,24 @@ def attach_upcoming_set_suggestions(
                         suggestion_reason = (
                             f"currently at {current_location}; case cancelled"
                         )
+                    elif source_check:
+                        suggestion_kind = (
+                            "OUT_RESTORED_BY_TARGET"
+                            if ready_by_target
+                            else "OUT_RESTORE_LATER"
+                        )
+                        suggestion_rank = 2 if ready_by_target else 5
+                        suggestion_reason = (
+                            f"currently at {current_location}; available from {format_date(source_check)}"
+                        )
                     elif source_return:
                         suggestion_kind = "OUT_RETURNED"
                         suggestion_rank = 2
                         suggestion_reason = f"currently at {current_location}; return dated {format_date(source_return)}"
                     elif source_sales_code:
                         suggestion_kind = "OUT_SALES_POSTED"
-                        suggestion_rank = 2
+                        suggestion_rank = 4
                         suggestion_reason = f"currently at {current_location}; sales posted on {source_case.get('case_id', assignment.get('case_id', ''))}"
-                    elif ready_by_target and source_surgery:
-                        suggestion_kind = "OUT_SURGERY_DONE"
-                        suggestion_rank = 2
-                        suggestion_reason = f"currently at {current_location}; surgery done {format_date(source_surgery)}"
-                    elif ready_by_target and source_delivery:
-                        suggestion_kind = "OUT_DELIVERED"
-                        suggestion_rank = 3
-                        suggestion_reason = f"currently at {current_location}; delivered {format_date(source_delivery)}"
                     else:
                         suggestion_kind = "OUT_WAITING"
                         suggestion_rank = 4
@@ -2555,6 +2670,7 @@ def attach_upcoming_set_suggestions(
                             "source_surgery_date": format_date(source_surgery),
                             "source_sales_code": source_sales_code,
                             "source_return_date": format_date(source_return),
+                            "source_check_date": format_date(source_check),
                             "source_case_status": str(
                                 source_case.get(
                                     "status", assignment.get("case_status", "")
@@ -2655,10 +2771,10 @@ def build_archive_30d_summary(
     sets_delivered = 0
 
     for row in archive_rows:
-        row_date = parse_date(row_value(row, "surgery_date")) or parse_date(
-            row_value(row, "delivery_date")
+        archive_date = row_date(row, *SURGERY_DATE_FIELDS) or row_date(
+            row, *DELIVERY_DATE_FIELDS
         )
-        if row_date is None or not (window_start <= row_date <= today_kl):
+        if archive_date is None or not (window_start <= archive_date <= today_kl):
             continue
         raw_hospital = row_value(row, "hospital")
         resolved_code, _ = resolve_hospital_code(raw_hospital, hospitals)
@@ -2732,6 +2848,10 @@ def build_case_buckets(
         return_date = normalize_code(case["return_date"])
         status = normalize_code(case["status"])
         prefix = normalize_code(case["prefix"])
+        check_date = case.get("check_date_obj") or parse_date(case.get("check_date"))
+        sets_available = bool(case.get("sets_available")) or (
+            check_date is not None and check_date <= today_kl
+        )
         cancelled = is_cancelled_case(case)
 
         # Sales code recorded but equipment not yet returned
@@ -2747,8 +2867,8 @@ def build_case_buckets(
             if delivery_date == tomorrow:
                 buckets["to_deliver_tomorrow"].append(case)
 
-        # ITO status → needs verification
-        if "ITO" in status:
+        # CHECK DATE is when returned sets are restored and available again.
+        if "ITO" in status and not sets_available:
             buckets["to_check"].append(case)
 
         # Prefix P → plate top-up needed

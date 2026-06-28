@@ -5,6 +5,8 @@ Run: streamlit run dashboard.py
 
 import streamlit as st
 import pandas as pd
+import hashlib
+import os
 import re
 from datetime import date, datetime, timedelta
 from html import escape
@@ -434,6 +436,7 @@ details[data-testid="stExpander"] summary * {
 KL_TZ = ZoneInfo("Asia/Kuala_Lumpur")
 DEFAULT_MASTER_DATA_PATH = str(Path(__file__).resolve().with_name("master_data.py"))
 _POWERTOOL_CATS = {"P5503", "P5400", "P8400"}
+CONFIDENTIAL_DISPLAY = str(os.getenv("CHECKSETGO_CONFIDENTIAL", "1")).strip().lower() not in {"0", "false", "no", "off"}
 THEME_GREEN_BLUE = "#2f6f73"
 THEME_GLAUCOUS = "#6e8f95"
 THEME_BUFF = "#8c6b3f"
@@ -457,23 +460,122 @@ PLATE_UID_ORDER = [
 ]
 PLATE_UID_RANK = {uid: idx for idx, uid in enumerate(PLATE_UID_ORDER)}
 
+_PUBLIC_LOCATION_LABELS = {
+    "",
+    "-",
+    "—",
+    "OFFICE",
+    "OUT",
+    "BOOKED",
+    "STANDBY",
+    "NA",
+    "N/A",
+}
+
+
+def _anon_label(value: object, label: str, prefix: str, *, public: set[str] | None = None) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return "—"
+    if not CONFIDENTIAL_DISPLAY:
+        return text
+    normalized = re.sub(r"\s+", " ", text).strip().upper()
+    if public and normalized in public:
+        return text
+    digest = hashlib.blake2s(normalized.encode("utf-8"), digest_size=3).hexdigest().upper()
+    return f"{label} {prefix}-{digest}"
+
+
+def _anon_hospital(value: object) -> str:
+    return _anon_label(value, "Hospital", "H", public=_PUBLIC_LOCATION_LABELS)
+
+
+def _anon_hospital_short(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return "—"
+    if not CONFIDENTIAL_DISPLAY:
+        return text[:8].upper()
+    digest = hashlib.blake2s(text.upper().encode("utf-8"), digest_size=2).hexdigest().upper()
+    return f"H-{digest}"
+
+
+def _anon_set_category(value: object) -> str:
+    return _anon_label(value, "Set", "S")
+
+
+def _anon_set_unit_label(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if not CONFIDENTIAL_DISPLAY or re.fullmatch(r"\d+", text):
+        return text
+    return _anon_label(text, "Unit", "U")
+
+
+def _anon_set_display(value: object, category: object = "") -> str:
+    text = str(value or "").strip()
+    cat = str(category or "").strip()
+    if not text and not cat:
+        return "—"
+    if not CONFIDENTIAL_DISPLAY:
+        return text or cat
+    unit = ""
+    m = re.search(r"\(([^)]+)\)\s*$", text)
+    if m:
+        compact = _compact_set_id(m.group(1))
+        unit = f" ({_anon_set_unit_label(compact)})" if compact else ""
+    base = cat or re.sub(r"\s*\([^)]*\)\s*$", "", text).strip() or text
+    return f"{_anon_set_category(base)}{unit}"
+
+
+def _anon_plate_family(value: object) -> str:
+    return _anon_label(value, "Plate", "P")
+
+
+def _anon_plate_uid(value: object) -> str:
+    return _anon_label(value, "Plate ID", "P")
+
+
+def _anon_tool_category(value: object) -> str:
+    return _anon_label(value, "Tool", "T")
+
+
+def _anon_tool_unit(value: object) -> str:
+    return _anon_label(value, "Tool Unit", "T")
+
+
+def _anon_person(value: object) -> str:
+    return _anon_label(value, "Person", "D")
+
+
+def _anonymize_unknown_df(df: pd.DataFrame, key: str) -> pd.DataFrame:
+    if not CONFIDENTIAL_DISPLAY or df.empty:
+        return df
+    out = df.copy()
+    kind_by_key = {
+        "set_tokens": _anon_set_category,
+        "plate_tokens": _anon_plate_family,
+        "powertool_tokens": _anon_tool_category,
+        "hospitals_for_routes": _anon_hospital,
+    }
+    anon = kind_by_key.get(key, lambda value: _anon_label(value, "Value", "X"))
+    for col in out.columns:
+        if pd.api.types.is_object_dtype(out[col]) or pd.api.types.is_string_dtype(out[col]):
+            out[col] = out[col].map(lambda value: anon(value))
+    return out
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Sidebar
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 with st.sidebar:
-    st.markdown("### ⚙️ Data Sources")
-    master_path   = st.text_input("master_data.py path", value=DEFAULT_MASTER_DATA_PATH)
-    cases_source  = st.text_input("Cases CSV (path or URL)", value=(
-        "https://docs.google.com/spreadsheets/d/e/"
-        "2PACX-1vQrbm_5s59966ZVWFmrqkg1vQ21YR1YEd1h_J0M7Fc6FjO0ai3l-aWns0IY"
-        "nirCfsnGHoMyn5xPoG5c/pub?gid=0&single=true&output=csv"))
-    archive_source = st.text_input("Archive CSV (path or URL)", value=(
-        "https://docs.google.com/spreadsheets/d/e/"
-        "2PACX-1vQrbm_5s59966ZVWFmrqkg1vQ21YR1YEd1h_J0M7Fc6FjO0ai3l-aWns0IY"
-        "nirCfsnGHoMyn5xPoG5c/pub?gid=1320419668&single=true&output=csv"))
+    master_path = DEFAULT_MASTER_DATA_PATH
+    cases_source = ""
+    archive_source = ""
+    st.markdown("### Controls")
     refresh      = st.button("🔄 Refresh Data", use_container_width=True)
     st.divider()
-    search_query = st.text_input("🔍 Search", placeholder="cases, sets, plates, hospitals…")
+    search_query = st.text_input("🔍 Search", placeholder="cases, inventory, dates…")
     st.divider()
     st.caption("TZ: Asia/Kuala_Lumpur")
 
@@ -544,6 +646,7 @@ case_sales_lookup:      dict[str,str]  = {}
 case_delivery_lookup:   dict[str,str]  = {}
 case_surgery_lookup:    dict[str,str]  = {}
 case_return_lookup:     dict[str,str]  = {}
+case_check_lookup:      dict[str,str]  = {}
 case_prefix_lookup:     dict[str,str]  = {}
 case_status_lookup:     dict[str,str]  = {}
 case_is_booking_lookup: dict[str,bool] = {}
@@ -586,6 +689,7 @@ if not cases_all_df.empty and "case_id" in cases_all_df.columns:
         case_delivery_lookup[cid]   = str(r.get("delivery_date","") or "").strip()
         case_surgery_lookup[cid]    = str(r.get("surgery_date","") or "").strip()
         case_return_lookup[cid]     = str(r.get("return_date","") or "").strip()
+        case_check_lookup[cid]      = str(r.get("check_date","") or "").strip()
         case_prefix_lookup[cid]     = str(r.get("prefix","") or "").strip().upper()
         case_status_lookup[cid]     = str(r.get("status","") or "").strip().upper()
         case_is_booking_lookup[cid] = bool(r.get("is_booking_case", False))
@@ -830,10 +934,12 @@ def _render_meeple_steps(steps: list, accent: str) -> str:
 def _history_hospital_short(entry: dict) -> str:
     code = str(entry.get("hospital_code", "") or "").strip().upper()
     if code:
-        return code[:8]
+        return _anon_hospital_short(code)
     hospital_name = str(entry.get("hospital_name", "") or "").strip()
     if not hospital_name:
         return "—"
+    if CONFIDENTIAL_DISPLAY:
+        return _anon_hospital_short(hospital_name)
     tokens = re.findall(r"[A-Z0-9]+", hospital_name.upper())
     if not tokens:
         return hospital_name[:8].upper()
@@ -854,8 +960,9 @@ def _render_recent_case_history(entries: list[dict], accent: str, *, title: str 
         '<div class="meeple-track is-history">',
     ]
     for idx, entry in enumerate(display_entries):
-        hospital_name = str(entry.get("hospital_name", "") or entry.get("hospital_code", "") or "—").strip()
-        hospital_short = str(entry.get("hospital_code", "") or "").strip().upper() or _history_hospital_short(entry)
+        raw_hospital = str(entry.get("hospital_name", "") or entry.get("hospital_code", "") or "—").strip()
+        hospital_name = _anon_hospital(raw_hospital)
+        hospital_short = _anon_hospital_short(str(entry.get("hospital_code", "") or raw_hospital).strip())
         d_obj = _parse_ui_date(str(entry.get("date", "")).strip())
         date_display = d_obj.strftime("%-d %b") if d_obj else str(entry.get("date", "") or "—").strip()
         parts.append(
@@ -874,7 +981,7 @@ def _render_recent_case_history(entries: list[dict], accent: str, *, title: str 
     return "\n".join(parts)
 
 
-def _build_meeple_steps(*, prefix, delivery, surgery, sales_code, status, is_booking, return_date=""):
+def _build_meeple_steps(*, prefix, delivery, surgery, sales_code, status, is_booking, return_date="", check_date=""):
     """
     Returns (steps, accent).
     Cancelled: Delivered → Cancelled → In Transit → Checking
@@ -885,7 +992,8 @@ def _build_meeple_steps(*, prefix, delivery, surgery, sales_code, status, is_boo
     """
     is_parking  = prefix.startswith("P") and not is_booking
     is_transit  = status in {"ITS","ITD"}
-    is_checking = status in {"ITO","COMPLETED"}
+    sets_restored = _is_past_or_today(check_date)
+    is_checking = sets_restored or status in {"ITO","COMPLETED"}
     is_cnx      = status == "CNX"
     tl = "With Saiful" if status=="ITS" else "With Dylan" if status=="ITD" else "In Transit"
 
@@ -899,7 +1007,7 @@ def _build_meeple_steps(*, prefix, delivery, surgery, sales_code, status, is_boo
             ("Delivered", "DEL",  _is_past_or_today(delivery),  delivery),
             ("Cancelled", "CNX",  True,                           ""),
             (tl,          "TRNST",is_transit,                     ""),
-            ("Checking",  "CHK",  is_checking,                    ""),
+            ("Restored",  "AVL",  is_checking,                    check_date),
         ], THEME_CANCELLED
 
     if is_parking:
@@ -921,7 +1029,7 @@ def _build_meeple_steps(*, prefix, delivery, surgery, sales_code, status, is_boo
             ("Surgery",     "SURG",  _is_past_or_today(surgery),    surgery),
             ("Sales Posted","SALES", bool(sales_code),               ""),
             (tl,            "TRNST", is_transit,                     ""),
-            ("Checking",    "CHK",   is_checking,                    ""),
+            ("Restored",    "AVL",   is_checking,                    check_date),
         ], THEME_GLAUCOUS
 
     return [
@@ -929,7 +1037,7 @@ def _build_meeple_steps(*, prefix, delivery, surgery, sales_code, status, is_boo
         ("Surgery",     "SURG",  _is_past_or_today(surgery),    surgery),
         ("Sales Posted","SALES", bool(sales_code),               ""),
         (tl,            "TRNST", is_transit,                     ""),
-        ("Checking",    "CHK",   is_checking,                    ""),
+        ("Restored",    "AVL",   is_checking,                    check_date),
     ], THEME_GREEN_BLUE
 
 def _meeple_track_for_case_id(case_id: str, *, surgery="", delivery="", case_status="") -> str:
@@ -944,43 +1052,48 @@ def _meeple_track_for_case_id(case_id: str, *, surgery="", delivery="", case_sta
         status      = status,
         is_booking  = case_is_booking_lookup.get(cid, False),
         return_date = case_return_lookup.get(cid,""),
+        check_date  = case_check_lookup.get(cid,""),
     )
     return _render_meeple_steps(steps, accent)
 
 
-def _hospital_status_class(sv, *, sales_code="", case_status="", is_booked=False, delivery_value="") -> str:
+def _hospital_status_class(sv, *, sales_code="", case_status="", is_booked=False, delivery_value="", check_date="") -> str:
     s   = str(case_status or "").strip().upper()
     bdv = str(delivery_value or "").strip() or (str(sv or "").strip() if is_booked else "")
     if s == "CNX": return "is-cancelled"
     if s == "PP":  return "is-postponed"
     if is_booked and bdv: return "is-delivered"
+    if _is_past_or_today(check_date): return "is-checking"
     if _parse_ui_date(sv) is not None: return "is-surgery"
     if str(sales_code or "").strip(): return "is-sales-posted"
     if s in {"ITS","ITD"}: return f"is-in-transit is-{s.lower()}"
     if s in {"ITO","COMPLETED"}: return "is-checking"
     return "is-collect"
 
-def _hospital_status_label(sv, *, sales_code="", case_status="", is_booked=False, delivery_value="") -> str:
+def _hospital_status_label(sv, *, sales_code="", case_status="", is_booked=False, delivery_value="", check_date="") -> str:
     s   = str(case_status or "").strip().upper()
     bdv = str(delivery_value or "").strip() or (str(sv or "").strip() if is_booked else "")
     if s == "CNX": return "Cancelled"
     if s == "PP":  return "Postponed"
     if is_booked and bdv: return "Delivered"
+    if _is_past_or_today(check_date): return "Restored / available"
+    if _parse_ui_date(check_date) is not None: return f"Available from {check_date}"
     if _parse_ui_date(sv) is not None: return "Surgery"
     if str(sales_code or "").strip(): return "Sales posted"
     if s in {"ITS","ITD"}: return "In transit with Saiful" if s=="ITS" else "In transit with Dylan"
     if s in {"ITO","COMPLETED"}: return "Checking"
     return "Collect"
 
-def _hospital_with_led(hospital, sv, *, variant="", sales_code="", case_status="", is_booked=False, delivery_value="") -> str:
-    sc  = _hospital_status_class(sv, sales_code=sales_code, case_status=case_status, is_booked=is_booked, delivery_value=delivery_value)
-    sl  = _hospital_status_label(sv, sales_code=sales_code, case_status=case_status, is_booked=is_booked, delivery_value=delivery_value)
+def _hospital_with_led(hospital, sv, *, variant="", sales_code="", case_status="", is_booked=False, delivery_value="", check_date="") -> str:
+    sc  = _hospital_status_class(sv, sales_code=sales_code, case_status=case_status, is_booked=is_booked, delivery_value=delivery_value, check_date=check_date)
+    sl  = _hospital_status_label(sv, sales_code=sales_code, case_status=case_status, is_booked=is_booked, delivery_value=delivery_value, check_date=check_date)
     vc  = f"is-{variant}" if variant else ""
     ca  = " ".join(p for p in ("out-hosp-wrap", vc, sc) if p)
+    hospital_label = _anon_hospital(hospital)
     return (
         f"<span class='{ca}' title='{escape(sl)}'>"
         f"<span class='out-hosp-led'></span>"
-        f"<span class='out-hosp-name'>{escape(str(hospital or '—'))}</span>"
+        f"<span class='out-hosp-name'>{escape(hospital_label)}</span>"
         f"</span>"
     )
 
@@ -1001,7 +1114,7 @@ with inv_tabs[0]:
     if set_avail.empty and set_status_all.empty:
         st.info("No set data.")
     else:
-        for col in ("category","set_display","id","location_now","surgery_date","patient_doctor",
+        for col in ("category","set_display","id","location_now","surgery_date","check_date","patient_doctor",
                     "case_id","set_status","home","assignment_kind","delivery_date","case_status","set_key"):
             if col not in set_status_all.columns: set_status_all[col] = ""
         set_status_all = set_status_all.copy()
@@ -1216,8 +1329,8 @@ with inv_tabs[0]:
             oi = list(r.get("OfficeItems",[])); si = list(r.get("StandbyItems",[]))
             in_html = ""
             if oi or si:
-                ol = [escape(str(i.get("label",""))) for i in oi if str(i.get("label","")).strip()]
-                sl = [escape(str(i.get("label",""))) for i in si if str(i.get("label","")).strip()]
+                ol = [escape(_anon_set_unit_label(i.get("label",""))) for i in oi if str(i.get("label","")).strip()]
+                sl = [escape(_anon_set_unit_label(i.get("label",""))) for i in si if str(i.get("label","")).strip()]
                 if ol: in_html += f"<div class='office-set-ids'>{', '.join(ol)}</div>"
                 if sl: in_html += f"<div class='office-set-ids is-standby'>{', '.join(sl)} [standby]</div>"
                 if not in_html: in_html = "<span class='office-set-empty'>none available</span>"
@@ -1225,11 +1338,18 @@ with inv_tabs[0]:
                 in_html = "<span class='office-set-empty'>none available</span>"
 
             nb = dict(r.get("NextBooking",{}))
-            nb_parts = [p for p in [escape(str(nb.get("date","")).strip()), escape(str(nb.get("hospital","")).strip())] if p]
+            nb_parts = [
+                p
+                for p in [
+                    escape(str(nb.get("date","")).strip()),
+                    escape(_anon_hospital(nb.get("hospital","")) if str(nb.get("hospital","")).strip() else ""),
+                ]
+                if p
+            ]
             nb_html = ""
             if nb_parts:
                 nb_lbl = " · ".join(nb_parts)
-                if nb.get("set"): nb_lbl += f" · {escape(str(nb['set']))}"
+                if nb.get("set"): nb_lbl += f" · {escape(_anon_set_display(nb['set'], cn))}"
                 if nb.get("case_id"): nb_lbl += f" · {escape(str(nb['case_id']))}"
                 nb_html = f"<div class='booking-next'>next booking {nb_lbl}</div>"
 
@@ -1245,14 +1365,14 @@ with inv_tabs[0]:
                 suggested_set = str(item.get("suggested_set","")).strip()
                 suggested_cls = "uc-set" if bool(item.get("suggested_confirmed", False)) else "uc-set is-tentative"
                 suggested_html = (
-                    f"<span class='{suggested_cls}'>→ {escape(suggested_set)}</span>"
+                    f"<span class='{suggested_cls}'>→ {escape(_anon_set_display(suggested_set, cn))}</span>"
                     if suggested_set else
                     ""
                 )
                 up_parts.append(
                     f"<span class='{chip_cls}'>"
                     f"<span class='uc-date'>{date_lbl}{escape(hint)}</span>"
-                    f"<span class='uc-hosp'>{escape(str(item.get('hospital','—')))}</span>"
+                    f"<span class='uc-hosp'>{escape(_anon_hospital(item.get('hospital','—')))}</span>"
                     f"{suggested_html}"
                     f"<span style='color:#9ca3af;font-size:10px'>{escape(str(item.get('case_id','')))}</span>"
                     f"</span>"
@@ -1264,8 +1384,8 @@ with inv_tabs[0]:
 
             home_parts = []
             for item in list(r.get("HomeItems", []) or []):
-                label = escape(str(item.get("label", "")).strip())
-                home = escape(str(item.get("home", "")).strip())
+                label = escape(_anon_set_unit_label(str(item.get("label", "")).strip()))
+                home = escape(_anon_hospital(str(item.get("home", "")).strip()))
                 maintained = escape(_format_last_maintained(str(item.get("last_maintained", "")).strip()))
                 if not label and not home:
                     continue
@@ -1289,7 +1409,7 @@ with inv_tabs[0]:
 
             service_items = [
                 {
-                    "label": escape(str(item.get("label", "")).strip()),
+                    "label": escape(_anon_set_unit_label(str(item.get("label", "")).strip())),
                     "maintained": escape(_format_last_maintained(str(item.get("last_maintained", "")).strip())),
                 }
                 for item in list(r.get("ServiceItems", []) or [])
@@ -1317,7 +1437,7 @@ with inv_tabs[0]:
             left_col = (
                 f"<div style='flex:0 0 40%;max-width:40%;padding-right:20px'>"
                 f"<div style='display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px'>"
-                f"<span class='inv-name' style='font-size:20px'>{r['DisplayLabel']}</span>{badge}</div>"
+                f"<span class='inv-name' style='font-size:20px'>{escape(_anon_set_category(r['DisplayLabel']))}</span>{badge}</div>"
                 f"{in_html}{nb_html}{up_html}{home_html}{service_html}</div>"
             )
 
@@ -1339,7 +1459,7 @@ with inv_tabs[0]:
                         next_parts.append(
                             f"<span class='{nx_cls}'>"
                             f"next {escape(str(next_item.get('date','')) or '—')} · "
-                            f"{escape(str(next_item.get('hospital','')) or '—')} · "
+                            f"{escape(_anon_hospital(str(next_item.get('hospital','')) or '—'))} · "
                             f"{escape(str(next_item.get('case_id','')))}</span>"
                         )
                     if len(next_cases) > 3:
@@ -1351,13 +1471,14 @@ with inv_tabs[0]:
                                 "<div class='out-line'>",
                                 f"<span class='out-order'>#{idx}</span>",
                                 "<span class='out-tag out-tag-booked'>BOOKED</span> ",
-                                f"<span class='out-set'>{o['Set']}</span><span class='out-sep'> → </span>",
+                                f"<span class='out-set'>{escape(_anon_set_display(o['Set'], cn))}</span><span class='out-sep'> → </span>",
                                 _hospital_with_led(
                                     o['Hospital'],
                                     o.get('Delivery Date',''),
                                     is_booked=True,
                                     sales_code=o.get('Sales Code',''),
                                     case_status=o.get('Case Status',''),
+                                    check_date=case_check_lookup.get(str(o.get('Case','')).strip(),''),
                                 ),
                                 meeple,
                                 next_html,
@@ -1370,12 +1491,13 @@ with inv_tabs[0]:
                                 "<div class='out-line'>",
                                 f"<span class='out-order'>#{idx}</span>",
                                 "<span class='out-tag'>OUT</span> ",
-                                f"<span class='out-set'>{o['Set']}</span><span class='out-sep'> → </span>",
+                                f"<span class='out-set'>{escape(_anon_set_display(o['Set'], cn))}</span><span class='out-sep'> → </span>",
                                 _hospital_with_led(
                                     o['Hospital'],
                                     o['Surgery Date'],
                                     sales_code=o.get('Sales Code',''),
                                     case_status=o.get('Case Status',''),
+                                    check_date=case_check_lookup.get(str(o.get('Case','')).strip(),''),
                                 ),
                                 meeple,
                                 next_html,
@@ -1431,8 +1553,12 @@ with inv_tabs[0]:
             ("Ankle Nail",["ANKLE ARTHRODESIS NAIL"],"sum"),("Coatlmon Cable",["COATLMON CABLE SYSTEM"],"sum"),
             ("ROI",["ROI"],"sum"),
         ]
-        copy_lines = ["*Office Sets availability*",""] + [f"{l} - {_cc(k,m)}" for l,k,m in copy_map] + [
-            "","Power",f"5503B (normal) - {_cc(['P5503'])}",f"5400 (kwire) - {_cc(['P5400'])}",f"8400 (handpiece) - {_cc(['P8400'])}",
+        copy_lines = ["*Office Sets availability*",""] + [f"{_anon_set_category(k[0])} - {_cc(k,m)}" for _,k,m in copy_map] + [
+            "",
+            "Tools",
+            f"{_anon_tool_category('P5503')} - {_cc(['P5503'])}",
+            f"{_anon_tool_category('P5400')} - {_cc(['P5400'])}",
+            f"{_anon_tool_category('P8400')} - {_cc(['P8400'])}",
         ]
         st.markdown("##### Copy Block")
         st.code("\n".join(copy_lines), language="text")
@@ -1513,6 +1639,8 @@ with inv_tabs[1]:
         def _plate_row_html(row: pd.Series) -> str:
             uid   = row["plate_uid"]
             uid_norm = str(uid).strip().upper()
+            plate_label = _anon_plate_family(row.get("proper_name", "") or uid_norm)
+            uid_label = _anon_plate_uid(uid_norm or uid)
             badge = avail_badge(int(row["available_units"]), int(row["total_units"]))
             udl   = _dl.get(uid, {})
 
@@ -1583,7 +1711,7 @@ with inv_tabs[1]:
                         f"<span class='dh-out-tag {tc}'>"
                         f"<span class='dh-out-sr'>{escape(size_range_label)} out</span>"
                         f"<span class='out-sep'>→</span>"
-                        f"{_hospital_with_led(hosp, surg, variant='plate', sales_code=case_sales_lookup.get(str(cd.get('case_id','')).strip(),''), case_status=cd.get('case_status',''))}"
+                        f"{_hospital_with_led(hosp, surg, variant='plate', sales_code=case_sales_lookup.get(str(cd.get('case_id','')).strip(),''), case_status=cd.get('case_status',''), check_date=case_check_lookup.get(str(cd.get('case_id','')).strip(),''))}"
                         f"{stks}</span>"
                     )
                     cid = str(cd.get("case_id","")).strip()
@@ -1593,7 +1721,7 @@ with inv_tabs[1]:
                         out_meeples += (
                             f"<div style='padding:4px 10px 6px 10px;border-top:1px solid #f3f4f6'>"
                             f"<span style='font-size:9px;font-weight:700;color:#9ca3af;letter-spacing:.08em;text-transform:uppercase'>"
-                            f"{escape(cid)} · {escape(hosp)}</span>{mp}</div>"
+                            f"{escape(cid)} · {escape(_anon_hospital(hosp))}</span>{mp}</div>"
                         )
 
                 # Size chips
@@ -1614,14 +1742,14 @@ with inv_tabs[1]:
                     ),
                 )
                 chips_html = "".join(
-                    f"<span class='sc {'sc-none' if sz['no_stock'] else 'sc-case' if sz['sr_is_out'] else _SR_CHIP.get(sz['size_range'],'sc-std')}'>{sz['label']}</span>"
+                    f"<span class='sc {'sc-none' if sz['no_stock'] else 'sc-case' if sz['sr_is_out'] else _SR_CHIP.get(sz['size_range'],'sc-std')}'>{escape(str(sz['label']))}</span>"
                     for sz in ordered_sz
                 )
 
                 drc_cls = "drc-out" if unique_out else ""
                 drawer_blocks += "\n".join([
                     "<div class='dr-block'>",
-                    f"<div class='dr-hdr {hdr_cls}'><span>{drawer}</span><span class='dh-out-list'>{out_tags}</span></div>",
+                    f"<div class='dr-hdr {hdr_cls}'><span>{escape(drawer)}</span><span class='dh-out-list'>{out_tags}</span></div>",
                     out_meeples,
                     f"<div class='dr-chips {drc_cls}'>{chips_html}</div>",
                     "</div>",
@@ -1644,9 +1772,9 @@ with inv_tabs[1]:
             return "\n".join([
                 "<div class='inv-row'>",
                 "<div style='display:flex;justify-content:space-between;align-items:center'>",
-                f"<span class='inv-name'>{row['proper_name']}</span><span>{badge}</span></div>",
-                f"<div class='inv-sub'>{uid} &nbsp;·&nbsp; {row['screw_sizes'] or ''}</div>",
-                f"<div class='inv-sub'>{row.get('size_ranges','') or ''} &nbsp;·&nbsp; {row.get('status_note','READY') or 'READY'}</div>",
+                f"<span class='inv-name'>{escape(plate_label)}</span><span>{badge}</span></div>",
+                f"<div class='inv-sub'>{escape(uid_label)} &nbsp;·&nbsp; {escape(str(row['screw_sizes'] or ''))}</div>",
+                f"<div class='inv-sub'>{escape(str(row.get('size_ranges','') or ''))} &nbsp;·&nbsp; {escape(str(row.get('status_note','READY') or 'READY'))}</div>",
                 legend_html,
                 history_block,
                 drawer_blocks,
@@ -1711,11 +1839,12 @@ with inv_tabs[2]:
         def _uchip(uid, hold=False):
             bg,fg,bd = ("#f3f4f6","#6b7280","#d1d5db") if hold else ("#eff6ff","#1d4ed8","#bfdbfe")
             sf = " [hold]" if hold else ""
+            uid_label = _anon_tool_unit(uid)
             return (
                 f"<span style='display:inline-flex;flex-direction:column;align-items:flex-start;"
                 f"background:{bg};color:{fg};border:1px solid {bd};font-family:\"JetBrains Mono\",monospace;"
                 f"border-radius:8px;padding:7px 10px;margin:3px 6px 3px 0;min-width:140px'>"
-                f"<span style='font-size:14px;font-weight:700;line-height:1.1'>{uid}{sf}</span>{_uhtml(uid)}</span>"
+                f"<span style='font-size:14px;font-weight:700;line-height:1.1'>{escape(uid_label)}{sf}</span>{_uhtml(uid)}</span>"
             )
 
         pt_sum_rows = []
@@ -1753,21 +1882,21 @@ with inv_tabs[2]:
                 f"<span style='display:inline-flex;flex-direction:column;align-items:flex-start;"
                 f"background:#fff7ed;color:#b45309;border:1px solid #fdba74;font-family:\"JetBrains Mono\",monospace;"
                 f"border-radius:8px;padding:7px 10px;margin:3px 6px 3px 0;min-width:140px'>"
-                f"<span style='font-size:14px;font-weight:700;line-height:1.1'>{i['uid']} [standby]</span>{_uhtml(i['uid'])}</span>"
+                f"<span style='font-size:14px;font-weight:700;line-height:1.1'>{escape(_anon_tool_unit(i['uid']))} [standby]</span>{_uhtml(i['uid'])}</span>"
                 for i in row["standby_units"]
             )
             if not li: li = "<span style='color:#9ca3af;font-size:12px;font-style:italic'>none available</span>"
             lc = (
                 f"<div style='flex:0 0 39%;padding-right:20px'>"
                 f"<div style='display:flex;align-items:center;gap:12px;flex-wrap:wrap'>"
-                f"<span class='inv-name' style='font-size:20px'>{row['category']}</span>{badge}{hn}{sn}</div>"
+                f"<span class='inv-name' style='font-size:20px'>{escape(_anon_tool_category(row['category']))}</span>{badge}{hn}{sn}</div>"
                 f"<div style='margin-top:8px'>{li}</div></div>"
             )
             if row["out_items"]:
                 ol = "".join(
                     f"<div class='out-line'><span class='out-tag'>OUT</span> "
-                    f"<span class='out-set'>{o['uid']}</span><span class='out-sep'> → </span>"
-                    f"{_hospital_with_led(o['hospital'],o['surgery'],sales_code=case_sales_lookup.get(str(o.get('case_id','')).strip(),''))}"
+                    f"<span class='out-set'>{escape(_anon_tool_unit(o['uid']))}</span><span class='out-sep'> → </span>"
+                    f"{_hospital_with_led(o['hospital'],o['surgery'],sales_code=case_sales_lookup.get(str(o.get('case_id','')).strip(),''), check_date=case_check_lookup.get(str(o.get('case_id','')).strip(),''))}"
                     f"<span class='out-sep'> · </span><span class='out-surg'>surg {o['surgery'] or '—'}</span>"
                     f"<span style='display:inline-block;margin-left:8px;color:#4b5563;font-size:14px;font-weight:700'>30d use {usage_by_uid.get(o['uid'],0)}</span>"
                     + (f"<span style='margin-left:8px;color:#b45309;font-size:12px;font-weight:700'>[standby]</span>" if o.get('standby') else "")
@@ -1792,7 +1921,7 @@ if total_unknowns > 0:
         for tab,key in zip(st.tabs(["Sets","Plates","Powertools","Hospitals"]),["set_tokens","plate_tokens","powertool_tokens","hospitals_for_routes"]):
             with tab:
                 df = pd.DataFrame(report.get("unknown",{}).get(key,[]))
-                (st.success("None.") if df.empty else st.dataframe(df,use_container_width=True,hide_index=True))
+                (st.success("None.") if df.empty else st.dataframe(_anonymize_unknown_df(df, key),use_container_width=True,hide_index=True))
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # HOSPITAL DIRECTORY
@@ -1803,7 +1932,10 @@ if search_query:
         filt = hdf[hdf["hosp_code"].str.contains(search_query,case=False,na=False)|hdf["name"].str.contains(search_query,case=False,na=False)|hdf["region"].str.contains(search_query,case=False,na=False)]
         if not filt.empty:
             st.markdown("<div class='sec-header'>Hospital Directory — Search Results</div>", unsafe_allow_html=True)
-            st.dataframe(filt[["hosp_code","name","region","office_to_hospital_km","tbs_to_hospital_km"]].rename(columns={"hosp_code":"Code","name":"Name","region":"Region","office_to_hospital_km":"Office→Hosp (km)","tbs_to_hospital_km":"TBS→Hosp (km)"}),use_container_width=True,hide_index=True)
+            safe_filt = filt[["hosp_code","name","region","office_to_hospital_km","tbs_to_hospital_km"]].copy()
+            safe_filt["hosp_code"] = safe_filt.apply(lambda row: _anon_hospital_short(row.get("hosp_code") or row.get("name")), axis=1)
+            safe_filt["name"] = safe_filt.apply(lambda row: _anon_hospital(row.get("name") or row.get("hosp_code")), axis=1)
+            st.dataframe(safe_filt.rename(columns={"hosp_code":"Code","name":"Name","region":"Region","office_to_hospital_km":"Office→Hosp (km)","tbs_to_hospital_km":"TBS→Hosp (km)"}),use_container_width=True,hide_index=True)
 
 # Footer
 st.divider()
